@@ -5,7 +5,7 @@
  *
  * The MIT License
  * 
- * @copyright Copyright (c) 2016 MIT and Intel Corp.
+ * @copyright Copyright (c) 2016 MIT and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -1021,7 +1021,7 @@ int ArraySchema::init(const MetadataSchemaC* metadata_schema_c) {
   // Set compression
   int* compression = 
       (int*) malloc((metadata_schema_c->attribute_num_+2)*sizeof(int));
-  if(metadata_schema_c->cell_val_num_ == NULL) {
+  if(metadata_schema_c->compression_ == NULL) {
     for(int i=0; i<metadata_schema_c->attribute_num_+1; ++i)
       compression[i] = TILEDB_NO_COMPRESSION;
   } else {
@@ -1370,6 +1370,7 @@ int ArraySchema::cell_order_cmp(const T* coords_a, const T* coords_b) const {
     // Check hilbert ids
     int64_t id_a = hilbert_id(coords_a);
     int64_t id_b = hilbert_id(coords_b);
+
     if(id_a < id_b)
       return -1;
     else if(id_a > id_b)

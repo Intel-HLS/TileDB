@@ -5,7 +5,7 @@
  *
  * The MIT License
  * 
- * Copyright (c) 2016 MIT and Intel Corp.
+ * @copyright Copyright (c) 2016 MIT and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -108,8 +108,10 @@ int StorageManager::init(const char* config_filename) {
   // Create the TileDB home directory if it does not exists, as well
   // as the master catalog.
   if(!is_dir(tiledb_home_)) { 
+
     if(create_dir(tiledb_home_) != TILEDB_UT_OK)
       return TILEDB_SM_ERR;
+
     if(master_catalog_create() != TILEDB_SM_OK)
       return TILEDB_SM_ERR;
   }
@@ -752,9 +754,8 @@ int StorageManager::ls(
   DIR* dir = opendir(parent_dir_real.c_str());
   
   if(dir == NULL) {
-    PRINT_ERROR(std::string("Cannot open parent directory '") + 
-                parent_dir_real + "'; " + strerror(errno));
-    return TILEDB_SM_ERR;
+    dir_num = 0;
+    return TILEDB_SM_OK;
   }
 
   while((next_file = readdir(dir))) {
@@ -1206,8 +1207,7 @@ int StorageManager::master_catalog_consolidate() const {
 int StorageManager::master_catalog_create() const {
   // Create a metadata schema
   MetadataSchemaC metadata_schema_c = {};
-  metadata_schema_c.metadata_name_ = 
-      (char*) (tiledb_home_ + "/" + TILEDB_SM_MASTER_CATALOG).c_str();
+  metadata_schema_c.metadata_name_ = (char*) master_catalog_dir_.c_str(); 
 
  // Initialize array schema
   ArraySchema* array_schema = new ArraySchema();

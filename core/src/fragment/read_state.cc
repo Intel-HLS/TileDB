@@ -5,7 +5,7 @@
  *
  * The MIT License
  *
- * @copyright Copyright (c) 2016 MIT and Intel Corp.
+ * @copyright Copyright (c) 2016 MIT and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -421,10 +421,12 @@ int ReadState::copy_cells_var(
   if(tiles_offsets_[attribute_id] != end_offset + 1) 
     overflow_[attribute_id] = true;
 
-  //Entering this if condition implies that the var data in this cell is so large
-  //that the allocated buffer cannot hold it
-  if(buffer_offset == 0u && bytes_to_copy == 0u)
-    return TILEDB_RS_ERR;
+  // Entering this if condition implies that the var data in this cell is so large
+  // that the allocated buffer cannot hold it
+  if(buffer_offset == 0u && bytes_to_copy == 0u) {
+    overflow_[attribute_id] = true; 
+    return TILEDB_RS_OK;
+  }
 
   // Success
   return TILEDB_RS_OK;
@@ -840,8 +842,9 @@ void ReadState::get_next_overlapping_tile_dense(const T* tile_coords) {
     // Find the search tile position
     T* tile_coords_norm = new T[dim_num];
     for(int i=0; i<dim_num; ++i)
-      tile_coords_norm[i] = (domain[2*i] - array_domain[2*i]) / tile_extents[i];
-    search_tile_pos_ = array_schema->get_tile_pos(domain, tile_coords);
+      tile_coords_norm[i] = 
+          tile_coords[i] - (domain[2*i]-array_domain[2*i]) / tile_extents[i]; 
+    search_tile_pos_ = array_schema->get_tile_pos(domain, tile_coords_norm);
     delete [] tile_coords_norm;
 
     // Compute overlap of the query subarray with tile
@@ -1430,7 +1433,6 @@ int ReadState::get_tile_from_disk_cmp_gzip(int attribute_id, int64_t tile_i) {
   size_t full_tile_size = fragment_->tile_size(attribute_id_real);
   int64_t cell_num = book_keeping_->cell_num(tile_i);  
   size_t tile_size = cell_num * cell_size; 
-
   const std::vector<std::vector<off_t> >& tile_offsets = 
       book_keeping_->tile_offsets(); 
   int64_t tile_num = book_keeping_->tile_num();

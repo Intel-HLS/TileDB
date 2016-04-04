@@ -5,7 +5,7 @@
  *
  * The MIT License
  *
- * @copyright Copyright (c) 2016 MIT and Intel Corp.
+ * @copyright Copyright (c) 2016 MIT and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -888,9 +888,10 @@ void ArrayReadState::get_next_overlapping_tiles_sparse() {
     // Check if done
     done_ = true;
     for(int i=0; i<fragment_num_; ++i) { 
-      if(fragment_bounding_coords_[i] != NULL) 
+      if(fragment_bounding_coords_[i] != NULL) { 
         done_ = false;
         break;
+      }
     }
   }
 }
