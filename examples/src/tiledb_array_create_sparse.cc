@@ -39,7 +39,7 @@ int main() {
 
   // Prepare parameters for array schema
   const char* array_name = "my_workspace/sparse_arrays/my_array_B";
-  const char* attributes[] = { "a1", "a2", "a3" };  // Three attributes
+  const char* attributes[] = { "a1", "a2", "a3" , "a4"};  // Three attributes
   const char* dimensions[] = { "d1", "d2" };        // Two dimensions
   int64_t domain[] = 
   { 
@@ -50,13 +50,15 @@ int main() {
   { 
       1,                          // a1
       TILEDB_VAR_NUM,             // a2 
-      2                           // a3
+      2,                          // a3
+      2                           // a4
   };
   const int compression[] = 
   { 
         TILEDB_GZIP,              // a1 
         TILEDB_GZIP,              // a2
         TILEDB_NO_COMPRESSION,    // a3
+        TILEDB_NO_COMPRESSION,    // a4
         TILEDB_NO_COMPRESSION     // coordinates
   };
   const int types[] = 
@@ -64,6 +66,7 @@ int main() {
       TILEDB_INT32,               // a1 
       TILEDB_CHAR,                // a2
       TILEDB_FLOAT32,             // a3
+      TILEDB_FLOAT64,             // a4
       TILEDB_INT64                // coordinates
   };
 
@@ -73,7 +76,7 @@ int main() {
       &array_schema,              // Array schema struct 
       array_name,                 // Array name 
       attributes,                 // Attributes 
-      3,                          // Number of attributes 
+      4,                          // Number of attributes 
       2,                          // Capacity 
       TILEDB_HILBERT,             // Cell order 
       cell_val_num,               // Number of cell values per attribute  
