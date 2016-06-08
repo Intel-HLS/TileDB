@@ -23,7 +23,7 @@ ifeq ($(USE_MMAP),1)
 endif 
 
 # --- Parallel sort --- #
-GNU_PARALLEL =
+GNU_PARALLEL?=1
 ifeq ($(GNU_PARALLEL),)
   GNU_PARALLEL = 1
 endif
