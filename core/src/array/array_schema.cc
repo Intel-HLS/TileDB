@@ -212,7 +212,11 @@ void ArraySchema::array_schema_export(
 }
 
 const std::string& ArraySchema::attribute(int attribute_id) const {
-  assert(attribute_id >= 0 && attribute_id <= attribute_num_);
+  assert(attribute_id >= 0 && attribute_id <= attribute_num_+1);
+
+  // Special case for the search attribute (same as coordinates)
+  if(attribute_id == attribute_num_+1)
+    attribute_id = attribute_num_;
 
   return attributes_[attribute_id];
 }
@@ -255,11 +259,20 @@ int ArraySchema::cell_order() const {
 }
 
 size_t ArraySchema::cell_size(int attribute_id) const {
+  // Special case for the search tile
+  if(attribute_id == attribute_num_+1)
+    attribute_id = attribute_num_;
+
   return cell_sizes_[attribute_id];
 }
 
 int ArraySchema::compression(int attribute_id) const {
-  assert(attribute_id >= 0 && attribute_id <= attribute_num_);
+  assert(attribute_id >= 0 && attribute_id <= attribute_num_+1);
+
+  // Special case for the "search tile", which is essentially the 
+  // coordinates tile
+  if(attribute_id == attribute_num_+1)
+    attribute_id = attribute_num_;
 
   return compression_[attribute_id];
 }
@@ -668,8 +681,9 @@ int64_t ArraySchema::tile_num() const {
     return tile_num<int>();
   else if(types_[attribute_num_] == TILEDB_INT64)
     return tile_num<int64_t>();
-  else
-    assert(0);
+
+  assert(0);
+  return TILEDB_AS_ERR;
 }
 
 template<class T>
@@ -691,8 +705,10 @@ int64_t ArraySchema::tile_num(const void* domain) const {
     return tile_num<int>(static_cast<const int*>(domain));
   else if(types_[attribute_num_] == TILEDB_INT64)
     return tile_num<int64_t>(static_cast<const int64_t*>(domain));
-  else
-    assert(0);
+
+
+  assert(0);
+  return TILEDB_AS_ERR;
 }
 
 template<class T>
@@ -1699,7 +1715,7 @@ size_t ArraySchema::compute_cell_size(int i) const {
     return TILEDB_VAR_SIZE;
 
   // Fixed-sized cell
-  size_t size;
+  size_t size = 0;
   
   // Attributes
   if(i < attribute_num_) {
