@@ -13,11 +13,6 @@ endif
 CPPFLAGS = -std=gnu++11 -fPIC -fvisibility=hidden \
       -D_FILE_OFFSET_BITS=64 
 
-# For the Travis integration
-ifdef TRAVIS
-  CPPFLAGS += --coverage
-endif
-
 # --- Support for OpenMP --- #
 OPENMP_FLAG =
 ifeq ($(COMPILER), gcc)
@@ -53,6 +48,13 @@ endif
 
 # --- Compilers --- #
 CXX = g++   
+
+# For the Travis integration
+ifdef TRAVIS
+  CPPFLAGS += --coverage
+  COMPILER := mpicc
+  CXX := mpic++
+endif
 
 # --- Directories --- #
 CORE_INCLUDE_DIR = core/include
