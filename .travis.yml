@@ -8,7 +8,7 @@ matrix:
         - os: osx
 
 install:
-    - ./install.sh
+    - sudo ./install.sh
 
 before_script:
     - export PATH=$PATH:/usr/local/bin
