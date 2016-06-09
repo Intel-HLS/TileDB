@@ -19,7 +19,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
 
     #install packages
     brew update
-    brew install openssl lcov doxygen mpich
+    brew install openssl lcov doxygen open-mpi
 
     #install gtest
     wget https://github.com/google/googletest/archive/release-1.7.0.tar.gz
