@@ -30,6 +30,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     mv include/gtest /usr/include/gtest
     mv libgtest_main.a libgtest.a /usr/lib/
     cd $TRAVIS_BUILD_DIR
+    export CXX=g++-4.9
 
 fi
 
