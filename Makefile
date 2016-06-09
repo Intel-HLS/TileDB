@@ -52,8 +52,8 @@ CXX = g++
 # For the Travis integration
 ifdef TRAVIS
   CPPFLAGS += --coverage
+  COMPILER := mpicc
   ifeq ($(TRAVIS_OS_NAME),linux)
-    COMPILER := mpicc
     CXX := mpic++
   endif
 endif
