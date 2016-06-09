@@ -1530,12 +1530,12 @@ int ArrayReadState::sort_fragment_cell_ranges(
       // Keep on discarding ranges from the queue
       while(!pq.empty() &&
             top_fragment_i < popped_fragment_i &&
-            array_schema->cell_order_cmp(top_range, popped_range) >= 0 &&
-            array_schema->cell_order_cmp(
+            array_schema->tile_cell_order_cmp(top_range, popped_range) >= 0 &&
+            array_schema->tile_cell_order_cmp(
                 top_range, 
                 &popped_range[dim_num]) <= 0) {
         // Cut the top range and re-insert, only if there is partial overlap
-        if(array_schema->cell_order_cmp(
+        if(array_schema->tile_cell_order_cmp(
                &top_range[dim_num], 
                &popped_range[dim_num]) > 0) {
           // Create the new trimmed top range
@@ -1580,7 +1580,7 @@ int ArrayReadState::sort_fragment_cell_ranges(
       // Potentially trim the popped range
       if(!pq.empty() && 
          top_fragment_i > popped_fragment_i && 
-         array_schema->cell_order_cmp(
+         array_schema->tile_cell_order_cmp(
              top_range, 
              &popped_range[dim_num]) <= 0) {         
         // Create a new popped range
@@ -1715,7 +1715,7 @@ bool ArrayReadState::SmallerFragmentCellRange<T>::operator () (
   assert(array_schema_ != NULL);
 
   // Get cell ordering information for the first range endpoints
-  int cmp = array_schema_->cell_order_cmp<T>(
+  int cmp = array_schema_->tile_cell_order_cmp<T>(
       static_cast<const T*>(a.second), 
       static_cast<const T*>(b.second)); 
 
