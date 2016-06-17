@@ -3,14 +3,22 @@
 # **************** # 
 
 OS := $(shell uname)
+INCLUDE_PATHS =
 
 # --- Configuration flags --- #
 CPPFLAGS = -std=gnu++11 -fPIC -fvisibility=hidden \
       -D_FILE_OFFSET_BITS=64 
+LINKFLAGS:=
 
 # For the Travis integration
 ifdef TRAVIS
   CPPFLAGS += --coverage
+endif
+
+ifeq ($(OS), Darwin)
+  OPENSSL_PREFIX_DIR?=/usr/local/opt/openssl
+  CPPFLAGS+=-mmacosx-version-min=10.9
+  INCLUDE_PATHS+=-I$(OPENSSL_PREFIX_DIR)/include
 endif
 
 # --- Use of mmap function for reading --- #
@@ -29,6 +37,7 @@ ifeq ($(GNU_PARALLEL),)
 endif
 ifeq ($(GNU_PARALLEL),1)
   CPPFLAGS += -DGNU_PARALLEL
+  LINKFLAGS=-fopenmp
 endif
 
 # --- Debug/Release mode handler --- #
@@ -107,7 +116,6 @@ DOXYGEN_DIR = doxygen
 DOXYGEN_MAINPAGE = $(DOXYGEN_DIR)/mainpage.dox
 
 # --- Paths --- #
-INCLUDE_PATHS =
 CORE_INCLUDE_PATHS = $(addprefix -I, $(CORE_INCLUDE_SUBDIRS))
 EXAMPLES_INCLUDE_PATHS = -I$(EXAMPLES_INCLUDE_DIR)
 TEST_INCLUDE_PATHS = $(addprefix -I, $(CORE_INCLUDE_SUBDIRS))
@@ -179,7 +187,7 @@ $(CORE_OBJ_DIR)/%.o: $(CORE_SRC_DIR)/%.cc
 	@mkdir -p $(dir $@) 
 	@echo "Compiling $<"
 	@$(CXX) $(CPPFLAGS) $(INCLUDE_PATHS) $(CORE_INCLUDE_PATHS) -c $< -o $@ 
-	@$(CXX) -MM $(CORE_INCLUDE_PATHS) $< > $(@:.o=.d)
+	@$(CXX) -MM $(CORE_INCLUDE_PATHS) $(INCLUDE_PATHS) $< > $(@:.o=.d)
 	@mv -f $(@:.o=.d) $(@:.o=.d.tmp)
 	@sed 's|.*:|$@:|' < $(@:.o=.d.tmp) > $(@:.o=.d)
 	@rm -f $(@:.o=.d.tmp)
@@ -214,8 +222,8 @@ endif
 $(CORE_LIB_DIR)/libtiledb.$(SHLIB_EXT): $(CORE_OBJ)
 	@mkdir -p $(CORE_LIB_DIR)
 	@echo "Creating dynamic library libtiledb.$(SHLIB_EXT)"
-	@$(CXX) $(SHLIB_FLAGS) $(SONAME) -o $@ $^ $(LIBRARY_PATHS) $(ZLIB) \
-		$(OPENSSLLIB) -fopenmp 
+	@$(CXX) $(LINKFLAGS) $(SHLIB_FLAGS) $(SONAME) -o $@ $^ $(LIBRARY_PATHS) $(ZLIB) \
+		$(OPENSSLLIB)
 
 $(CORE_LIB_DIR)/libtiledb.a: $(CORE_OBJ)
 	@mkdir -p $(CORE_LIB_DIR)
@@ -242,7 +250,7 @@ $(EXAMPLES_OBJ_DIR)/%.o: $(EXAMPLES_SRC_DIR)/%.cc
 	@$(CXX) $(CPPFLAGS) $(INCLUDE_PATHS) $(EXAMPLES_INCLUDE_PATHS) \
 		$(CORE_INCLUDE_PATHS) -c $< -o $@
 	@$(CXX) -MM $(EXAMPLES_INCLUDE_PATHS) \
-                    $(CORE_INCLUDE_PATHS) $< > $(@:.o=.d)
+                    $(CORE_INCLUDE_PATHS) $(INCLUDE_PATHS) $< > $(@:.o=.d)
 	@mv -f $(@:.o=.d) $(@:.o=.d.tmp)
 	@sed 's|.*:|$@:|' < $(@:.o=.d.tmp) > $(@:.o=.d)
 	@rm -f $(@:.o=.d.tmp)
@@ -252,8 +260,7 @@ $(EXAMPLES_OBJ_DIR)/%.o: $(EXAMPLES_SRC_DIR)/%.cc
 $(EXAMPLES_BIN_DIR)/%: $(EXAMPLES_OBJ_DIR)/%.o $(CORE_LIB_DIR)/libtiledb.a
 	@mkdir -p $(EXAMPLES_BIN_DIR)
 	@echo "Creating $@"
-	@$(CXX) -std=gnu++11 -o $@ $^ $(LIBRARY_PATHS) $(ZLIB) $(OPENSSLLIB) \
-		-fopenmp 
+	@$(CXX) $(LINKFLAGS) -std=gnu++11 -o $@ $^ $(LIBRARY_PATHS) $(ZLIB) $(OPENSSLLIB)
 
 # --- Cleaning --- #
 
@@ -275,7 +282,7 @@ $(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.cc
 	@echo "Compiling $<"
 	@$(CXX) $(CPPFLAGS) $(TEST_INCLUDE_PATHS) -c $< -o $@
 	@$(CXX) -MM $(TEST_INCLUDE_PATHS) \
-                    $(CORE_INCLUDE_PATHS) $< > $(@:.o=.d)
+                    $(CORE_INCLUDE_PATHS) $(INCLUDE_PATHS) $< > $(@:.o=.d)
 	@mv -f $(@:.o=.d) $(@:.o=.d.tmp)
 	@sed 's|.*:|$@:|' < $(@:.o=.d.tmp) > $(@:.o=.d)
 	@rm -f $(@:.o=.d.tmp)
@@ -285,8 +292,8 @@ $(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.cc
 $(TEST_BIN_DIR)/tiledb_test: $(TEST_OBJ) $(CORE_LIB_DIR)/libtiledb.a
 	@mkdir -p $(TEST_BIN_DIR)
 	@echo "Creating test_cmd"
-	@$(CXX) -std=gnu++11 -o $@ $^ $(LIBRARY_PATHS) $(ZLIB) $(OPENSSLLIB) \
-		$(GTESTLIB) -fopenmp 
+	@$(CXX) $(LINKFLAGS) -std=gnu++11 -o $@ $^ $(LIBRARY_PATHS) $(ZLIB) $(OPENSSLLIB) \
+		$(GTESTLIB)
 
 # --- Cleaning --- #
 
