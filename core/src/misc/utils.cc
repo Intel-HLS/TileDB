@@ -66,7 +66,7 @@
 #  define PRINT_WARNING(x) do { } while(0) 
 #endif
 
-
+int g_TileDB_enable_SYNC_write = 0x7FFFFFFF; //all 1s - synced write enabled
 
 
 /* ****************************** */
@@ -219,7 +219,7 @@ int create_dir(const std::string& dir) {
 int create_fragment_file(const std::string& dir) {
   // Create the special fragment file
   std::string filename = std::string(dir) + "/" + TILEDB_FRAGMENT_FILENAME;
-  int fd = ::open(filename.c_str(), O_WRONLY | O_CREAT | O_SYNC, S_IRWXU);
+  int fd = ::open(filename.c_str(), O_WRONLY | O_CREAT | (O_SYNC & g_TileDB_enable_SYNC_write), S_IRWXU);
   if(fd == -1 || ::close(fd)) {
     PRINT_ERROR(std::string("Failed to create fragment file; ") +
                 strerror(errno));
@@ -780,7 +780,7 @@ int write_to_file(
   // Open file
   int fd = open(
       filename, 
-      O_WRONLY | O_APPEND | O_CREAT | O_SYNC, 
+      O_WRONLY | O_APPEND | O_CREAT | (O_SYNC & g_TileDB_enable_SYNC_write),
       S_IRWXU);
   if(fd == -1) {
     PRINT_ERROR(std::string("Cannot write to file '") + filename + 

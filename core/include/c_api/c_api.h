@@ -1023,6 +1023,8 @@ TILEDB_EXPORT int tiledb_ls(
     int* dir_types,
     int* dir_num);
 
+extern int g_TileDB_enable_SYNC_write;
+
 #undef TILEDB_EXPORT
 #ifdef __cplusplus
 }
