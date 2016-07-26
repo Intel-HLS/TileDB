@@ -56,13 +56,15 @@ set(CMAKE_CXX_FLAGS_DEBUG "-DDEBUG -g3 -gdwarf-3 -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fvisibility=hidden")
 set(CMAKE_CXX_FLAGS_COVERAGE "-DDEBUG -g3 -gdwarf-3 --coverage")
 
-#OpenSSL 
-set(OPENSSL_ROOT_DIR "${OPENSSL_PREFIX_DIR}")
+#OpenSSL
+if(OPENSSL_PREFIX_DIR AND NOT OPENSSL_ROOT_DIR)
+    set(OPENSSL_ROOT_DIR "${OPENSSL_PREFIX_DIR}")
+endif()
 if(BUILD_DISTRIBUTABLE_LIBRARY)
     set(OPENSSL_USE_STATIC_LIBS True)
 endif()
 find_package(OpenSSL REQUIRED)
-include_directories(OPENSSL_INCLUDE_DIR)
+include_directories("${OPENSSL_INCLUDE_DIR}")
 
 #Zlib
 find_package(ZLIB REQUIRED)
