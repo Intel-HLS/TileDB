@@ -12,5 +12,5 @@ add_library(TileDB_test_object_files OBJECT ${TileDB_test_sources})
 set_property(TARGET TileDB_test_object_files PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_executable(tiledb_test $<TARGET_OBJECTS:TileDB_core_library_object_files>)
-target_link_libraries(tiledb_test tiledb_static ${GTEST_BOTH_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})
+target_link_libraries(tiledb_test tiledb_static ${GTEST_MAIN_LIBRARIES} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})
 add_test(tiledb_test tiledb_test)
