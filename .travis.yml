@@ -2,9 +2,12 @@
 sudo: required
 dist: trusty
 
+env:
+    - TILEDB_BUILD_DIR=$TRAVIS_BUILD_DIR/build TILEDB_INSTALL_DIR=$TILEDB_BUILD_DIR/install
+
 install:
     #Install lcov and MPICH
-    - sudo apt-get -y install lcov mpich zlib1g-dev libssl-dev libgtest-dev
+    - sudo apt-get -y install lcov mpich zlib1g-dev libssl-dev libgtest-dev cmake
     - cd /usr/src/gtest
     - sudo cmake .
     - sudo make
@@ -12,14 +15,16 @@ install:
     - cd $TRAVIS_BUILD_DIR
     # install lcov to coveralls conversion + upload tool
     - gem install coveralls-lcov
+    - mkdir -p $TILEDB_BUILD_DIR
+    - mkdir -p $TILEDB_INSTALL_DIR
+    - cd $TILEDB_BUILD_DIR && cmake $TRAVIS_BUILD_DIR -DCMAKE_BUILD_TYPE=Coverage -DCMAKE_INSTALL_PREFIX=$TILEDB_INSTALL_DIR -DBUILD_UNIT_TESTS=True
 
 before_script:
-    - lcov --directory . --zerocounters
+    - lcov --directory $TILEDB_BUILD_DIR --zerocounters
 
 script:
-    - make CXX=mpic++ INCLUDE_PATHS=-I/usr/include/mpich MPILIB=-lmpich -j 4
-    - make test CXX=mpic++ INCLUDE_PATHS=-I/usr/include/mpich MPILIB=-lmpich 
-    - lcov --directory . --capture --output-file coverage.info
-    - lcov --list coverage.info # debug before upload
+    - cd $TILEDB_BUILD_DIR && make -j 4 && make install && make test
 
 after_success:
+    - cd $TILEDB_BUILD_DIR && lcov --directory . --capture --output-file coverage.info
+    - cd $TILEDB_BUILD_DIR && lcov --list coverage.info # debug before upload
