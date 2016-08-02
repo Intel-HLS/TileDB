@@ -1,0 +1,5 @@
+This folder contains the scripts for Vertica(R) used to benchmark
+load, read, update, random read, parallel load, parallel read
+parallel update, and consolidation operations.
+
+The results are discussed in detail in www.tiledb.org.
