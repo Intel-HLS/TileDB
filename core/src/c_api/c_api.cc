@@ -38,6 +38,10 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <stdexcept>
+#include <typeinfo>
+#include <unistd.h>
+#include <sys/ioctl.h>
 
 /* ****************************** */
 /*             MACROS             */
@@ -1573,4 +1577,522 @@ int tiledb_array_aio_write(
 
   // Success
   return TILEDB_OK;
+}
+
+
+/* ****************************** */
+/*     METHODS FOR PRETTY PRINT   */
+/* ****************************** */
+int tiledb_array_pretty_print(
+  TileDB_CTX* tiledb_ctx,
+  const char* array_name) {
+
+	/* Intialize context with the default configuration parameters. */
+	TileDB_Config config;
+	config.read_method_ = TILEDB_IO_MMAP;
+  tiledb_ctx_init(&tiledb_ctx, &config);
+
+	// Load array schema when the array is not initialized
+  TileDB_ArraySchema array_schema;
+  tiledb_array_load_schema(
+      tiledb_ctx,
+      array_name,
+      &array_schema);
+  
+	bool dense = array_schema.dense_;
+
+	print_header(array_name, array_schema);
+
+  /* Initialize the array in READ mode. */
+  TileDB_Array* tiledb_array;
+  tiledb_array_init(
+      tiledb_ctx,
+      &tiledb_array,
+      array_name,
+      TILEDB_ARRAY_READ,
+      NULL,
+      NULL,
+      0);
+
+	if (dense) 
+		pretty_print_dense_array(tiledb_array, array_schema);
+	else
+		pretty_print_sparse_array(tiledb_array, array_schema);
+	
+  // Free array schema
+  tiledb_array_free_schema(&array_schema);
+
+  /* Finalize context. */
+  tiledb_ctx_finalize(tiledb_ctx);
+
+  return 0;	
+}
+
+void print_header(
+	const char *array_name,
+	TileDB_ArraySchema &schema) {
+
+	std::cout << "\nTileDB(R) Pretty Print - version " << TILEDB_VERSION << "\n";
+	std::cout << "\n  Array - " << array_name;
+	if (schema.dense_ == 1) {
+		std::cout << "\n  Type - Dense";
+	} else {
+		std::cout << "\n  Type - Sparse";
+	}
+
+	if (schema.tile_order_ == TILEDB_ROW_MAJOR) {
+		std::cout << "\n  Tile Order - TILEDB_ROW_MAJOR";
+	} else if (schema.tile_order_ == TILEDB_COL_MAJOR) {
+		std::cout << "\n  Tile Order - TILEDB_COL_MAJOR";
+	} else {
+		std::cout << "\n  Tile Order - UNKNOWN (error)";
+	}
+
+	if (schema.cell_order_ == TILEDB_ROW_MAJOR) {
+		std::cout << "\n  Cell Order - TILEDB_ROW_MAJOR";
+	} else if (schema.cell_order_ == TILEDB_COL_MAJOR) {
+		std::cout << "\n  Cell Order - TILEDB_COL_MAJOR";
+		std::cout << "\n ERROR: Print not supported for TILEDB_COL_MAJOR cell order\n";
+		exit(EXIT_FAILURE);
+	} else if (schema.cell_order_ == TILEDB_HILBERT) {
+		std::cout << "\n  Cell Order - TILEDB_HILBERT";
+		std::cout << "\n ERROR: Print not supported for TILEDB_HILBERT cell order\n";
+		exit(EXIT_FAILURE);
+	} else {
+		std::cout << "\n  Cell Order - UNKNOWN (error)";
+	}
+	
+	int nattribute = schema.attribute_num_;
+	if (&typeid(schema.types_[nattribute+1]) == &typeid(int)) {
+		std::cout << "\n  Domain Type - INT32";
+	} else if (&typeid(schema.types_[nattribute+1]) == &typeid(long)) {
+		std::cout << "\n  Domain Type - INT64";
+	} else if (&typeid(schema.types_[nattribute+1]) == &typeid(float)) {
+		std::cout << "\n  Domain Type - FLOAT32";
+		std::cout << "\n ERROR: Pretty print not supported\n";
+		exit(EXIT_FAILURE);
+	} else if (&typeid(schema.types_[nattribute+1]) == &typeid(double)) {
+		std::cout << "\n  Domain Type - FLOAT64";
+		std::cout << "\n ERROR: Pretty print not supported\n";
+		exit(EXIT_FAILURE);
+	} else if (&typeid(schema.types_[nattribute+1]) == &typeid(char)) {
+		std::cout << "\n  Domain Type - CHAR";
+		std::cout << "\n ERROR: Pretty print not supported\n";
+		exit(EXIT_FAILURE);
+	}
+
+	uint64_t *domain = (uint64_t*) schema.domain_;
+	std::cout << "\n  Domain Ranges - ";
+	for (int d = 0; d < schema.dim_num_; ++d) {
+		std::cout << "(" << domain[2*d] << "," << domain[2*d+1] << ")";
+		if (d != schema.dim_num_ - 1) {
+			std::cout << ", ";
+		}
+	}
+
+	uint64_t *tile_extents = (uint64_t*) schema.tile_extents_;
+	std::cout << "\n  Tile Extents - (";
+	for (int d = 0; d < schema.dim_num_; ++d) {
+		std::cout << tile_extents[d];
+		if (d != schema.dim_num_ - 1) {
+			std::cout << ", ";
+		}	
+	}
+	std::cout << ")";
+
+	if (schema.dense_ == 0) {
+		std::cout << "\n  Capacity - " << schema.capacity_;
+	}
+
+	char *attr_compression_type = new char [100];
+	char *attr_type = new char [100];
+
+	std::cout << "\n  Attributes - ";
+	for (int a = 0; a < nattribute; ++a) {
+		switch (schema.compression_[a]) {
+			case TILEDB_NO_COMPRESSION:
+				sprintf(attr_compression_type, "TILEDB_NO_COMPRESSION");
+				break;
+			case TILEDB_GZIP:
+				sprintf(attr_compression_type, "TILEDB_GZIP");
+				break;
+		}
+		if (&typeid(schema.types_[a]) == &typeid(int)) {
+			sprintf(attr_type, "INT32");
+		} else if (&typeid(schema.types_[a]) == &typeid(long)) {
+			sprintf(attr_type, "INT64");
+		} else if (&typeid(schema.types_[a]) == &typeid(float)) {
+			sprintf(attr_type, "FLOAT32");
+		} else if (&typeid(schema.types_[a]) == &typeid(double)) {
+			sprintf(attr_type, "FLOAT64");
+		} else if (&typeid(schema.types_[a]) == &typeid(char)) {
+			sprintf(attr_type, "CHAR");
+		}	
+		std::cout << "(\"" << schema.attributes_[a]
+			<< "\", " << attr_compression_type
+			<< ", " << attr_type
+			<< ")";
+		if (a != nattribute - 1) {
+			std::cout << ", ";
+		}
+	}
+
+	std::cout << "\n\n";
+}
+
+int get_window_columns() {
+	struct winsize w;
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+	int ncols = w.ws_col;
+	return ncols;
+}
+
+int pretty_print_dense_array(
+	TileDB_Array *tiledb_array,
+	TileDB_ArraySchema &array_schema) {
+
+	int nattribute = array_schema.attribute_num_;
+	int ndimensions = array_schema.dim_num_;
+	int64_t *domain = (int64_t*) array_schema.domain_;
+  uint64_t *dim_sizes = new uint64_t [ndimensions];
+	uint64_t *tile_extents = (uint64_t *) array_schema.tile_extents_;
+	uint64_t buffer_size = 1;
+	int nchunks = 1;
+	for (int d = 0; d < ndimensions; ++d) {
+		dim_sizes[d] = domain[2*d+1] - domain[2*d] + 1;
+		buffer_size *= tile_extents[d];
+		nchunks *= dim_sizes[d]/tile_extents[d];
+	}
+
+	int *types = array_schema.types_;
+	// Plus 1 for dimension type
+	int *sizeof_attributes = new int [nattribute + 1];
+	size_t *buffer_sizes = new size_t [nattribute+1];
+	void **buffers = new void * [nattribute];
+
+	for (int i = 0; i < nattribute; ++i) {
+		switch (types[i]) {
+			case TILEDB_INT32:
+				sizeof_attributes[i] = sizeof(int);
+				buffers[i] = new int [buffer_size];
+				break;
+			case TILEDB_INT64:
+				sizeof_attributes[i] = sizeof(long);
+				buffers[i] = new int64_t [buffer_size];
+				break;
+			case TILEDB_FLOAT32:
+				sizeof_attributes[i] = sizeof(float);
+				buffers[i] = new float [buffer_size];
+				break;
+			case TILEDB_FLOAT64:
+				sizeof_attributes[i] = sizeof(double);
+				buffers[i] = new double [buffer_size];
+				break;
+			case TILEDB_CHAR:
+				sizeof_attributes[i] = sizeof(char);
+				buffers[i] = new char [buffer_size];
+				break;
+		}
+
+		buffer_sizes[i] = sizeof_attributes[i]*buffer_size;
+	}
+
+	std::string print_string("");
+	std::cout << "  Data - \n";
+	if (&typeid(types[nattribute+1]) == &typeid(int) ||
+			&typeid(types[nattribute+1]) == &typeid(int64_t)) {
+
+		int *subarray = new int [2*ndimensions];
+		for (int i = 0; i < 2*ndimensions; ++i) subarray[i] = 0;
+		int chunks_printed = 0;
+
+		// Read chunk by chunk
+		do {
+			for (int d = 0; d < ndimensions; ++d) {
+				bool no_mod = false;
+				for (int x = d+1; x < ndimensions; ++x) {
+					if (subarray[2*x+1] < domain[2*x+1] - 1) {
+						no_mod = true;
+					}
+				}
+				if (chunks_printed==0) {
+					subarray[2*d] = 0;
+					subarray[2*d+1] = subarray[2*d] + tile_extents[d] - 1;
+				} else {
+					if (d==ndimensions-1) {
+						subarray[2*d] = (subarray[2*d] + tile_extents[d])%domain[2*d+1];
+						subarray[2*d+1] = subarray[2*d] + tile_extents[d] - 1;
+					} else {
+						subarray[2*d] =
+							(no_mod)
+							? subarray[2*d]
+							: subarray[2*d] + tile_extents[d];
+						subarray[2*d+1] = subarray[2*d] + tile_extents[d] - 1;
+						if (!no_mod) {
+							for (int y = d+1; y < ndimensions; ++y) {
+								subarray[2*y] = 0;
+								subarray[2*y+1] = subarray[2*y] + tile_extents[y] - 1;
+							}
+							break;
+						}
+					}
+				}
+			}
+
+			std::cout << "subarray: ";
+			for (int d = 0; d < ndimensions; ++d) {
+				std::cout << subarray[2*d] << "," << subarray[2*d+1] << "::";
+			}
+			std::cout << "\n";
+			/* Read from array. */
+			if (tiledb_array_read(tiledb_array, buffers, buffer_sizes) != TILEDB_OK) {
+				throw std::runtime_error("ERROR: TileDB read failed\n");
+			}
+
+			char temp[100];
+
+			int64_t *dim_index = new int64_t [ndimensions];
+			for (int d = 0; d < ndimensions; ++d) {
+				dim_index[d] = subarray[2*d];
+			}
+			//int return_size = buffer_sizes[0]/sizeof_attributes[0];
+			for (size_t i = 0; i < buffer_size; ++i) {
+				print_string.clear();
+
+				if (i!=0) {
+					// Print the coordinates first
+					if (array_schema.tile_order_ == TILEDB_ROW_MAJOR) {
+						for (int d = ndimensions-1; d >= 0; --d) {
+							if (d == ndimensions-1) {
+								dim_index[d] = (dim_index[d] + 1) % tile_extents[d]
+									+ subarray[2*d];
+							} else {
+								if (i!=0) {
+									if (dim_index[d+1] == subarray[2*(d+1)])
+										dim_index[d] = (dim_index[d] + 1) % tile_extents[d]
+											+ subarray[2*d];
+								}	
+							}
+						}
+					} else if (array_schema.tile_order_ == TILEDB_COL_MAJOR) {
+						for (int d = ndimensions-1; d >= 0; --d) {
+							if (d == ndimensions-1) {
+								dim_index[d] = (dim_index[d] + 1) % tile_extents[d]
+									+ subarray[2*d];
+							} else {
+								if (i!=0) {
+									if (dim_index[d+1] == subarray[2*(d+1)])
+										dim_index[d] = (dim_index[d] + 1) % tile_extents[d]
+											+ subarray[2*d];
+								}	
+							}
+						}	
+					}
+				}
+				print_string.append("    (");
+				for (int d = 0; d < ndimensions; ++d) {
+					sprintf(temp, "%ld", dim_index[d]);
+					print_string.append(temp);
+					if (d < ndimensions-1) {
+						print_string.append(", ");
+					}
+				}
+				print_string.append("): (");
+				for (int a = 0; a < nattribute; ++a) {
+					const std::type_info& info = typeid(array_schema.types_[a]);
+					const std::type_info& int_info = typeid(int);
+					const std::type_info& int64_info = typeid(int64_t);
+					const std::type_info& char_info = typeid(char);
+					const std::type_info& float_info = typeid(float);
+					const std::type_info& double_info = typeid(double);
+					size_t hash = info.hash_code();
+					if (hash == int_info.hash_code()) {
+						int *bx = (int*) buffers[a];
+						sprintf(temp,"%d",bx[i]);
+					} else if (hash == int64_info.hash_code()) {
+						int64_t *bx = (int64_t*) buffers[a];
+						sprintf(temp,"%ld",bx[i]);
+					} else if (hash == float_info.hash_code()) {
+						float *bx = (float*) buffers[a];
+						sprintf(temp,"%.3f",bx[i]);
+					} else if (hash == double_info.hash_code()) {
+						double *bx = (double*) buffers[a];
+						sprintf(temp,"%.3f",bx[i]);
+					} else if (hash == char_info.hash_code()) {
+						char *bx = (char *) buffers[a];
+						sprintf(temp,"%c", bx[i]);
+					}
+					print_string.append(temp);
+					if (a < nattribute-1) print_string.append(", ");
+				}
+				if (i==buffer_size-1 && chunks_printed == nchunks-1)
+					print_string.append(")");
+				else
+					print_string.append("),");
+				flush_string(print_string);
+			}
+			chunks_printed++;
+		} while (chunks_printed < nchunks);
+
+	} else if (&typeid(types[nattribute+1]) == &typeid(float)) {
+		throw std::runtime_error("ERROR: Pretty print function is not \
+			supported for domain type float\n");
+	} else if (&typeid(types[nattribute+1]) == &typeid(double)) {
+		throw std::runtime_error("ERROR: Pretty print function is not \
+			supported for domain type double\n");
+	} else if (&typeid(types[nattribute+1]) == &typeid(char)) {
+		throw std::runtime_error("ERROR: Pretty print function is not \
+			supported for domain type char\n");
+	}
+
+	std::cout << "\n";
+
+  /* Finalize the array. */
+  tiledb_array_finalize(tiledb_array);
+
+	return TILEDB_OK;
+}
+
+int pretty_print_sparse_array(
+	TileDB_Array * tiledb_array,
+	TileDB_ArraySchema &array_schema) {
+
+	int nattribute = array_schema.attribute_num_;
+	int ndimensions = array_schema.dim_num_;
+	uint64_t buffer_size = array_schema.capacity_;
+
+	int *types = array_schema.types_;
+	// Plus 1 for dimension type
+	int *sizeof_attributes = new int [nattribute + 1];
+	size_t *buffer_sizes = new size_t [nattribute+1];
+	void **buffers = new void * [nattribute+1];
+
+	for (int i = 0; i < nattribute+1; ++i) {
+		switch (types[i]) {
+			case TILEDB_INT32:
+				sizeof_attributes[i] = sizeof(int);
+				buffers[i] = (i==nattribute)
+										 ? new int [buffer_size]
+										 : new int [buffer_size*2];
+				break;
+			case TILEDB_INT64:
+				sizeof_attributes[i] = sizeof(long);
+				buffers[i] = (i==nattribute)
+										 ? new int [buffer_size]
+										 : new int [buffer_size*2];
+				break;
+			case TILEDB_FLOAT32:
+				sizeof_attributes[i] = sizeof(float);
+				buffers[i] = new float [buffer_size];
+				break;
+			case TILEDB_FLOAT64:
+				sizeof_attributes[i] = sizeof(double);
+				buffers[i] = new double [buffer_size];
+				break;
+			case TILEDB_CHAR:
+				sizeof_attributes[i] = sizeof(char);
+				buffers[i] = new char [buffer_size];
+				break;
+		}
+
+		buffer_sizes[i] = (i==nattribute) ? sizeof_attributes[i]*buffer_size*2
+			 : sizeof_attributes[i]*buffer_size;
+	}
+
+	std::string print_string("");
+	std::cout << "  Data - \n";
+	if (&typeid(types[nattribute+1]) == &typeid(int) ||
+			&typeid(types[nattribute+1]) == &typeid(int64_t)) {
+
+		char temp[100];
+		std::string print_string;
+		size_t return_num = 0;
+
+		do {
+			if (tiledb_array_read(tiledb_array, buffers, buffer_sizes) != TILEDB_OK) {
+				throw std::runtime_error("ERROR: TileDB read failed");
+			}
+
+			return_num = buffer_sizes[0] / sizeof_attributes[0];
+			for (size_t i = 0; i < return_num; ++i) {
+				print_string.clear();
+				print_string.append("    (");
+				int64_t *bx = (int64_t*) buffers[nattribute];
+				for (int d = 0; d < ndimensions; ++d) {
+					sprintf(temp,"%ld",bx[2*d+i]);
+					print_string.append(temp);
+					if (d < ndimensions-1) {
+						print_string.append(", ");
+					}
+				}
+				print_string.append("): (");
+				for (int a = 0; a < nattribute; ++a) {
+					const std::type_info& info = typeid(array_schema.types_[a]);
+					const std::type_info& int_info = typeid(int);
+					const std::type_info& int64_info = typeid(int64_t);
+					const std::type_info& char_info = typeid(char);
+					const std::type_info& float_info = typeid(float);
+					const std::type_info& double_info = typeid(double);
+					size_t hash = info.hash_code();
+					if (hash == int_info.hash_code()) {
+						int *bx = (int*) buffers[a];
+						sprintf(temp,"%d",bx[i]);
+					} else if (hash == int64_info.hash_code()) {
+						int64_t *bx = (int64_t*) buffers[a];
+						sprintf(temp,"%ld",bx[i]);
+					} else if (hash == float_info.hash_code()) {
+						float *bx = (float*) buffers[a];
+						sprintf(temp,"%.3f",bx[i]);
+					} else if (hash == double_info.hash_code()) {
+						double *bx = (double*) buffers[a];
+						sprintf(temp,"%.3f",bx[i]);
+					} else if (hash == char_info.hash_code()) {
+						char *bx = (char *) buffers[a];
+						sprintf(temp,"%c", bx[i]);
+					}
+					print_string.append(temp);
+					if (a < nattribute-1) print_string.append(", ");
+				}
+				print_string.append("),");
+				flush_string(print_string);
+			}
+		} while (return_num == buffer_size);
+
+	} else if (&typeid(types[nattribute+1]) == &typeid(float)) {
+		throw std::runtime_error("ERROR: Pretty print function is not \
+			supported for domain type float\n");
+	} else if (&typeid(types[nattribute+1]) == &typeid(double)) {
+		throw std::runtime_error("ERROR: Pretty print function is not \
+			supported for domain type double\n");
+	} else if (&typeid(types[nattribute+1]) == &typeid(char)) {
+		throw std::runtime_error("ERROR: Pretty print function is not \
+			supported for domain type char\n");
+	}
+	
+	std::cout << "\n";
+
+  /* Finalize the array. */
+  tiledb_array_finalize(tiledb_array);
+
+	return TILEDB_OK;
+}
+
+void flush_string(
+	std::string &print_string) {
+	int length = print_string.length();
+	const int print_width = get_window_columns();
+	int offset = 0;
+	std::string substr;
+	if (length > print_width) {
+		do {
+			std::cout << print_string.substr(offset,print_width-1);
+			substr = print_string.substr(print_width,length-1);
+			if (substr.empty()) break;
+			length = substr.length();
+			offset = print_width;
+		} while (length > print_width);
+	} else {
+		std::cout << print_string;
+	}
+	std::cout << "\n";
 }

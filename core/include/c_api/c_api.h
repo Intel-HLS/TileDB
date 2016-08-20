@@ -38,6 +38,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string>
+#include <cstring>
 #include <unistd.h>
 
 
@@ -1214,6 +1215,80 @@ TILEDB_EXPORT int tiledb_array_aio_write(
     const TileDB_Array* tiledb_array,
     TileDB_AIO_Request* tiledb_aio_request);
 
+/* ********************************* */
+/*      METHODS FOR PRETTY PRINT     */
+/* ********************************* */
+
+/**
+ * A simple method to print an initialized
+ * non-empty TileDB array to the standard
+ * output. First, the array schema is printed
+ * followed by the cells printed as coordinates
+ * first and then the attributes
+ *
+ * @param tiledb_ctx TileDB context
+ * @param tiledb_array_name TileDB array name
+ * @return TILEDB_OK if success, otherwise, throws
+ *         error or exits the program
+ */
+TILEDB_EXPORT int tiledb_array_pretty_print(
+  TileDB_CTX* tiledb_ctx,
+  const char* array_name);
+
+/**
+ * Gets the width of the terminal from ioctl
+ * @return columns Number of columns in the current terminal
+ */
+TILEDB_EXPORT int get_window_columns();
+
+/**
+ * Print TileDB version, arrayname and
+ * metadata
+ *
+ * @param tiledb_array_name TileDB array name
+ * @param tiledb_array_schema TileDB array schema
+ * @return void
+ */
+TILEDB_EXPORT void print_header(
+	const char *array_name,
+	TileDB_ArraySchema &tiledb_array_schema);
+
+/**
+ * Print coordinates of the TileDB dense
+ * array sequentially according to the
+ * cell order i.e.: 
+ * ROW_MAJOR => highest index moves fastest
+ * COL_MAJOR => lowest index moves fastest
+ *
+ * @param tiledb_array An initialized TileDB array
+ * @param tiledb_array_schema TileDB array schema
+ * @return TILEDB_OK upon success, otherwise TILEDB_ERR
+ */
+TILEDB_EXPORT int pretty_print_dense_array(
+	TileDB_Array *tiledb_array,
+	TileDB_ArraySchema &tiledb_array_schema);
+
+/**
+ * Print coordinates of the TileDB sparse
+ * array as read from the coordinates file
+ * (automatically follows the cell order
+ *
+ * @param tiledb_array An initialized TileDB array
+ * @param tiledb_array_schema TileDB array schema
+ * @return TILEDB_OK upon success, otherwise TILEDB_ERR
+ *
+ */
+TILEDB_EXPORT int pretty_print_sparse_array(
+	TileDB_Array *tiledb_array,
+	TileDB_ArraySchema &tiledb_array_schema);
+
+/**
+ * Flush a given string to the standard output
+ *
+ * @param print_string A string to be printed to standard output
+ * @return void
+ */
+TILEDB_EXPORT void flush_string(std::string &print_string);
 
 #undef TILEDB_EXPORT
 #ifdef __cplusplus
