@@ -20,6 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# Description: This script runs random queries on both dense and sparse
+#							 regions of the sparse array in Vertica. The tablename is
+#              specified in random_sparse_query.sh script. The queries
+#              are run on sprase region with result size = 10K, 100K, 1M
+#							 and on dense region with result size = 10K, 100K, 1M, 10M
+
 echo "Sparse - 10K"
 sudo ~/workspace/clean_caches.sh
 sudo ~/workspace/clean_caches.sh
