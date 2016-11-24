@@ -38,12 +38,11 @@ LINK_FLAGS=-lstdc++ -lz -lcrypto -ltiledb -lhdf5_cpp -lhdf5
 # Adding this flag solves that problem
 CFLAGS=-D_FILE_OFFSET_BITS=64 -g -ggdb3 -Wall -gdwarf-3
 
-CXX=mpic++ $(CFLAGS) $(CONFIG_FLAGS) $(INCLUDE_FLAGS)
+CXX=mpicxx $(CFLAGS) $(CONFIG_FLAGS) $(INCLUDE_FLAGS)
 
 SRC=$(wildcard dense/*.cc)
 SRC+=$(wildcard dense/parallel/*.cc)
 SRC+=$(wildcard sparse/*.cc)
-SRC+=$(wildcard sparse/parallel/*.cc)
 PROGS = $(patsubst %.cc,%,$(SRC))
 
 all: $(PROGS)

@@ -75,7 +75,6 @@ int main(int argc, char **argv) {
 			for (int k = 0; k < chunkdim1; ++k) {
 				for (int l = 0; l < chunkdim2; ++l) {
 					buffer[k*chunkdim2+l] = (i+k)*dim2+(j+l);
-					//cout << k << "," << l << "==" << buffer[k*chunkdim2+l] << "\n";
 				}
 			}
 			if (write(fd[block], (void*) buffer, buffer_size) == -1) {

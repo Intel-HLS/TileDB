@@ -10,7 +10,7 @@ CFLAGS=-D_FILE_OFFSET_BITS=64 -g -ggdb3 -Wall -gdwarf-3 -std=c++11
 CXX=g++ $(CFLAGS) $(CONFIG_FLAGS) $(INCLUDE_FLAGS)
 
 SRC=$(wildcard *.cc)
-SRC=$(wildcard ais/*.cc)
+SRC+=$(wildcard ais/*.cc)
 SRC:=$(filter-out $(OPT_SRC), $(SRC))
 PROGS = $(patsubst %.cc,%,$(SRC))
 
@@ -22,4 +22,4 @@ all: $(PROGS) $(OPT_OBJ)
 	@LD_LIBRARY_PATH=$(HDF5_HOME)/lib:$(LD_LIBRARY_PATH) $(CXX) $(LD_FLAGS) $< -o $@ $(LINK_FLAGS)
 
 clean:
-	rm -rf $(PROGS)
+	@rm -rf $(PROGS)

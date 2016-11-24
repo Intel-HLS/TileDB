@@ -53,7 +53,6 @@ int main(int argc, char **argv) {
 
 	long blockcount = (dim1/chunkdim1)*(dim2/chunkdim2);
 	cout << blockcount << "\n";
-	int *fd = new int [blockcount];
 	char filename[1024];
 	sprintf(filename, "./dense_%dx%d_%dx%d", dim1,dim2,chunkdim1,chunkdim2);
 	if (withtileid==1) {
@@ -67,7 +66,6 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 	
-	int buffer_size = chunkdim1 * chunkdim2 * sizeof(int);
 	int *buffer = new int [chunkdim1 * chunkdim2];
 	int block = 0;
 
@@ -76,7 +74,6 @@ int main(int argc, char **argv) {
 			for (int k = 0; k < chunkdim1; ++k) {
 				for (int l = 0; l < chunkdim2; ++l) {
 					buffer[k*chunkdim2+l] = (i+k)*dim2+(j+l);
-					//cout << k << "," << l << "==" << buffer[k*chunkdim2+l] << "\n";
 					if (withtileid==1)
 						file << i+k << " " << j+l << " " << block << " " << buffer[k*chunkdim2+l] << "\n";
 					else

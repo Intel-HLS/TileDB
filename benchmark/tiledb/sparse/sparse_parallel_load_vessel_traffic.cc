@@ -73,7 +73,6 @@ size_t fileToBuffer(char *filename) {
 	buffer_coords = new uint64_t [2*lines];
 
 	long coord_index = 0L;
-	char *linestr = new char [100];
 	std::vector<int64_t> vals(linesize);
 	vals.clear();
 
@@ -84,7 +83,8 @@ size_t fileToBuffer(char *filename) {
 	}
 	uint64_t x,y;
 	int64_t a,b,c,d,e,f,g;
-	while (fscanf(fp,"%ld %ld %d %d %d %d %d %d %d", &x,&y,&a,&b,&c,&d,&e,&f,&g)!=EOF) {
+	while (fscanf(fp,
+		"%ld %ld %ld %ld %ld %ld %ld %ld %ld", &x,&y,&a,&b,&c,&d,&e,&f,&g)!=EOF) {
 		buffer_coords[coord_index++] = x;
 		buffer_coords[coord_index++] = y;
 		buffer_SOG[lineindex] = a;
@@ -133,18 +133,19 @@ int main(int argc, char **argv) {
 	float rt = 0.0, wt = 0.0;
 	for (int i=1;i<=months;++i) {
 		sprintf(filename, "%s/sorted_tsv_deduped_%02d-Broadcast-2009", datadir, i);
-		//sprintf(filename, "%s/%d/%d/sparse_1d-01.tsv", datadir, mpi_size, mpi_rank);
 		GETTIME(start);
 		linecount = fileToBuffer(filename);
 		GETTIME(end);
 		rt += DIFF_TIME_SECS(start, end);
-		cout << "File: " << filename << " read in " << DIFF_TIME_SECS(start, end) << " secs. Done\n";
+		cout << "File: " << filename << " read in "
+			<< DIFF_TIME_SECS(start, end) << " secs. Done\n";
 
 		int64_t offset = mpi_rank * linecount/mpi_size;
-		int64_t offset = 0;
 		int l = linecount;
-		const void* buffers[] = { buffer_SOG+offset, buffer_COG+offset, buffer_Heading+offset, buffer_ROT+offset,	
-			buffer_Status+offset, buffer_VoyageID+offset, buffer_MMSI+offset, buffer_coords+2*offset  };
+		const void* buffers[] = { buffer_SOG+offset, buffer_COG+offset,
+			buffer_Heading+offset, buffer_ROT+offset,	
+			buffer_Status+offset, buffer_VoyageID+offset, buffer_MMSI+offset,
+			buffer_coords+2*offset  };
 		size_t buffer_sizes[8] = { l*sizeof(int64_t), l*sizeof(int64_t),
 			l*sizeof(int64_t), l*sizeof(int64_t),
 			l*sizeof(int64_t), l*sizeof(int64_t),

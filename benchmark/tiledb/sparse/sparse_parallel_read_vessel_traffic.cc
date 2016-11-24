@@ -32,6 +32,7 @@
 #include <iostream>
 #include <fstream>
 #include <tiledb_tests.h>
+#include <fcntl.h>
 #include "c_api.h"
 
 using namespace std;
@@ -42,7 +43,6 @@ int main(int argc, char **argv) {
 	int mpi_size = 0;
 	MPI_Init(&argc,&argv);
 	MPI_Comm comm = MPI_COMM_WORLD;
-	MPI_Info info = MPI_INFO_NULL;
 	MPI_Comm_size(comm, &mpi_size);
 	MPI_Comm_rank(comm, &mpi_rank);
 
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
 		offset = rand() % (2*rand_range) - rand_range;
 		x0 = ((int64_t)(dim0_lo + offset) < 0) ? dim0_lo : dim0_lo + offset;
 		y0 = ((int64_t)(dim1_lo + offset) < 0) ? dim1_lo : dim1_lo + offset;
-		int64_t subarray[] = { x0, dim0_hi + offset, y0, dim1_hi + offset };
+		int64_t subarray[] = { x0, (int64_t)(dim0_hi + offset), y0, (int64_t)(dim1_hi + offset) };
 		GETTIME(start);
 		tiledb_array_reset_subarray(tiledb_array, subarray);
 		/* Read from array. */
@@ -122,6 +122,12 @@ int main(int argc, char **argv) {
 	if (mpi_rank==0) {
 		printf("total: %.3f\n", DIFF_TIME_SECS(g_start, g_end));
 		printf("avg: %.3f\n", (DIFF_TIME_SECS(start, end)/nqueries));
+	}
+
+	if (toFileFlag==1) {
+		int fd = open("temp_tiledb.bin", O_CREAT | O_WRONLY, S_IRWXU);
+		write(fd, buffer_coords, 2*readsize*sizeof(uint64_t));
+		close(fd);	
 	}
 
 	return 0;

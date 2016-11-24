@@ -40,6 +40,8 @@ using namespace std;
 int main(int argc, char **argv) {
 	if (argc < 3) {
 		cout << "Usage: " << argv[0] << " input-file output-file\n";
+		cout << "\tNote that input-file must be sorted "
+			   << "on coordinates X,Y (first two columns)\n";
 		exit(EXIT_FAILURE);
 	}
 	char *ifilename = new char [10240];
@@ -55,40 +57,21 @@ int main(int argc, char **argv) {
 	}
 	uint64_t x,y;
 	int a,b,c,d,e,f,g;
-	uint64_t prev_x,prev_y;
-	int prev_a,prev_b,prev_c,prev_d,prev_e,prev_f,prev_g;
-	uint64_t l=0L;
-	while (fscanf(fp,"%ld %ld %d %d %d %d %d %d %d", &x,&y,&a,&b,&c,&d,&e,&f,&g)!=EOF) {
-		if (l==0) {
-			prev_x=x;
-			prev_y=y;
-			prev_a=a;
-			prev_b=b;
-			prev_c=c;
-			prev_d=d;
-			prev_e=e;
-			prev_f=f;
-			prev_g=g;
-			l++;
-			fprintf(ofp, "%ld %ld %d %d %d %d %d %d %d\n", x,y,a,b,c,d,e,f, g);
-			continue;
+	uint64_t prev_x = 0,prev_y = 0;
+	uint64_t lines_written=0L, lines_read=0L;
+	while (fscanf(fp,
+			"%ld %ld %d %d %d %d %d %d %d", &x,&y,&a,&b,&c,&d,&e,&f,&g)!=EOF) {
+		if (!(x==prev_x && y==prev_y)) {
+			fprintf(ofp, "%ld %ld %d %d %d %d %d %d %d\n", x,y,a,b,c,d,e,f,g);
+			lines_written++;
 		}
-
-		if (x!=prev_x || y!=prev_y) {
-			prev_x=x;
-			prev_y=y;
-			prev_a=a;
-			prev_b=b;
-			prev_c=c;
-			prev_d=d;
-			prev_e=e;
-			prev_f=f;
-			prev_g=g;	
-			fprintf(ofp, "%ld %ld %d %d %d %d %d %d %d\n", x,y,a,b,c,d,e,f, g);
-		}
-		l++;
+		prev_x = x;
+		prev_y = y;
+		lines_read++;
 	}
 	fclose(fp);
 	fclose(ofp);
+	cout << "Lines read: " << lines_read << "\n";
+	cout << "Lines written: " << lines_written << "\n";
 	return EXIT_SUCCESS;
 }
