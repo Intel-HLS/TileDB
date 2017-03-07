@@ -1,0 +1,8 @@
+DROP TABLE vessel_traffic_rle;
+DROP TABLE vessel_traffic_3_rle;
+DROP TABLE vessel_traffic_5_rle;
+DROP TABLE vessel_traffic_with_tileid_10Kx10K_rle;
+DROP TABLE vessel_traffic_with_tileid_10Kx10K_3_rle;
+DROP TABLE vessel_traffic_with_tileid_10Kx10K_5_rle;
+DROP TABLE vessel_traffic_with_tileid_100Kx100K_rle;
+DROP TABLE vessel_traffic_with_tileid_1Mx1M_rle;
