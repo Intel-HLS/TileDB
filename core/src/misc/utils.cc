@@ -67,6 +67,7 @@
 #endif
 
 int g_TileDB_enable_SYNC_write = 0x7FFFFFFF; //all 1s - synced write enabled
+int g_TileDB_compression_level = Z_DEFAULT_COMPRESSION;
 
 
 /* ****************************** */
@@ -400,7 +401,7 @@ ssize_t gzip(
   strm.zalloc = Z_NULL;
   strm.zfree = Z_NULL;
   strm.opaque = Z_NULL;
-  ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
+  ret = deflateInit(&strm, g_TileDB_compression_level);
 
   if(ret != Z_OK) {
     PRINT_ERROR("Cannot compress with GZIP");
