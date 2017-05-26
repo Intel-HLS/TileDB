@@ -229,13 +229,16 @@ class WriteState {
    * @param tile The tile buffer to be compressed.
    * @param tile_size The size of the tile buffer in bytes.
    * @param tile_compressed_size The size of the resulting compressed tile.
+   * @param compression_level The level of compression to be used.
    * @return TILEDB_WS_OK on success and TILEDB_WS_ERR on error.
    */
   int compress_tile_gzip(
       unsigned char* tile,
       size_t tile_size,
-      size_t& tile_compressed_size);
+      size_t& tile_compressed_size,
+      int compression_level);
 
+#ifdef HAVE_ZSTD
   /**
    * Compresses with Zstandard the input tile buffer, and stores it inside 
    * tile_compressed_ member attribute. 
@@ -243,13 +246,17 @@ class WriteState {
    * @param tile The tile buffer to be compressed.
    * @param tile_size The size of the tile buffer in bytes.
    * @param tile_compressed_size The size of the resulting compressed tile.
+   * @param compression_level The level of compression to be used.
    * @return TILEDB_WS_OK on success and TILEDB_WS_ERR on error.
    */
   int compress_tile_zstd(
       unsigned char* tile,
       size_t tile_size,
-      size_t& tile_compressed_size);
+      size_t& tile_compressed_size,
+      int compression_level);
+#endif // HAVE_ZSTD
 
+#ifdef HAVE_LZ4
   /**
    * Compresses with LZ4 the input tile buffer, and stores it inside 
    * tile_compressed_ member attribute. 
@@ -263,7 +270,9 @@ class WriteState {
       unsigned char* tile,
       size_t tile_size,
       size_t& tile_compressed_size);
+#endif // HAVE_LZ4
 
+#ifdef HAVE_BLOSC
   /**
    * Compresses with Blosc the input tile buffer, and stores it inside 
    * tile_compressed_ member attribute. 
@@ -272,6 +281,7 @@ class WriteState {
    * @param tile The tile buffer to be compressed.
    * @param tile_size The size of the tile buffer in bytes.
    * @param tile_compressed_size The size of the resulting compressed tile.
+   * @param compression_level 0-9 compression levels
    * @param compressor  The Blosc compressor.
    * @return TILEDB_WS_OK on success and TILEDB_WS_ERR on error.
    */
@@ -280,7 +290,9 @@ class WriteState {
       unsigned char* tile,
       size_t tile_size,
       size_t& tile_compressed_size,
+      int compression_level,
       const char* compressor);
+#endif // HAVE_BLOSC
 
   /**
    * Compresses with RLE the input tile buffer, and stores it inside 

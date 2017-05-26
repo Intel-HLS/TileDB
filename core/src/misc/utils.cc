@@ -515,7 +515,8 @@ ssize_t gzip(
     unsigned char* in, 
     size_t in_size,
     unsigned char* out, 
-    size_t out_size) {
+    size_t out_size,
+    int compression_level) {
 
   ssize_t ret;
   z_stream strm;
@@ -524,7 +525,9 @@ ssize_t gzip(
   strm.zalloc = Z_NULL;
   strm.zfree = Z_NULL;
   strm.opaque = Z_NULL;
-  ret = deflateInit(&strm, TILEDB_COMPRESSION_LEVEL_GZIP);
+  int level = (compression_level == -1) ?
+                  TILEDB_COMPRESSION_LEVEL_GZIP : compression_level;
+  ret = deflateInit(&strm, level);
 
   if(ret != Z_OK) {
     std::string errmsg = "Cannot compress with GZIP";

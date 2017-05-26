@@ -391,6 +391,20 @@ int tiledb_array_set_schema(
   return TILEDB_OK;
 }
 
+int tiledb_set_compression_level(
+    TileDB_ArraySchema* tiledb_array_schema,
+    int compression_level) {
+
+  if (tiledb_array_schema==NULL) {
+    std::string errmsg = "Compression level cannot be set. Null schema found";
+    PRINT_ERROR(errmsg);
+    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
+    return TILEDB_ERR;
+  }
+  tiledb_array_schema->compression_level_ = compression_level;
+  return TILEDB_OK;
+}
+
 int tiledb_array_create(
     const TileDB_CTX* tiledb_ctx,
     const TileDB_ArraySchema* array_schema) {
@@ -533,6 +547,7 @@ int tiledb_array_get_schema(
   tiledb_array_schema->tile_extents_ = array_schema_c.tile_extents_;
   tiledb_array_schema->tile_order_ = array_schema_c.tile_order_;
   tiledb_array_schema->types_ = array_schema_c.types_;
+  tiledb_array_schema->compression_level_ = array_schema_c.compression_level_;
 
   // Success
   return TILEDB_OK;
@@ -579,6 +594,7 @@ int tiledb_array_load_schema(
   tiledb_array_schema->tile_extents_ = array_schema_c.tile_extents_;
   tiledb_array_schema->tile_order_ = array_schema_c.tile_order_;
   tiledb_array_schema->types_ = array_schema_c.types_;
+  tiledb_array_schema->compression_level_ = array_schema_c.compression_level_;
 
   // Clean up
   delete array_schema;

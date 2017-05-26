@@ -76,6 +76,7 @@ ArraySchema::ArraySchema() {
   tile_extents_ = NULL;
   tile_domain_ = NULL;
   tile_coords_aux_ = NULL;
+  compression_level_ = -1;
 }
 
 ArraySchema::~ArraySchema() {
@@ -542,6 +543,14 @@ void ArraySchema::print() const {
     std::cout << "\tCoordinates: RLE\n";
   else if(compression_[attribute_num_] == TILEDB_NO_COMPRESSION)
     std::cout << "\tCoordinates: NONE\n";
+}
+
+int ArraySchema::compression_level() const {
+  return compression_level_;
+}
+
+void ArraySchema::compression_level(int level) {
+  compression_level_ = level;
 }
 
 // ===== FORMAT =====
