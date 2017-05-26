@@ -148,6 +148,9 @@ class ArraySchema {
   /** Returns the compression type of the attribute with the input id. */
   int compression(int attribute_id) const;
 
+  /** Returns the gzip compression level. */
+  int compression_level() const;
+
   /** Returns the coordinates size. */
   size_t coords_size() const;
 
@@ -370,6 +373,12 @@ class ArraySchema {
 
   /** Sets the compression types. */
   int set_compression(int* compression);
+
+  /** 
+   * Sets the compresion level. Data type of compression level
+   * is same as zlib#deflate_Init()
+   */
+  void compression_level(int compression_level);
 
   /** Sets the proper flag to indicate if the array is dense. */
   void set_dense(int dense);
@@ -723,6 +732,8 @@ class ArraySchema {
    *    - TILEDB_RLE 
    */
   std::vector<int> compression_;
+  /** Compression level - 0 to 9 (inclusive) */
+  int compression_level_;
   /** Auxiliary variable used when calculating Hilbert ids. */
   int* coords_for_hilbert_;
   /** The size (in bytes) of the coordinates. */

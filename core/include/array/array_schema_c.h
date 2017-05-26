@@ -81,6 +81,11 @@ typedef struct ArraySchemaC {
    *    - TILEDB_RLE 
    */
   int* compression_;
+  /**
+   * Compression level to be used for all attributs of the array
+   * in gzip#deflate
+   */
+  int compression_level_;
   /** 
    * Specifies if the array is dense (1) or sparse (0). If the array is dense, 
    * then the user must specify tile extents (see below).

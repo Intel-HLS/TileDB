@@ -292,13 +292,15 @@ std::string get_mac_addr();
  * @param in_size The size of the input buffer.
  * @param out The output buffer.
  * @param out_size The available size in the output buffer.
+ * @param compression_level 0-9 to determine level of compression
  * @return The size of compressed data on success, and TILEDB_UT_ERR on error.
  */
 ssize_t gzip(
     unsigned char* in, 
     size_t in_size, 
     unsigned char* out, 
-    size_t out_size);
+    size_t out_size,
+    int compression_level);
 
 /** 
  * Decompresses the GZIPed input buffer and stores the result in the output 

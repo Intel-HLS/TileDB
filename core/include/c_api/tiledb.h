@@ -251,6 +251,11 @@ typedef struct TileDB_ArraySchema {
    * attributes.
    */
   int* compression_;
+  /**
+   * Compression level to be used for all attributs of the array
+   * in gzip#deflate
+   */
+  int compression_level_;
   /** 
    * Specifies if the array is dense (1) or sparse (0). If the array is dense, 
    * then the user must specify tile extents (see below).
@@ -338,6 +343,21 @@ TILEDB_EXPORT int tiledb_array_set_schema(
     size_t tile_extents_len,
     int tile_order,
     const int* types);
+
+/**
+ * Sets the compression level of the array. Compression level
+ * can be set GZIP, ZSTD and BLOSC, not for LZ4. Defaults to
+ * level 6. Values are 0-9 (inclusive). 0 means no compression
+ * and 9 means highest compression.
+ *
+ * @param tiledb_array_schema The array schema to be populated.
+ * @param compression_level Compression level to be used.
+ * @return TILEDB_OK for success, TILEDB_ERR otherwise.
+ * @see TileDB_ArraySchema
+ */
+TILEDB_EXPORT int tiledb_array_set_compression_level(
+    TileDB_ArraySchema* tiledb_array_schema,
+    int compression_level);
 
 /**
  * Creates a new TileDB array.

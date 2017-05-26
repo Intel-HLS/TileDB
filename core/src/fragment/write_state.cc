@@ -34,17 +34,24 @@
 #include "tiledb_constants.h"
 #include "utils.h"
 #include "write_state.h"
-#include <blosc.h>
 #include <cassert>
 #include <cmath>
 #include <cstring>
 #include <fcntl.h>
-#include <lz4.h>
 #include <iostream>
 #include <unistd.h>
-#include <zstd.h>
 
+#ifdef HAVE_LZ4
+  #include <lz4.h>
+#endif // HAVE_LZ4
 
+#ifdef HAVE_BLOSC
+  #include <blosc.h>
+#endif // HAVE_BLOSC
+
+#ifdef HAVE_ZSTD
+  #include <zstd.h>
+#endif // HAVE_ZSTD
 
 
 /* ****************************** */
@@ -460,20 +467,35 @@ int WriteState::compress_tile(
   // For easy reference
   const ArraySchema* array_schema = fragment_->array()->array_schema();
   int compression = array_schema->compression(attribute_id);
+  int compression_level = array_schema->compression_level();
 
   // Handle different compression
   if(compression == TILEDB_GZIP)
-    return compress_tile_gzip(tile, tile_size, tile_compressed_size);
+    return compress_tile_gzip(
+               tile,
+               tile_size,
+               tile_compressed_size,
+               compression_level);
+#ifdef HAVE_ZSTD
   else if(compression == TILEDB_ZSTD)
-    return compress_tile_zstd(tile, tile_size, tile_compressed_size);
+    return compress_tile_zstd(
+               tile,
+               tile_size,
+               tile_compressed_size,
+               compression_level);
+#endif // HAVE_ZSTD
+#ifdef HAVE_LZ4
   else if(compression == TILEDB_LZ4)
     return compress_tile_lz4(tile, tile_size, tile_compressed_size);
+#endif // HAVE_LZ4
+#ifdef HAVE_BLOSC
   else if(compression == TILEDB_BLOSC)
     return compress_tile_blosc(
                attribute_id,
                tile, 
                tile_size, 
-               tile_compressed_size, 
+               tile_compressed_size,
+               compression_level,
                "blosclz");
   else if(compression == TILEDB_BLOSC_LZ4)
     return compress_tile_blosc(
@@ -481,6 +503,7 @@ int WriteState::compress_tile(
                tile, 
                tile_size, 
                tile_compressed_size, 
+               compression_level,
                "lz4");
   else if(compression == TILEDB_BLOSC_LZ4HC)
     return compress_tile_blosc(
@@ -488,6 +511,7 @@ int WriteState::compress_tile(
                tile, 
                tile_size, 
                tile_compressed_size, 
+               compression_level,
                "lz4hc");
   else if(compression == TILEDB_BLOSC_SNAPPY)
     return compress_tile_blosc(
@@ -495,6 +519,7 @@ int WriteState::compress_tile(
                tile, 
                tile_size, 
                tile_compressed_size, 
+               compression_level,
                "snappy");
   else if(compression == TILEDB_BLOSC_ZLIB)
     return compress_tile_blosc(
@@ -502,6 +527,7 @@ int WriteState::compress_tile(
                tile, 
                tile_size, 
                tile_compressed_size, 
+               compression_level,
                "zlib");
   else if(compression == TILEDB_BLOSC_ZSTD)
     return compress_tile_blosc(
@@ -509,7 +535,9 @@ int WriteState::compress_tile(
                tile, 
                tile_size, 
                tile_compressed_size, 
+               compression_level,
                "zstd");
+#endif // HAVE_BLOSC
   else if(compression == TILEDB_RLE)
     return compress_tile_rle(
                attribute_id, 
@@ -525,7 +553,8 @@ int WriteState::compress_tile(
 int WriteState::compress_tile_gzip(
     unsigned char* tile, 
     size_t tile_size,
-    size_t& tile_compressed_size) {
+    size_t& tile_compressed_size,
+    int compression_level) {
   // Allocate space to store the compressed tile
   if(tile_compressed_ == NULL) {
     tile_compressed_allocated_size_ = 
@@ -548,7 +577,12 @@ int WriteState::compress_tile_gzip(
 
   // Compress tile
   ssize_t gzip_size = 
-      gzip(tile, tile_size, tile_compressed, tile_compressed_allocated_size_);
+      gzip(
+          tile,
+          tile_size,
+          tile_compressed,
+          tile_compressed_allocated_size_,
+          compression_level);
   if(gzip_size == static_cast<ssize_t>(TILEDB_UT_ERR)) {
     tiledb_ws_errmsg = tiledb_ut_errmsg;
     return TILEDB_WS_ERR;
@@ -559,10 +593,12 @@ int WriteState::compress_tile_gzip(
   return TILEDB_WS_OK;
 }
 
+#ifdef HAVE_ZSTD
 int WriteState::compress_tile_zstd(
     unsigned char* tile, 
     size_t tile_size,
-    size_t& tile_compressed_size) {
+    size_t& tile_compressed_size,
+    int compression_level) {
   // Allocate space to store the compressed tile
   size_t compress_bound = ZSTD_compressBound(tile_size);
   if(tile_compressed_ == NULL) {
@@ -580,6 +616,9 @@ int WriteState::compress_tile_zstd(
   unsigned char* tile_compressed = 
       static_cast<unsigned char*>(tile_compressed_);
 
+  int level = (compression_level == -1) ?
+                  TILEDB_COMPRESSION_LEVEL_ZSTD : compression_level;
+
   // Compress tile
   size_t zstd_size = 
       ZSTD_compress(
@@ -587,7 +626,7 @@ int WriteState::compress_tile_zstd(
           tile_compressed_allocated_size_,
           tile, 
           tile_size,
-          TILEDB_COMPRESSION_LEVEL_ZSTD);
+          level);
   if(ZSTD_isError(zstd_size)) {
     std::string errmsg = "Failed compressing with Zstandard";
     PRINT_ERROR(errmsg);
@@ -599,7 +638,9 @@ int WriteState::compress_tile_zstd(
   // Success
   return TILEDB_WS_OK;
 }
+#endif // HAVE_ZSTD
 
+#ifdef HAVE_LZ4
 int WriteState::compress_tile_lz4(
     unsigned char* tile, 
     size_t tile_size,
@@ -619,9 +660,10 @@ int WriteState::compress_tile_lz4(
 
   // Compress tile
   int lz4_size = 
-      LZ4_compress(
+      LZ4_compress_default(
           (const char*) tile, 
           (char*) tile_compressed_, 
+          tile_size,
           tile_size);
   if(lz4_size < 0) {
     std::string errmsg = "Failed compressing with LZ4";
@@ -634,12 +676,15 @@ int WriteState::compress_tile_lz4(
   // Success
   return TILEDB_WS_OK;
 }
+#endif // HAVE_LZ4
 
+#ifdef HAVE_BLOSC
 int WriteState::compress_tile_blosc(
     int attribute_id,
     unsigned char* tile, 
     size_t tile_size,
     size_t& tile_compressed_size,
+    int compression_level,
     const char* compressor) {
   // For easy reference
   const ArraySchema* array_schema = fragment_->array()->array_schema();
@@ -673,10 +718,12 @@ int WriteState::compress_tile_blosc(
   unsigned char* tile_compressed = 
       static_cast<unsigned char*>(tile_compressed_);
 
+  int level = (compression_level == -1) ?
+                  TILEDB_COMPRESSION_LEVEL_BLOSC : compression_level;
   // Compress tile
   int blosc_size = 
       blosc_compress(
-          TILEDB_COMPRESSION_LEVEL_BLOSC,
+          level,
           1,
           array_schema->type_size(attribute_id),
           tile_size,
@@ -698,6 +745,7 @@ int WriteState::compress_tile_blosc(
   // Success
   return TILEDB_WS_OK;
 }
+#endif // HAVE_BLOSC
 
 int WriteState::compress_tile_rle(
     int attribute_id,

@@ -32,20 +32,27 @@
 
 #include "utils.h"
 #include "read_state.h"
-#include <blosc.h>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
-#include <lz4.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <zstd.h>
 
+#ifdef HAVE_LZ4
+  #include <lz4.h>
+#endif // HAVE_LZ4
 
+#ifdef HAVE_BLOSC
+  #include <blosc.h>
+#endif // HAVE_BLOSC
+
+#ifdef HAVE_ZSTD
+  #include <zstd.h>
+#endif // HAVE_ZSTD
 
 
 /* ****************************** */
@@ -1445,18 +1452,23 @@ int ReadState::decompress_tile(
                tile_compressed_size, 
                tile, 
                tile_size);
+#ifdef HAVE_ZSTD
   else if(compression == TILEDB_ZSTD)
     return decompress_tile_zstd(
                tile_compressed, 
                tile_compressed_size, 
                tile, 
                tile_size);
+#endif // HAVE_ZSTD
+#ifdef HAVE_LZ4
   else if(compression == TILEDB_LZ4)
     return decompress_tile_lz4(
                tile_compressed, 
                tile_compressed_size, 
                tile, 
                tile_size);
+#endif // HAVE_LZ4
+#ifdef HAVE_BLOSC
   else if(compression == TILEDB_BLOSC)
     return decompress_tile_blosc(
                tile_compressed, 
@@ -1499,6 +1511,7 @@ int ReadState::decompress_tile(
                tile, 
                tile_size,
                "zstd");
+#endif // HAVE_BLOSC
   else if(compression == TILEDB_RLE)
     return decompress_tile_rle(
                attribute_id,
@@ -1533,6 +1546,7 @@ int ReadState::decompress_tile_gzip(
   return TILEDB_RS_OK;
 }    
 
+#ifdef HAVE_ZSTD
 int ReadState::decompress_tile_zstd(
     unsigned char* tile_compressed,
     size_t tile_compressed_size,
@@ -1555,7 +1569,9 @@ int ReadState::decompress_tile_zstd(
   // Success
   return TILEDB_RS_OK;
 }
+#endif // HAVE_ZSTD
 
+#ifdef HAVE_LZ4
 int ReadState::decompress_tile_lz4(
     unsigned char* tile_compressed,
     size_t tile_compressed_size,
@@ -1576,7 +1592,9 @@ int ReadState::decompress_tile_lz4(
   // Success
   return TILEDB_RS_OK;
 }
+#endif // HAVE_LZ4
 
+#ifdef HAVE_BLOSC
 int ReadState::decompress_tile_blosc(
     unsigned char* tile_compressed,
     size_t tile_compressed_size,
@@ -1604,6 +1622,7 @@ int ReadState::decompress_tile_blosc(
   // Success
   return TILEDB_RS_OK;
 }
+#endif // HAVE_BLOSC
 
 int ReadState::decompress_tile_rle(
     int attribute_id,
