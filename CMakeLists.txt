@@ -101,7 +101,6 @@ endif()
 # Add pthread library to dependencies
 set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} pthread)
 
-
 # Set C++ 2011 flag
 include(SetCXX2011Flag)
 

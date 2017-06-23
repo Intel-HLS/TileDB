@@ -394,7 +394,6 @@ int tiledb_array_set_schema(
 int tiledb_set_compression_level(
     TileDB_ArraySchema* tiledb_array_schema,
     int compression_level) {
-
   if (tiledb_array_schema==NULL) {
     std::string errmsg = "Compression level cannot be set. Null schema found";
     PRINT_ERROR(errmsg);
