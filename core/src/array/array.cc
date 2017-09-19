@@ -330,6 +330,9 @@ bool Array::write_mode() const {
   return array_write_mode(mode_);
 }
 
+int Array::read_with_filters(void** buffers, size_t* buffer_sizes) {
+  return TILEDB_AR_OK;
+}
 
 
 /* ****************************** */
@@ -538,6 +541,7 @@ int Array::init(
     const std::vector<std::string>& fragment_names,
     const std::vector<BookKeeping*>& book_keeping,
     int mode,
+    TileDB_Expression* expression,
     const char** attributes,
     int attribute_num,
     const void* subarray,
@@ -619,6 +623,11 @@ int Array::init(
 
   // Set array schema
   array_schema_ = array_schema;
+
+  // Set expressions for filters (if provided)
+  if (!expression) {
+    expression_ = expression;
+  }
 
   // Initialize new fragment if needed
   if(write_mode()) { // WRITE MODE

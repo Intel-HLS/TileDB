@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <cstdio>
 #include <dirent.h>
 #include <fcntl.h>
 #include <iostream>
@@ -99,7 +100,8 @@ void adjacent_slashes_dedup(std::string& value) {
 bool array_read_mode(int mode) {
   return mode == TILEDB_ARRAY_READ || 
          mode == TILEDB_ARRAY_READ_SORTED_COL ||
-         mode == TILEDB_ARRAY_READ_SORTED_ROW;
+         mode == TILEDB_ARRAY_READ_SORTED_ROW ||
+         mode == TILEDB_ARRAY_READ_WITH_FILTER;
 }
 
 bool array_write_mode(int mode) {
@@ -1921,7 +1923,9 @@ int write_to_file_cmp_gzip(
     const void* buffer,
     size_t buffer_size) {
   // Open file
-  gzFile fd = gzopen(filename, "wb");
+  char * mode = new char [4];
+  //sprintf(mode, "w%dh", g_TileDB_compression_level);
+  gzFile fd = gzopen(filename, mode);
   if(fd == NULL) {
     std::string errmsg = 
         std::string("Cannot write to file '") + filename + 

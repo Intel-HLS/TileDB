@@ -796,6 +796,8 @@ class ArraySchema {
   std::vector<int> types_;
   /** Stores the size of every attribute type (plus coordinates in the end). */
   std::vector<size_t> type_sizes_;
+  /** Stores the compression level of the array */
+  int compression_level;
 
 
 

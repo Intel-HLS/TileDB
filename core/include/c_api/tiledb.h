@@ -83,7 +83,11 @@ extern "C" {
 /** Stores potential error messages. */
 extern char tiledb_errmsg[TILEDB_ERRMSG_MAX_LEN];
 
+/** Stores global flag to determine sync writes or not */
+int g_TileDB_enable_SYNC_write = 0;
 
+/** Stores the global compression level value */
+int g_TileDB_compression_level = 6;
 
 
 /* ********************************* */
@@ -365,6 +369,12 @@ TILEDB_EXPORT int tiledb_array_create(
  *    - TILEDB_ARRAY_READ 
  *    - TILEDB_ARRAY_READ_SORTED_COL 
  *    - TILEDB_ARRAY_READ_SORTED_ROW
+ * @param where_clause The expression to be used to filter records.
+ *     Note that the expression is the condition based on which the
+ *     underlying data will be filtered. The names of the attributes
+ *     specified in the attributes buffer will still be the ones
+ *     returned by the read. If you need all attributes to be returned,
+ *     pass a NULL for the attributes buffer
  * @param subarray The subarray in which the array read/write will be
  *     constrained on. It should be a sequence of [low, high] pairs (one 
  *     pair per dimension), whose type should be the same as that of the
@@ -384,6 +394,7 @@ TILEDB_EXPORT int tiledb_array_init(
     TileDB_Array** tiledb_array,
     const char* array,
     int mode,
+    std::string where_clause,
     const void* subarray,
     const char** attributes,
     int attribute_num);

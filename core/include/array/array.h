@@ -42,6 +42,7 @@
 #include "fragment.h"
 #include "storage_manager_config.h"
 #include "tiledb_constants.h"
+#include "expression.h"
 #include <pthread.h>
 #include <queue>
 
@@ -232,8 +233,11 @@ class Array {
   /** Returns true if the array is in write mode. */
   bool write_mode() const;
 
-
-
+  /**
+   * Performs read operation with filters
+   * @param
+   */
+  int read_with_filters(void** buffers, size_t* buffer_sizes);
 
   /* ********************************* */
   /*              MUTATORS             */
@@ -305,6 +309,7 @@ class Array {
       const std::vector<std::string>& fragment_names,
       const std::vector<BookKeeping*>& book_keeping,
       int mode,
+      TileDB_Expression* expression,
       const char** attributes,
       int attribute_num,
       const void* subarray,
@@ -492,7 +497,11 @@ class Array {
    */
   void* subarray_;
 
-
+  /**
+   * The expression object which will be used to filter
+   * values
+   */
+  TileDB_Expression* expression_;
 
 
   /* ********************************* */

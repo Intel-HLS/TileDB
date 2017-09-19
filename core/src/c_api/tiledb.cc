@@ -35,6 +35,7 @@
 #include "array_schema_c.h"
 #include "storage_manager.h"
 #include "storage_manager_config.h"
+#include "expression.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -431,6 +432,7 @@ int tiledb_array_init(
     TileDB_Array** tiledb_array,
     const char* array,
     int mode,
+    TileDB_Expression* expression,
     const void* subarray,
     const char** attributes,
     int attribute_num) {
@@ -456,7 +458,8 @@ int tiledb_array_init(
   int rc = tiledb_ctx->storage_manager_->array_init(
                (*tiledb_array)->array_,
                array,
-               mode, 
+               mode,
+               expression,
                subarray, 
                attributes,
                attribute_num);
@@ -665,6 +668,25 @@ int tiledb_array_read(
 
   // Read
   if(tiledb_array->array_->read(buffers, buffer_sizes) != TILEDB_AR_OK) {
+    strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
+    return TILEDB_ERR;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_array_read_with_filter(
+    const TileDB_Array* tiledb_array,
+    void** buffers,
+    size_t* buffer_sizes) {
+
+  // Sanity check
+  if(!sanity_check(tiledb_array))
+    return TILEDB_ERR;
+
+  // Read
+  if(tiledb_array->array_->read_with_filters(buffers, buffer_sizes) != TILEDB_AR_OK) {
     strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
     return TILEDB_ERR;
   }
