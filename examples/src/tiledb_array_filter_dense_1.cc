@@ -1,5 +1,5 @@
 /**
- * @file   tiledb_array_aio_read_dense_1.cc
+ * @file   tiledb_array_filter_dense_1.cc
  *
  * @section LICENSE
  *
@@ -27,24 +27,22 @@
  * 
  * @section DESCRIPTION
  *
- * It shows how to read asynchronously from a dense array.
+ * It shows how to use filters on a complete dense array.
  */
 
 #include "tiledb.h"
 #include <cstdio>
-#include <cstring>
-
-// Simply prints the input string to stdout
-void *print_upon_completion(void* s) {
-  printf("%s\n", (char*) s);
-
-  return NULL;
-}
 
 int main() {
   // Initialize context with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
   tiledb_ctx_init(&tiledb_ctx, NULL);
+
+  // Initialize the filter expression object
+  TileDB_Exression* expression;
+  int filter_attribute_count = 0;
+
+  strcpy(expression->attribute[count], "a1");
 
   // Initialize array 
   TileDB_Array* tiledb_array;
@@ -52,14 +50,11 @@ int main() {
       tiledb_ctx,                                       // Context
       &tiledb_array,                                    // Array object
       "my_workspace/dense_arrays/my_array_A",           // Array name
-      TILEDB_ARRAY_READ,                                // Mode
-      NULL,                                             // Expression
+      TILEDB_ARRAY_FILTER,                                // Mode
+      expression,                                       // Expression
       NULL,                                             // Whole domain
       NULL,                                             // All attributes
       0);                                               // Number of attributes
-
-  // Prepare subarray
-  int64_t subarray[] = { 3, 4, 2, 4 }; // [3,4] on first dim, [2,4] on second
 
   // Prepare cell buffers 
   int buffer_a1[16];
@@ -75,33 +70,23 @@ int main() {
       sizeof(buffer_a3)
   };
 
-  // Prepare AIO request
-  TileDB_AIO_Request tiledb_aio_request;
-  memset(&tiledb_aio_request, 0, sizeof(struct TileDB_AIO_Request)); 
-  tiledb_aio_request.buffers_ = buffers;
-  tiledb_aio_request.buffer_sizes_ = buffer_sizes;
-  tiledb_aio_request.subarray_ = subarray;
-  tiledb_aio_request.completion_handle_ = print_upon_completion;
-  char s[100] = "AIO request completed";
-  tiledb_aio_request.completion_data_ = s; 
-
   // Read from array
-  tiledb_array_aio_read(tiledb_array, &tiledb_aio_request); 
+  tiledb_array_filter(tiledb_array, buffers, buffer_sizes);
 
-  // Wait for AIO to complete
-  printf("AIO in progress\n");
-  while(tiledb_aio_request.status_ != TILEDB_AIO_COMPLETED); 
-
-  // Print cell values
+  // Print only non-empty cell values
   int64_t result_num = buffer_sizes[0] / sizeof(int);
   printf(" a1\t    a2\t   (a3.first, a3.second)\n");
   printf("-----------------------------------------\n");
   for(int i=0; i<result_num; ++i) { 
-    printf("%3d", buffer_a1[i]);
-    size_t var_size = (i != result_num-1) ? buffer_a2[i+1] - buffer_a2[i] 
-                                          : buffer_sizes[2] - buffer_a2[i];
-    printf("\t %4.*s", int(var_size), &buffer_var_a2[buffer_a2[i]]);
-    printf("\t\t (%5.1f, %5.1f)\n", buffer_a3[2*i], buffer_a3[2*i+1]);
+    if(buffer_a1[i] != TILEDB_EMPTY_INT32) {    
+      printf("%3d", buffer_a1[i]);
+      size_t var_size = (i != result_num-1) ? buffer_a2[i+1] - buffer_a2[i] 
+                                            : buffer_sizes[2] - buffer_a2[i];
+      printf("\t %4.*s", int(var_size), &buffer_var_a2[buffer_a2[i]]);
+      printf("\t\t (%5.1f, %5.1f)\n", buffer_a3[2*i], buffer_a3[2*i+1]);
+    } else {
+      printf("\t\t Empty cell\n");
+    }
   }
 
   // Finalize the array

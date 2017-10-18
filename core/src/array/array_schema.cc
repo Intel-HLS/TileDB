@@ -105,11 +105,20 @@ ArraySchema::~ArraySchema() {
 /*            ACCESSORS           */
 /* ****************************** */
 
+const std::string& ArraySchema::array_workspace() const {
+  return array_workspace_;
+}
+
 const std::string& ArraySchema::array_name() const {
   return array_name_;
 }
 
 void ArraySchema::array_schema_export(ArraySchemaC* array_schema_c) const {
+  // Set array workspace
+  size_t array_workspace_len = array_workspace_.size();
+  array_schema_c->array_workspace_ = (char*) malloc(array_workspace_len+1);
+  strcpy(array_schema_c->array_workspace_, array_workspace_.c_str());
+
   // Set array name
   size_t array_name_len = array_name_.size(); 
   array_schema_c->array_name_ = (char*) malloc(array_name_len+1);
@@ -179,6 +188,11 @@ void ArraySchema::array_schema_export(ArraySchemaC* array_schema_c) const {
 
 void ArraySchema::array_schema_export(
     MetadataSchemaC* metadata_schema_c) const {
+  // Set metadata workspace
+  size_t array_workspace_len = array_workspace_.size();
+  metadata_schema_c->metadata_workspace_ = (char*) malloc(array_workspace_len+1);
+  strcpy(metadata_schema_c->metadata_name_, array_workspace_.c_str());
+
   // Set metadata name
   size_t array_name_len = array_name_.size(); 
   metadata_schema_c->metadata_name_ = (char*) malloc(array_name_len+1);
@@ -362,6 +376,8 @@ bool ArraySchema::is_contained_in_tile_slab_row(const void* range) const {
 }
 
 void ArraySchema::print() const {
+  // Array workspace
+  std::cout << "Array workspace:\n\t" << array_workspace_ << "\n";
   // Array name
   std::cout << "Array name:\n\t" << array_name_ << "\n";
   // Dimension names
@@ -545,6 +561,8 @@ void ArraySchema::print() const {
 }
 
 // ===== FORMAT =====
+// array_workspace_size(int)
+//     array_workspace(string)
 // array_name_size(int) 
 //     array_name(string)
 // dense(bool)
@@ -582,6 +600,14 @@ int ArraySchema::serialize(
   size_t buffer_size = array_schema_bin_size;
   size_t offset = 0;
 
+  // Copy array_workspace_
+  int array_workspace_size = array_workspace_.size();
+  assert(offset + sizeof(int) < buffer_size);
+  memcpy(buffer + offset, &array_workspace_size, sizeof(int));
+  offset += sizeof(int);
+  assert(offset + array_workspace_size < buffer_size);
+  memcpy(buffer + offset, &array_workspace_[0], array_workspace_size);
+  offset += array_workspace_size;
   // Copy array_name_
   int array_name_size = array_name_.size();
   assert(offset + sizeof(int) < buffer_size);
@@ -884,6 +910,8 @@ bool ArraySchema::var_size(int attribute_id) const {
 /* ****************************** */
 
 // ===== FORMAT =====
+// array_workspace_size(int)
+//     array_workspace(string)
 // array_name_size(int) 
 //     array_name(string)
 // dense(bool)
@@ -914,7 +942,16 @@ int ArraySchema::deserialize(
   const char* buffer = static_cast<const char*>(array_schema_bin);
   size_t buffer_size = array_schema_bin_size;
   size_t offset = 0;
-
+  
+  // Load array_workspace_
+  int array_workspace_size;
+  assert(offset + sizeof(int) < buffer_size);
+  memcpy(&array_workspace_size, buffer + offset, sizeof(int));
+  offset += sizeof(int);
+  array_workspace_.resize(array_workspace_size);
+  assert(offset + array_workspace_size < buffer_size);
+  memcpy(&array_workspace_[0], buffer + offset, array_workspace_size);
+  offset += array_workspace_size;
   // Load array_name_ 
   int array_name_size;
   assert(offset + sizeof(int) < buffer_size);
@@ -1054,6 +1091,8 @@ int ArraySchema::deserialize(
 }
 
 int ArraySchema::init(const ArraySchemaC* array_schema_c) {
+  // Set array workspace
+  set_array_name(array_schema_c->array_workspace_);
   // Set array name
   set_array_name(array_schema_c->array_name_);
   // Set attributes
@@ -1115,6 +1154,7 @@ int ArraySchema::init(const ArraySchemaC* array_schema_c) {
 int ArraySchema::init(const MetadataSchemaC* metadata_schema_c) {
   // Create an array schema C struct and populate it
   ArraySchemaC array_schema_c;
+  array_schema_c.array_workspace_ = metadata_schema_c->metadata_workspace_;
   array_schema_c.array_name_ = metadata_schema_c->metadata_name_;
   array_schema_c.capacity_ = metadata_schema_c->capacity_;
   array_schema_c.cell_order_ = TILEDB_ROW_MAJOR;
@@ -1218,12 +1258,25 @@ int ArraySchema::init(const MetadataSchemaC* metadata_schema_c) {
   return TILEDB_AS_OK;
 }
 
+void ArraySchema::set_array_workspace(const char* array_workspace) {
+  // Get real array workspace
+  std::string array_workspace_real = real_dir(array_workspace);
+
+  // Set array workspace
+  array_workspace_ = array_workspace_real;
+}
+
 void ArraySchema::set_array_name(const char* array_name) {
   // Get real array name
-  std::string array_name_real = real_dir(array_name);
+  // Changed by Kushal - array names are only logical
+  // now and will not contain the entire path so that
+  // the entire array can be copied to a different
+  // location
+  //std::string array_name_real = real_dir(array_name);
 
   // Set array name
-  array_name_ = array_name_real;
+  //array_name_ = array_name_real;
+  array_name_ = array_name;
 }
 
 int ArraySchema::set_attributes(
@@ -2136,6 +2189,8 @@ size_t ArraySchema::compute_bin_size() const {
   // Initialization
   size_t bin_size = 0;
 
+  // Size for array_workspace_
+  bin_size += sizeof(int) + array_workspace_.size();
   // Size for array_name_ 
   bin_size += sizeof(int) + array_name_.size();
   // Size for dense_

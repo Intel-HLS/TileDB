@@ -169,6 +169,7 @@ void parallel_write(
       &tiledb_array,                             // Array object
       array_name,                                // Array name
       TILEDB_ARRAY_WRITE,                        // Mode
+      NULL,                                      // Expression
       subarray,                                  // Subarray
       NULL,                                      // All attributes
       0);                                        // Number of attributes

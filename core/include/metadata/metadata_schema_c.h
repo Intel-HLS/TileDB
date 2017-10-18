@@ -38,6 +38,10 @@
 /** Specifies the metadata schema. */
 typedef struct MetadataSchemaC {
   /** 
+   * The TileDB metadata workspace. 
+   */
+  char* metadata_workspace_;
+  /** 
    * The metadata name. It is a directory, whose parent must be a TileDB
    * workspace, group, or array.
    */

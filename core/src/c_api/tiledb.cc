@@ -59,7 +59,11 @@
 
 char tiledb_errmsg[TILEDB_ERRMSG_MAX_LEN];
 
+/** Stores global flag to determine sync writes or not */
+int g_TileDB_enable_SYNC_write = 0;
 
+/** Stores the global compression level value */
+int g_TileDB_compression_level = 6;
 
 
 /* ****************************** */
@@ -272,6 +276,10 @@ typedef struct TileDB_Array {
   const TileDB_CTX* tiledb_ctx_;
 } TileDB_Array;
 
+typedef struct TileDB_Expression {
+  Expression* expression_;
+} TileDB_Expression;
+
 int tiledb_array_set_schema(
     TileDB_ArraySchema* tiledb_array_schema,
     const char* array_name,
@@ -459,8 +467,8 @@ int tiledb_array_init(
                (*tiledb_array)->array_,
                array,
                mode,
-               expression,
-               subarray, 
+               expression->expression_,
+               subarray,
                attributes,
                attribute_num);
 
@@ -676,7 +684,7 @@ int tiledb_array_read(
   return TILEDB_OK;
 }
 
-int tiledb_array_read_with_filter(
+int tiledb_array_filter(
     const TileDB_Array* tiledb_array,
     void** buffers,
     size_t* buffer_sizes) {
@@ -686,7 +694,7 @@ int tiledb_array_read_with_filter(
     return TILEDB_ERR;
 
   // Read
-  if(tiledb_array->array_->read_with_filters(buffers, buffer_sizes) != TILEDB_AR_OK) {
+  if(tiledb_array->array_->filter(buffers, buffer_sizes) != TILEDB_AR_OK) {
     strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
     return TILEDB_ERR;
   }

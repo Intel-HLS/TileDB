@@ -65,6 +65,7 @@ int main() {
       &tiledb_array,                             // Array object
       "my_workspace/sparse_arrays/my_array_B",   // Array name
       TILEDB_ARRAY_READ,                         // Mode
+      NULL,                                      // Expression
       NULL,                                      // Subarray (whole domain)
       NULL,                                      // Attributes (all attributes)
       0);                                        // Number of attributes

@@ -54,7 +54,7 @@
 #define TILEDB_ARRAY_WRITE_SORTED_COL               4
 #define TILEDB_ARRAY_WRITE_SORTED_ROW               5
 #define TILEDB_ARRAY_WRITE_UNSORTED                 6
-#define TILEDB_ARRAY_READ_WITH_FILTER               7
+#define TILEDB_ARRAY_FILTER                         7
 /**@}*/
 
 /**@{*/

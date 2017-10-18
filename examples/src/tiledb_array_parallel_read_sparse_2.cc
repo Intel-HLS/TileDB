@@ -125,6 +125,7 @@ void parallel_read(
       &tiledb_array,                             // Array object
       array_name,                                // Array name
       TILEDB_ARRAY_READ,                         // Mode
+      NULL,                                      // Expression
       subarray,                                  // Subarray
       attributes,                                // Subset on attributes
       1);                                        // Number of attributes

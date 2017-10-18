@@ -101,6 +101,9 @@ class ArraySchema {
   /*             ACCESSORS             */
   /* ********************************* */
 
+  /** Returns the array workspace. */
+  const std::string& array_workspace() const;
+
   /** Returns the array name. */
   const std::string& array_name() const;
 
@@ -337,6 +340,9 @@ class ArraySchema {
    * @return TILEDB_AS_OK for success, and TILEDB_AS_ERR for error.
    */
   int init(const MetadataSchemaC* metadata_schema_c);  
+
+  /** Sets the array workspace. */
+  void set_array_workspace(const char* array_workspace);
 
   /** Sets the array name. */
   void set_array_name(const char* array_name);
@@ -675,7 +681,11 @@ class ArraySchema {
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */
   /* ********************************* */
-
+  
+  /** 
+   * The array workspace directory.
+   */
+  std::string array_workspace_;
   /** 
    * The array name. It is a directory, whose parent must be a TileDB workspace,
    * or group.

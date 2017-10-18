@@ -50,6 +50,7 @@ int main() {
       &tiledb_array,                             // Array object
       "my_workspace/dense_arrays/my_array_A",    // Array name
       TILEDB_ARRAY_WRITE_SORTED_ROW,             // Mode
+      NULL,                                      // Expression
       subarray,                                  // Subarray
       NULL,                                      // All attributes
       0);                                        // Number of attributes

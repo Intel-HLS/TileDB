@@ -100,8 +100,7 @@ void adjacent_slashes_dedup(std::string& value) {
 bool array_read_mode(int mode) {
   return mode == TILEDB_ARRAY_READ || 
          mode == TILEDB_ARRAY_READ_SORTED_COL ||
-         mode == TILEDB_ARRAY_READ_SORTED_ROW ||
-         mode == TILEDB_ARRAY_READ_WITH_FILTER;
+         mode == TILEDB_ARRAY_READ_SORTED_ROW;
 }
 
 bool array_write_mode(int mode) {
@@ -109,6 +108,10 @@ bool array_write_mode(int mode) {
          mode == TILEDB_ARRAY_WRITE_SORTED_COL || 
          mode == TILEDB_ARRAY_WRITE_SORTED_ROW || 
          mode == TILEDB_ARRAY_WRITE_UNSORTED;
+}
+
+bool array_filter_mode(int mode) {
+  return mode == TILEDB_ARRAY_FILTER;
 }
 
 bool both_slashes(char a, char b) {

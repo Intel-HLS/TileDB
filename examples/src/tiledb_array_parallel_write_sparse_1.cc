@@ -142,6 +142,7 @@ void *parallel_write(void* args) {
       &tiledb_array,                             // Array object
       data->array_name,                          // Array name
       TILEDB_ARRAY_WRITE_UNSORTED,               // Mode
+      NULL,                                      // Expression
       NULL,                                      // Inapplicable
       NULL,                                      // All attributes
       0);                                        // Number of attributes

@@ -84,10 +84,10 @@ extern "C" {
 extern char tiledb_errmsg[TILEDB_ERRMSG_MAX_LEN];
 
 /** Stores global flag to determine sync writes or not */
-int g_TileDB_enable_SYNC_write = 0;
+extern int g_TileDB_enable_SYNC_write;
 
 /** Stores the global compression level value */
-int g_TileDB_compression_level = 6;
+extern int g_TileDB_compression_level;
 
 
 /* ********************************* */
@@ -552,6 +552,38 @@ TILEDB_EXPORT int tiledb_array_write(
  * @return TILEDB_OK for success and TILEDB_ERR for error.
  */
 TILEDB_EXPORT int tiledb_array_read(
+    const TileDB_Array* tiledb_array,
+    void** buffers,
+    size_t* buffer_sizes);
+
+/**
+ * Performs a filter operation on an array.
+ * The array must be initialized in one of the following read mode:
+ *    - TILEDB_ARRAY_FILTER: \n
+ *      In this mode, the cell values are read into the read buffer
+ *      as provided and values are filtered out based on the expression
+ *      provided during array initialization
+ * 
+ * @param tiledb_array The TileDB array.
+ * @param buffers An array of buffers, one for each attribute. These must be
+ *     provided in the same order as the attributes specified in
+ *     tiledb_array_init() or tiledb_array_reset_attributes(). The case of
+ *     variable-sized attributes is special. Instead of providing a single
+ *     buffer for such an attribute, **two** must be provided: the second
+ *     will hold the variable-sized cell values, whereas the first holds the
+ *     start offsets of each cell in the second buffer.
+ * @param buffer_sizes The sizes (in bytes) allocated by the user for the input
+ *     buffers (there is a one-to-one correspondence). The function will attempt
+ *     to write as many results as can fit in the buffers, and potentially
+ *     alter the buffer size to indicate the size of the *useful* data written
+ *     in the buffer. If a buffer cannot hold all results, the function will
+ *     still succeed, writing as much data as it can and turning on an overflow
+ *     flag which can be checked with function tiledb_array_overflow(). The
+ *     next invocation will resume from the point the previous one stopped,
+ *     without inflicting a considerable performance penalty due to overflow.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_array_filter(
     const TileDB_Array* tiledb_array,
     void** buffers,
     size_t* buffer_sizes);

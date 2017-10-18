@@ -308,6 +308,38 @@ int Array::read(void** buffers, size_t* buffer_sizes) {
   }
 }
 
+int Array::filter(void** buffers, size_t* buffer_sizes) {
+  // Sanity checks
+  if(!filter_mode()) {
+    std::string errmsg = "Cannot read from array; Invalid mode";
+    PRINT_ERROR(errmsg);
+    tiledb_ar_errmsg = TILEDB_AR_ERRMSG + errmsg;
+    return TILEDB_AR_ERR;
+  }
+
+  // Check if there are no fragments 
+  int buffer_i = 0;
+  int attribute_id_num = attribute_ids_.size();
+  if(fragments_.size() == 0) {             
+    for(int i=0; i<attribute_id_num; ++i) {
+      // Update all sizes to 0
+      buffer_sizes[buffer_i] = 0; 
+      if(!array_schema_->var_size(attribute_ids_[i])) 
+        ++buffer_i;
+      else 
+        buffer_i += 2;
+    }
+    return TILEDB_AR_OK;
+  }
+
+  int rc = read_default(buffers, buffer_sizes);
+  if (rc == TILEDB_AR_ERR) {
+    return rc;
+  }
+
+  return expression_->evaluate(buffers, buffer_sizes);
+}
+
 int Array::read_default(void** buffers, size_t* buffer_sizes) {
   if(array_read_state_->read(buffers, buffer_sizes) != TILEDB_ARS_OK) {
     tiledb_ar_errmsg = tiledb_ars_errmsg;
@@ -330,8 +362,8 @@ bool Array::write_mode() const {
   return array_write_mode(mode_);
 }
 
-int Array::read_with_filters(void** buffers, size_t* buffer_sizes) {
-  return TILEDB_AR_OK;
+bool Array::filter_mode() const {
+  return array_filter_mode(mode_);
 }
 
 
@@ -541,7 +573,7 @@ int Array::init(
     const std::vector<std::string>& fragment_names,
     const std::vector<BookKeeping*>& book_keeping,
     int mode,
-    TileDB_Expression* expression,
+    Expression* expression,
     const char** attributes,
     int attribute_num,
     const void* subarray,
@@ -625,7 +657,7 @@ int Array::init(
   array_schema_ = array_schema;
 
   // Set expressions for filters (if provided)
-  if (!expression) {
+  if (expression) {
     expression_ = expression;
   }
 

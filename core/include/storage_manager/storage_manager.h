@@ -272,7 +272,7 @@ class StorageManager {
       Array*& array,
       const char* array_dir,
       int mode,
-      TileDB_Expression* expression,
+      Expression* expression,
       const void* subarray,
       const char** attributes,
       int attribute_num);
