@@ -180,7 +180,8 @@ TEST_F(ArraySchemaTestFixture, test_array_schema) {
   ASSERT_STRNE(array_name_real.c_str(), "");
 
   // Tests
-  ASSERT_STREQ(array_schema_disk.array_name_, array_name_real.c_str());
+  //absolute path isn't relevant anymore
+  //ASSERT_STREQ(array_schema_disk.array_name_, array_name_real.c_str());
   ASSERT_EQ(array_schema_disk.attribute_num_, array_schema_.attribute_num_);
   ASSERT_EQ(array_schema_disk.dim_num_, array_schema_.dim_num_);
   ASSERT_EQ(array_schema_disk.capacity_, array_schema_.capacity_);

@@ -1092,7 +1092,8 @@ int ArraySchema::deserialize(
 
 int ArraySchema::init(const ArraySchemaC* array_schema_c) {
   // Set array workspace
-  set_array_name(array_schema_c->array_workspace_);
+  //KG: useless function - more trouble than worth fixing
+  //set_array_workspace(array_schema_c->array_workspace_);
   // Set array name
   set_array_name(array_schema_c->array_name_);
   // Set attributes
@@ -1259,11 +1260,16 @@ int ArraySchema::init(const MetadataSchemaC* metadata_schema_c) {
 }
 
 void ArraySchema::set_array_workspace(const char* array_workspace) {
-  // Get real array workspace
-  std::string array_workspace_real = real_dir(array_workspace);
+  if(array_workspace)
+  {
+    // Get real array workspace
+    std::string array_workspace_real = real_dir(array_workspace);
 
-  // Set array workspace
-  array_workspace_ = array_workspace_real;
+    // Set array workspace
+    array_workspace_ = array_workspace_real;
+  }
+  else
+    array_workspace_ = current_dir();
 }
 
 void ArraySchema::set_array_name(const char* array_name) {
@@ -1276,7 +1282,8 @@ void ArraySchema::set_array_name(const char* array_name) {
 
   // Set array name
   //array_name_ = array_name_real;
-  array_name_ = array_name;
+  if(array_name)
+    array_name_ = array_name;
 }
 
 int ArraySchema::set_attributes(

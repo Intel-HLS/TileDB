@@ -71,7 +71,7 @@ endif()
 # Find required library dependencies
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIR})
-set(TILEDB_LIB_DEPENDENCIES ${ZLIB_LIBRARIES})
+set(TILEDB_LIB_DEPENDENCIES ${ZLIB_LIBRARIES} uuid)
 if(ENABLE_LZ4)
     find_package(LZ4 REQUIRED)
     include_directories(${LZ4_INCLUDE_DIR})

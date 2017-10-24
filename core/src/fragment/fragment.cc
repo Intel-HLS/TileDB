@@ -306,7 +306,7 @@ int Fragment::rename_fragment() {
 
   std::string parent_dir = ::parent_dir(fragment_name_);
   std::string new_fragment_name = parent_dir + "/" +
-                                  fragment_name_.substr(parent_dir.size() + 2);
+                                  ::real_dir(fragment_name_).substr(parent_dir.size() + 2);
 
   if(rename(fragment_name_.c_str(), new_fragment_name.c_str())) {
     std::string errmsg = 

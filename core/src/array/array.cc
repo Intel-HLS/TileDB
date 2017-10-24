@@ -39,6 +39,7 @@
 #include <sys/time.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <uuid/uuid.h>
 
 /* ****************************** */
 /*             MACROS             */
@@ -1254,10 +1255,19 @@ std::string Array::new_fragment_name() const {
   memcpy(&tid, &self, std::min(sizeof(self), sizeof(tid)));
   char fragment_name[TILEDB_NAME_MAX_LEN];
 
+#ifdef USE_MAC_ADDRESS_IN_FRAGMENT_NAMES
   // Get MAC address
   std::string mac = get_mac_addr();
   if(mac == "")
     return "";
+#else
+  //Use uuids
+  uuid_t value;
+  uuid_generate(value);
+  char uuid_str[40];
+  uuid_unparse(value, uuid_str);
+  std::string mac = uuid_str;
+#endif
 
   // Generate fragment name
   int n = sprintf(
