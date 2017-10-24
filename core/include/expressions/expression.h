@@ -52,6 +52,8 @@
 /** Default error message. */
 #define TILEDB_EXPR_ERRMSG std::string("[TileDB::Expression] Error: ")
 
+//Forward declaration
+class ArrayReadState;
 
 class Expression {
   public:

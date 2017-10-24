@@ -29,6 +29,7 @@
  *
  * This file implements the Expression class.
  */
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
 
 #include <expression.h>
 
@@ -127,4 +128,4 @@ int Expression::evaluate(
   return TILEDB_EXPR_OK;
 }
 
-
+#endif //ENABLE_MUPARSERX_EXPRESSIONS

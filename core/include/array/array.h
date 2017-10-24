@@ -42,7 +42,9 @@
 #include "fragment.h"
 #include "storage_manager_config.h"
 #include "tiledb_constants.h"
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
 #include "expression.h"
+#endif
 #include <pthread.h>
 #include <queue>
 
@@ -196,6 +198,7 @@ class Array {
    */
   int read(void** buffers, size_t* buffer_sizes); 
 
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
   /**
    * Performs a filter operation in an array, which must be initialized in filter 
    * mode. The function retrieves the result cells that lie inside
@@ -229,6 +232,7 @@ class Array {
    * @return TILEDB_AR_OK for success and TILEDB_AR_ERR for error.
    */
   int filter(void** buffers, size_t* buffer_sizes);
+#endif
 
   /**
    * Performs a read operation in an array, which must be initialized in read 
@@ -341,7 +345,6 @@ class Array {
       const std::vector<std::string>& fragment_names,
       const std::vector<BookKeeping*>& book_keeping,
       int mode,
-      Expression* expression,
       const char** attributes,
       int attribute_num,
       const void* subarray,
@@ -529,11 +532,13 @@ class Array {
    */
   void* subarray_;
 
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
   /**
    * The expression object which will be used to filter
    * values
    */
   Expression* expression_;
+#endif
 
 
   /* ********************************* */

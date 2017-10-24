@@ -34,15 +34,21 @@
 #include "tiledb_constants.h"
 #include "utils.h"
 #include "write_state.h"
+#ifdef ENABLE_BLOSC
 #include <blosc.h>
+#endif
 #include <cassert>
 #include <cmath>
 #include <cstring>
 #include <fcntl.h>
+#ifdef ENABLE_LZ4
 #include <lz4.h>
+#endif
 #include <iostream>
 #include <unistd.h>
+#ifdef ENABLE_ZSTD
 #include <zstd.h>
+#endif
 
 
 
@@ -464,10 +470,15 @@ int WriteState::compress_tile(
   // Handle different compression
   if(compression == TILEDB_GZIP)
     return compress_tile_gzip(tile, tile_size, tile_compressed_size);
+#ifdef ENABLE_ZSTD
   else if(compression == TILEDB_ZSTD)
     return compress_tile_zstd(tile, tile_size, tile_compressed_size);
+#endif
+#ifdef ENABLE_LZ4
   else if(compression == TILEDB_LZ4)
     return compress_tile_lz4(tile, tile_size, tile_compressed_size);
+#endif
+#ifdef ENABLE_BLOSC
   else if(compression == TILEDB_BLOSC)
     return compress_tile_blosc(
                attribute_id,
@@ -510,6 +521,7 @@ int WriteState::compress_tile(
                tile_size, 
                tile_compressed_size, 
                "zstd");
+#endif //ifdef ENABLE_BLOSC
   else if(compression == TILEDB_RLE)
     return compress_tile_rle(
                attribute_id, 
@@ -559,6 +571,7 @@ int WriteState::compress_tile_gzip(
   return TILEDB_WS_OK;
 }
 
+#ifdef ENABLE_ZSTD
 int WriteState::compress_tile_zstd(
     unsigned char* tile, 
     size_t tile_size,
@@ -599,7 +612,9 @@ int WriteState::compress_tile_zstd(
   // Success
   return TILEDB_WS_OK;
 }
+#endif //ifdef ENABLE_ZSTD
 
+#ifdef ENABLE_LZ4
 int WriteState::compress_tile_lz4(
     unsigned char* tile, 
     size_t tile_size,
@@ -634,7 +649,9 @@ int WriteState::compress_tile_lz4(
   // Success
   return TILEDB_WS_OK;
 }
+#endif //ifdef ENABLE_LZ4
 
+#ifdef ENABLE_BLOSC
 int WriteState::compress_tile_blosc(
     int attribute_id,
     unsigned char* tile, 
@@ -698,6 +715,7 @@ int WriteState::compress_tile_blosc(
   // Success
   return TILEDB_WS_OK;
 }
+#endif
 
 int WriteState::compress_tile_rle(
     int attribute_id,

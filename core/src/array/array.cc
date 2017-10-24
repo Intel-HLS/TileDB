@@ -308,6 +308,7 @@ int Array::read(void** buffers, size_t* buffer_sizes) {
   }
 }
 
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
 int Array::filter(void** buffers, size_t* buffer_sizes) {
   // Sanity checks
   if(!filter_mode()) {
@@ -339,6 +340,7 @@ int Array::filter(void** buffers, size_t* buffer_sizes) {
 
   return expression_->evaluate(buffers, buffer_sizes);
 }
+#endif
 
 int Array::read_default(void** buffers, size_t* buffer_sizes) {
   if(array_read_state_->read(buffers, buffer_sizes) != TILEDB_ARS_OK) {
@@ -573,7 +575,6 @@ int Array::init(
     const std::vector<std::string>& fragment_names,
     const std::vector<BookKeeping*>& book_keeping,
     int mode,
-    Expression* expression,
     const char** attributes,
     int attribute_num,
     const void* subarray,
@@ -655,11 +656,6 @@ int Array::init(
 
   // Set array schema
   array_schema_ = array_schema;
-
-  // Set expressions for filters (if provided)
-  if (expression) {
-    expression_ = expression;
-  }
 
   // Initialize new fragment if needed
   if(write_mode()) { // WRITE MODE
@@ -1266,7 +1262,7 @@ std::string Array::new_fragment_name() const {
   // Generate fragment name
   int n = sprintf(
               fragment_name, 
-              "%s/.__%s%llu_%llu", 
+              "%s/.__%s%"PRIu64"_%"PRIu64, 
               array_schema_->array_name().c_str(), 
               mac.c_str(),
               tid, 

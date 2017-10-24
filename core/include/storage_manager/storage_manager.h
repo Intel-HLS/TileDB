@@ -251,12 +251,6 @@ class StorageManager {
    *    - TILEDB_ARRAY_READ 
    *    - TILEDB_ARRAY_READ_SORTED_COL 
    *    - TILEDB_ARRAY_READ_SORTED_ROW
-   * @param where_clause The expression to be used to filter records.
-   *     Note that the expression is the condition based on which the
-   *     underlying data will be filtered. The names of the attributes
-   *     specified in the attributes buffer will still be the ones
-   *     returned by the read. If you need all attributes to be returned,
-   *     pass a NULL for the attributes buffer
    * @param subarray The subarray in which the array read/write will be
    *     constrained on. If it is NULL, then the subarray is set to the entire
    *     array domain. For the case of writes, this is meaningful only for
@@ -272,7 +266,6 @@ class StorageManager {
       Array*& array,
       const char* array_dir,
       int mode,
-      Expression* expression,
       const void* subarray,
       const char** attributes,
       int attribute_num);

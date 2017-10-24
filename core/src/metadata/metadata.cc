@@ -227,7 +227,6 @@ int Metadata::init(
               fragment_names,
               book_keeping,
               array_mode,
-              NULL,
               (const char**) array_attributes, 
               array_attribute_num, 
               NULL,

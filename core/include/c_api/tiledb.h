@@ -369,12 +369,6 @@ TILEDB_EXPORT int tiledb_array_create(
  *    - TILEDB_ARRAY_READ 
  *    - TILEDB_ARRAY_READ_SORTED_COL 
  *    - TILEDB_ARRAY_READ_SORTED_ROW
- * @param where_clause The expression to be used to filter records.
- *     Note that the expression is the condition based on which the
- *     underlying data will be filtered. The names of the attributes
- *     specified in the attributes buffer will still be the ones
- *     returned by the read. If you need all attributes to be returned,
- *     pass a NULL for the attributes buffer
  * @param subarray The subarray in which the array read/write will be
  *     constrained on. It should be a sequence of [low, high] pairs (one 
  *     pair per dimension), whose type should be the same as that of the
@@ -394,7 +388,6 @@ TILEDB_EXPORT int tiledb_array_init(
     TileDB_Array** tiledb_array,
     const char* array,
     int mode,
-    std::string where_clause,
     const void* subarray,
     const char** attributes,
     int attribute_num);
@@ -556,6 +549,7 @@ TILEDB_EXPORT int tiledb_array_read(
     void** buffers,
     size_t* buffer_sizes);
 
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
 /**
  * Performs a filter operation on an array.
  * The array must be initialized in one of the following read mode:
@@ -587,6 +581,7 @@ TILEDB_EXPORT int tiledb_array_filter(
     const TileDB_Array* tiledb_array,
     void** buffers,
     size_t* buffer_sizes);
+#endif
 
 /**
  * Checks if a read operation for a particular attribute resulted in a

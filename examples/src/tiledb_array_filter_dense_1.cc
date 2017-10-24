@@ -34,6 +34,7 @@
 #include <cstdio>
 
 int main() {
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
   // Initialize context with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
   tiledb_ctx_init(&tiledb_ctx, NULL);
@@ -51,7 +52,6 @@ int main() {
       &tiledb_array,                                    // Array object
       "my_workspace/dense_arrays/my_array_A",           // Array name
       TILEDB_ARRAY_FILTER,                                // Mode
-      expression,                                       // Expression
       NULL,                                             // Whole domain
       NULL,                                             // All attributes
       0);                                               // Number of attributes
@@ -96,4 +96,8 @@ int main() {
   tiledb_ctx_finalize(tiledb_ctx);
 
   return 0;
+#else //ENABLE_MUPARSERX_EXPRESSIONS
+  fprintf(stderr, "Compiled without MuParserX support\n");
+  return -1;
+#endif //ENABLE_MUPARSERX_EXPRESSIONS
 }

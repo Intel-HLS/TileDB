@@ -123,7 +123,6 @@ void *parallel_read(void* args) {
       &tiledb_array,                             // Array object
       data->array_name,                          // Array name
       TILEDB_ARRAY_READ,                         // Mode
-      NULL,                                      // Expression
       data->subarray,                            // Subarray
       attributes,                                // Subset on attributes
       1);                                        // Number of attributes

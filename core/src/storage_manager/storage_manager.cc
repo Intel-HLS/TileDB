@@ -320,7 +320,6 @@ int StorageManager::array_consolidate(const char* array_dir) {
       TILEDB_ARRAY_READ,
       NULL,
       NULL,
-      NULL,
       0) != TILEDB_SM_OK) 
     return TILEDB_SM_ERR;
 
@@ -547,7 +546,6 @@ int StorageManager::array_init(
     Array*& array,
     const char* array_dir,
     int mode,
-    Expression* expression,
     const void* subarray,
     const char** attributes,
     int attribute_num)  {
@@ -578,7 +576,6 @@ int StorageManager::array_init(
                      open_array->fragment_names_,
                      open_array->book_keeping_,
                      mode,
-                     expression,
                      attributes, 
                      attribute_num, 
                      subarray,
@@ -601,7 +598,6 @@ int StorageManager::array_init(
                open_array->fragment_names_,
                open_array->book_keeping_,
                mode,
-               expression,
                attributes, 
                attribute_num, 
                subarray,
@@ -696,7 +692,6 @@ int StorageManager::array_iterator_init(
       array, 
       array_dir, 
       mode,
-      NULL,
       subarray, 
       attributes, 
       attribute_num) != TILEDB_SM_OK) {

@@ -35,7 +35,9 @@
 #include "array_schema_c.h"
 #include "storage_manager.h"
 #include "storage_manager_config.h"
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
 #include "expression.h"
+#endif
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -276,9 +278,11 @@ typedef struct TileDB_Array {
   const TileDB_CTX* tiledb_ctx_;
 } TileDB_Array;
 
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
 typedef struct TileDB_Expression {
   Expression* expression_;
 } TileDB_Expression;
+#endif
 
 int tiledb_array_set_schema(
     TileDB_ArraySchema* tiledb_array_schema,
@@ -440,7 +444,6 @@ int tiledb_array_init(
     TileDB_Array** tiledb_array,
     const char* array,
     int mode,
-    TileDB_Expression* expression,
     const void* subarray,
     const char** attributes,
     int attribute_num) {
@@ -467,7 +470,6 @@ int tiledb_array_init(
                (*tiledb_array)->array_,
                array,
                mode,
-               expression->expression_,
                subarray,
                attributes,
                attribute_num);
@@ -684,6 +686,7 @@ int tiledb_array_read(
   return TILEDB_OK;
 }
 
+#ifdef ENABLE_MUPARSERX_EXPRESSIONS
 int tiledb_array_filter(
     const TileDB_Array* tiledb_array,
     void** buffers,
@@ -702,6 +705,7 @@ int tiledb_array_filter(
   // Success
   return TILEDB_OK;
 }
+#endif
 
 int tiledb_array_overflow(
     const TileDB_Array* tiledb_array,

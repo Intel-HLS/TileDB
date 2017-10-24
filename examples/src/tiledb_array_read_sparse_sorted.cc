@@ -51,7 +51,6 @@ int main() {
       &tiledb_array,                                    // Array object
       "my_workspace/sparse_arrays/my_array_B",          // Array name
       TILEDB_ARRAY_READ_SORTED_ROW,                     // Mode
-      NULL,                                             // Expression
       subarray,                                         // Constrain in subarray
       attributes,                                       // Subset on attributes
       1);                                               // Number of attributes
