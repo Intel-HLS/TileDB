@@ -32,6 +32,7 @@ set(ENABLE_LZ4 False CACHE BOOL "Enable lz4 compression")
 set(ENABLE_BLOSC False CACHE BOOL "Enable lz4 compression")
 set(ENABLE_ZSTD False CACHE BOOL "Enable lz4 compression")
 set(ENABLE_MUPARSERX_EXPRESSIONS False CACHE BOOL "Enable MuparserX expression parsing")
+set(LIBUUID_DIR "" CACHE PATH "Path to libuuid install directory")
 
 # Set the cmake Module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
@@ -71,7 +72,11 @@ endif()
 # Find required library dependencies
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIR})
-set(TILEDB_LIB_DEPENDENCIES ${ZLIB_LIBRARIES} uuid)
+
+find_package(libuuid REQUIRED)
+include_directories(${LIBUUID_INCLUDE_DIR})
+
+set(TILEDB_LIB_DEPENDENCIES ${ZLIB_LIBRARIES} ${LIBUUID_LIBRARY})
 if(ENABLE_LZ4)
     find_package(LZ4 REQUIRED)
     include_directories(${LZ4_INCLUDE_DIR})

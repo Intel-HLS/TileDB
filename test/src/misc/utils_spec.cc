@@ -93,7 +93,7 @@ TEST_F(UtilsTestFixture, test_RLE) {
   input_size = 100*value_size;
   compressed_size = RLE_compress_bound(input_size, value_size);
   rc = RLE_compress(input, input_size, compressed, compressed_size, value_size);
-  ASSERT_EQ(rc, compressed_size);
+  ASSERT_EQ(static_cast<size_t>(rc), compressed_size);
   decompressed_size = input_size;
   rc = RLE_decompress(
            compressed, 
@@ -304,7 +304,7 @@ TEST_F(UtilsTestFixture, test_RLE_coords_row) {
            compressed_size, 
            value_size,
            dim_num);
-  ASSERT_EQ(rc, compressed_size);
+  ASSERT_EQ(static_cast<size_t>(rc), compressed_size);
   decompressed_size = input_size;
   rc = RLE_decompress_coords_row(
            compressed, 
@@ -461,7 +461,7 @@ TEST_F(UtilsTestFixture, test_RLE_coords_col) {
            compressed_size, 
            value_size,
            dim_num);
-  ASSERT_EQ(rc, compressed_size);
+  ASSERT_EQ(static_cast<size_t>(rc), compressed_size);
   decompressed_size = input_size;
   rc = RLE_decompress_coords_col(
            compressed, 
