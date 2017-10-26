@@ -476,6 +476,11 @@ class Array {
    */
   int write_default(const void** buffers, const size_t* buffer_sizes); 
 
+  /**
+   * Set zlib compression level
+   * @param level zlib compression level
+   */
+  void set_zlib_compression_level(const int level);
  private:
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */

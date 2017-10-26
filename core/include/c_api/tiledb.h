@@ -83,13 +83,6 @@ extern "C" {
 /** Stores potential error messages. */
 extern char tiledb_errmsg[TILEDB_ERRMSG_MAX_LEN];
 
-/** Stores global flag to determine sync writes or not */
-extern int g_TileDB_enable_SYNC_write;
-
-/** Stores the global compression level value */
-extern int g_TileDB_compression_level;
-
-
 /* ********************************* */
 /*              CONFIG               */
 /* ********************************* */
@@ -1328,6 +1321,14 @@ TILEDB_EXPORT int tiledb_array_aio_write(
     const TileDB_Array* tiledb_array,
     TileDB_AIO_Request* tiledb_aio_request);
 
+/**
+ * Set zlib compression level
+ * @param tiledb_array An initialized TileDB array
+ * @param compression level
+ */
+TILEDB_EXPORT void tiledb_array_set_zlib_compression_level(
+    TileDB_Array* tiledb_array,
+    const int level);
 
 #undef TILEDB_EXPORT
 #ifdef __cplusplus

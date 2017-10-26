@@ -1657,3 +1657,15 @@ int tiledb_array_aio_write(
   // Success
   return TILEDB_OK;
 }
+
+/**
+ * Set zlib compression level
+ * @param tiledb_array An initialized TileDB array
+ * @param compression level
+ */
+void tiledb_array_set_zlib_compression_level(
+    TileDB_Array* tiledb_array,
+    const int level)
+{
+  tiledb_array->array_->set_zlib_compression_level(level);
+}

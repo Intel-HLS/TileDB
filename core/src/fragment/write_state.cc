@@ -91,7 +91,8 @@ WriteState::WriteState(
     const Fragment* fragment, 
     BookKeeping* book_keeping)
     : book_keeping_(book_keeping),
-      fragment_(fragment) {
+      fragment_(fragment),
+      zlib_compression_level_(TILEDB_COMPRESSION_LEVEL_GZIP){
   // For easy reference
   const ArraySchema* array_schema = fragment->array()->array_schema();
   int attribute_num = array_schema->attribute_num();
@@ -560,7 +561,7 @@ int WriteState::compress_tile_gzip(
 
   // Compress tile
   ssize_t gzip_size = 
-      gzip(tile, tile_size, tile_compressed, tile_compressed_allocated_size_);
+      gzip(tile, tile_size, tile_compressed, tile_compressed_allocated_size_, zlib_compression_level_);
   if(gzip_size == static_cast<ssize_t>(TILEDB_UT_ERR)) {
     tiledb_ws_errmsg = tiledb_ut_errmsg;
     return TILEDB_WS_ERR;
@@ -2570,3 +2571,7 @@ int WriteState::write_sparse_unsorted_attr_var_cmp(
   return TILEDB_WS_OK;
 }
 
+void WriteState::set_zlib_compression_level(const int level)
+{
+  zlib_compression_level_ = level;
+}

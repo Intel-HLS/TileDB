@@ -157,8 +157,11 @@ class WriteState {
       const void** buffers, 
       const size_t* buffer_sizes);
 
-
-
+  /**
+   * Set zlib compression level
+   * @param level zlib compression level
+   */
+  void set_zlib_compression_level(const int level);
 
  private:
   /* ********************************* */
@@ -198,7 +201,8 @@ class WriteState {
   size_t tile_compressed_allocated_size_;
   /** Offsets to the internal tile buffers used in compression. */
   std::vector<size_t> tile_offsets_;
-
+  /** zlib compression level. */
+  int zlib_compression_level_;
 
 
 

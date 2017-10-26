@@ -301,7 +301,8 @@ ssize_t gzip(
     unsigned char* in, 
     size_t in_size, 
     unsigned char* out, 
-    size_t out_size);
+    size_t out_size,
+    const int level);
 
 /** 
  * Decompresses the GZIPed input buffer and stores the result in the output 

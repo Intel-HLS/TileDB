@@ -1308,3 +1308,8 @@ int Array::open_fragments(
   return TILEDB_AR_OK;
 }
 
+void Array::set_zlib_compression_level(const int level)
+{
+  for(auto fragment_ptr : fragments_)
+    fragment_ptr->set_zlib_compression_level(level);
+}

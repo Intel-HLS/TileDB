@@ -321,3 +321,8 @@ int Fragment::rename_fragment() {
   return TILEDB_FG_OK;
 }
 
+void Fragment::set_zlib_compression_level(const int level)
+{
+  if(write_state_)
+    write_state_->set_zlib_compression_level(level);
+}
