@@ -574,6 +574,7 @@ int Array::finalize() {
 
 int Array::init(
     const ArraySchema* array_schema,
+    const std::string array_path_used,
     const std::vector<std::string>& fragment_names,
     const std::vector<BookKeeping*>& book_keeping,
     int mode,
@@ -584,6 +585,9 @@ int Array::init(
     Array* array_clone) {
   // Set mode
   mode_ = mode;
+
+  //Set path used to access array - might be different from the one in the schema
+  array_path_used_ = array_path_used;
 
   // Set array clone
   array_clone_ = array_clone;
@@ -645,7 +649,7 @@ int Array::init(
     if(sparse                   && 
        array_clone == NULL      && 
        !coords_found            && 
-       !is_metadata(array_schema->array_name()))
+       !is_metadata(get_array_path_used()))
       attributes_vec.push_back(TILEDB_COORDS);
   }
 
@@ -733,8 +737,6 @@ int Array::init(
   aio_thread_canceled_ = false;
   aio_thread_created_ = false;
   aio_last_handled_request_ = -1;
-
-  array_path_used_ = std::move(std::string(array_schema->array_name()));
 
   // Return
   return TILEDB_AR_OK;
@@ -1277,7 +1279,7 @@ std::string Array::new_fragment_name() const {
   int n = sprintf(
               fragment_name, 
               "%s/.__%s%"PRIu64"_%"PRIu64, 
-              array_schema_->array_name().c_str(), 
+              get_array_path_used().c_str(),
               mac.c_str(),
               tid, 
               ms);
@@ -1323,11 +1325,6 @@ void Array::free_array_schema()
   if(array_schema_)
     delete array_schema_;
   array_schema_ = NULL;
-}
-
-void Array::set_array_path_used(const std::string path)
-{
-  array_path_used_ = path;
 }
 
 const std::string& Array::get_array_path_used() const

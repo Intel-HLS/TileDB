@@ -226,6 +226,7 @@ int Metadata::init(
   array_ = new Array();
   int rc = array_->init(
               array_schema, 
+              array_schema->array_name(),
               fragment_names,
               book_keeping,
               array_mode,

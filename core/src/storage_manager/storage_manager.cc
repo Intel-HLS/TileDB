@@ -334,7 +334,7 @@ int StorageManager::array_consolidate(const char* array_dir) {
       array->consolidate(new_fragment, old_fragment_names);
   
   // Close the array
-  int rc_array_close = array_close(array->array_schema()->array_name());
+  int rc_array_close = array_close(array->get_array_path_used());
 
   // Finalize consolidation
   int rc_consolidation_finalize = 
@@ -578,17 +578,20 @@ int StorageManager::array_init(
   if(array_load_schema(array_dir, array_schema) != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
 
+  std::string full_array_path = real_dir(array_dir);
+
   // Open the array
   OpenArray* open_array = NULL;
   if(array_read_mode(mode)) {
-    if(array_open(real_dir(array_dir), open_array, mode) != TILEDB_SM_OK)
+    if(array_open(full_array_path, open_array, mode) != TILEDB_SM_OK)
       return TILEDB_SM_ERR;
   }
 
   // Create the clone Array object
   Array* array_clone = new Array();
   int rc_clone = array_clone->init(
-                     array_schema, 
+                     array_schema,
+                     full_array_path,
                      open_array->fragment_names_,
                      open_array->book_keeping_,
                      mode,
@@ -603,14 +606,15 @@ int StorageManager::array_init(
     delete array_clone;
     array = NULL;
     if(array_read_mode(mode)) 
-      array_close(array_dir);
+      array_close(full_array_path);
     return TILEDB_SM_ERR;
   } 
 
   // Create actual array
   array = new Array();
   int rc = array->init(
-               array_schema, 
+               array_schema,
+               full_array_path,
                open_array->fragment_names_,
                open_array->book_keeping_,
                mode,
@@ -626,12 +630,10 @@ int StorageManager::array_init(
     delete array;
     array = NULL;
     if(array_read_mode(mode)) 
-      array_close(array_dir);
+      array_close(full_array_path);
     tiledb_sm_errmsg = tiledb_as_errmsg;
     return TILEDB_SM_ERR;
   }
-
-  array->set_array_path_used(real_dir(array_dir));
 
   // Success
   return TILEDB_SM_OK;
@@ -1845,7 +1847,7 @@ int StorageManager::consolidation_finalize(
   // Acquire exclusive lock on consolidation filelock
   int fd;
   if(consolidation_filelock_lock(
-      new_fragment->array()->array_schema()->array_name(),
+      new_fragment->array()->get_array_path_used(),
       fd,
       TILEDB_SM_EXCLUSIVE_LOCK) != TILEDB_SM_OK) {
     delete new_fragment;

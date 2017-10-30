@@ -80,7 +80,7 @@ ArrayIterator::~ArrayIterator() {
 /* ****************************** */
 
 const std::string& ArrayIterator::array_name() const {
-  return array_->array_schema()->array_name();
+  return array_->get_array_path_used();
 }
 
 bool ArrayIterator::end() const {

@@ -310,6 +310,9 @@ int tiledb_array_set_schema(
     return TILEDB_ERR;
   }
 
+  //Nullify workspace
+  tiledb_array_schema->array_workspace_ = NULL;
+
   // Set array name
   size_t array_name_len = strlen(array_name); 
   if(array_name == NULL || array_name_len > TILEDB_NAME_MAX_LEN) {

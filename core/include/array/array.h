@@ -315,6 +315,7 @@ class Array {
    * Initializes a TileDB array object.
    *
    * @param array_schema The array schema.
+   * @param array_path_used The path to the array as specified by the caller - might be different from the one in array_schema
    * @param fragment_names The names of the fragments of the array.
    * @param book_keeping The book-keeping structures of the fragments
    *     of the array.
@@ -342,6 +343,7 @@ class Array {
    */
   int init(
       const ArraySchema* array_schema, 
+      const std::string array_path_used,
       const std::vector<std::string>& fragment_names,
       const std::vector<BookKeeping*>& book_keeping,
       int mode,
@@ -486,12 +488,6 @@ class Array {
    * Free array_schema_
    */
   void free_array_schema();
-
-  /**
-   * Set path used to open array - might be different from the one in the
-   * schema if the array is moved
-   */
-  void set_array_path_used(const std::string path);
 
   /**
    * Get path used to open array - might be different from the one in the
