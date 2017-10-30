@@ -528,6 +528,18 @@ int StorageManager::array_load_schema(
     return TILEDB_SM_ERR;
   }
 
+  //Old TileDB version - create consolidate file
+  if(!(array_schema->version_tag_exists())) {
+    std::string filename = real_array_dir + "/" + TILEDB_SM_CONSOLIDATION_FILELOCK_NAME;
+    int fd = ::open(filename.c_str(), O_WRONLY | O_CREAT | O_SYNC, S_IRWXU);
+    if(fd == -1) {
+      tiledb_sm_errmsg = strerror(errno);
+      return TILEDB_SM_ERR;
+    }
+    else
+      ::close(fd);
+  }
+
   // Clean up
   free(buffer);
   if(::close(fd)) {

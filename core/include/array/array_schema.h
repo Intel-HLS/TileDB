@@ -666,6 +666,10 @@ class ArraySchema {
   int tile_order_cmp(const T* coords_a, const T* coords_b) const;
 
 
+  /**
+   * Returns true if the schema has a version tag
+   */
+  bool version_tag_exists() const;
 
   /* ********************************* */
   /*        AUXILIARY ATTRIBUTES       */
@@ -808,6 +812,8 @@ class ArraySchema {
   std::vector<size_t> type_sizes_;
   /** Stores the compression level of the array */
   int compression_level;
+  /** Array schema version **/
+  unsigned version_tag_;
 
 
 

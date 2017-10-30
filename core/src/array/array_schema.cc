@@ -52,7 +52,11 @@
 #  define PRINT_ERROR(x) do { } while(0) 
 #endif
 
+//First 4 bytes of the array schema
+//To avoid conflicts with array size value in older schema, version tags are really large values
+#define TILEDB_ARRAY_SCHEMA_VERSION_TAG 0xFFFFFFFFu
 
+#define TILEDB_ARRAY_SCHEMA_MIN_VERSION_TAG 0xFFFFFFF0u
 
 
 /* ****************************** */
@@ -76,6 +80,7 @@ ArraySchema::ArraySchema() {
   tile_extents_ = NULL;
   tile_domain_ = NULL;
   tile_coords_aux_ = NULL;
+  version_tag_ = TILEDB_ARRAY_SCHEMA_VERSION_TAG;
 }
 
 ArraySchema::~ArraySchema() {
@@ -600,6 +605,10 @@ int ArraySchema::serialize(
   size_t buffer_size = array_schema_bin_size;
   size_t offset = 0;
 
+  //Write version tag
+  memcpy(buffer + offset, &version_tag_, sizeof(version_tag_));
+  offset += sizeof(unsigned);
+
   // Copy array_workspace_
   int array_workspace_size = array_workspace_.size();
   assert(offset + sizeof(int) < buffer_size);
@@ -942,16 +951,29 @@ int ArraySchema::deserialize(
   const char* buffer = static_cast<const char*>(array_schema_bin);
   size_t buffer_size = array_schema_bin_size;
   size_t offset = 0;
+
+  //Check if version tag exists
+  //The latest version of TileDB adds a version tag. The older schema doesn't have any.
+  //By doing a quick check of the version tag, previously loaded arrays can be queried by
+  //the newer version
+  assert(offset + sizeof(unsigned) < buffer_size);
+  memcpy(&version_tag_, buffer + offset, sizeof(unsigned));
   
-  // Load array_workspace_
-  int array_workspace_size;
-  assert(offset + sizeof(int) < buffer_size);
-  memcpy(&array_workspace_size, buffer + offset, sizeof(int));
-  offset += sizeof(int);
-  array_workspace_.resize(array_workspace_size);
-  assert(offset + array_workspace_size < buffer_size);
-  memcpy(&array_workspace_[0], buffer + offset, array_workspace_size);
-  offset += array_workspace_size;
+  //The older version of TileDB does NOT have workspace information
+  if(version_tag_exists())
+  {
+    //Move past version tag
+    offset += sizeof(unsigned);
+    // Load array_workspace_
+    int array_workspace_size;
+    assert(offset + sizeof(int) < buffer_size);
+    memcpy(&array_workspace_size, buffer + offset, sizeof(int));
+    offset += sizeof(int);
+    array_workspace_.resize(array_workspace_size);
+    assert(offset + array_workspace_size < buffer_size);
+    memcpy(&array_workspace_[0], buffer + offset, array_workspace_size);
+    offset += array_workspace_size;
+  }
   // Load array_name_ 
   int array_name_size;
   assert(offset + sizeof(int) < buffer_size);
@@ -961,6 +983,7 @@ int ArraySchema::deserialize(
   assert(offset + array_name_size < buffer_size);
   memcpy(&array_name_[0], buffer + offset, array_name_size);
   offset += array_name_size;
+
   // Load dense_
   assert(offset + sizeof(bool) < buffer_size);
   memcpy(&dense_, buffer + offset, sizeof(bool));
@@ -2196,6 +2219,9 @@ size_t ArraySchema::compute_bin_size() const {
   // Initialization
   size_t bin_size = 0;
 
+  //Size for version tag
+  bin_size += sizeof(unsigned);
+
   // Size for array_workspace_
   bin_size += sizeof(int) + array_workspace_.size();
   // Size for array_name_ 
@@ -2729,6 +2755,10 @@ int64_t ArraySchema::tile_slab_row_cell_num(const T* subarray) const {
 }
 
 
+bool ArraySchema::version_tag_exists() const
+{
+  return (version_tag_ >= TILEDB_ARRAY_SCHEMA_MIN_VERSION_TAG);
+}
 
 
 // Explicit template instantiations
