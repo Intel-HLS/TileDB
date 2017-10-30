@@ -481,6 +481,11 @@ class Array {
    * @param level zlib compression level
    */
   void set_zlib_compression_level(const int level);
+
+  /*
+   * Free array_schema_
+   */
+  void free_array_schema();
  private:
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */

@@ -201,6 +201,10 @@ typedef struct TileDB_Array TileDB_Array;
 
 /** The array schema. */
 typedef struct TileDB_ArraySchema {
+  /**
+   * The TileDB workspace. It is a directory.
+   */
+  char* array_workspace_;
   /** 
    * The array name. It is a directory, whose parent must be a TileDB workspace,
    * or group.

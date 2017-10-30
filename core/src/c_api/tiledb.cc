@@ -578,6 +578,7 @@ int tiledb_array_load_schema(
   array_schema->array_schema_export(&array_schema_c);
 
   // Copy the array schema C struct to the output
+  tiledb_array_schema->array_workspace_ = array_schema_c.array_workspace_;
   tiledb_array_schema->array_name_ = array_schema_c.array_name_;
   tiledb_array_schema->attributes_ = array_schema_c.attributes_; 
   tiledb_array_schema->attribute_num_ = array_schema_c.attribute_num_;
@@ -605,6 +606,10 @@ int tiledb_array_free_schema(
   // Trivial case
   if(tiledb_array_schema == NULL)
     return TILEDB_OK;
+
+  // Free workspace
+  if(tiledb_array_schema->array_workspace_ != NULL)
+    free(tiledb_array_schema->array_workspace_);
 
   // Free array name
   if(tiledb_array_schema->array_name_ != NULL)
@@ -645,6 +650,8 @@ int tiledb_array_free_schema(
   // Free cell val num
   if(tiledb_array_schema->cell_val_num_ != NULL)
     free(tiledb_array_schema->cell_val_num_);
+
+  memset(tiledb_array_schema, 0, sizeof(TileDB_ArraySchema));
 
   // Success
   return TILEDB_OK;

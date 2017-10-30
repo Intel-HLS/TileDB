@@ -95,9 +95,10 @@ Array::~Array() {
     delete array_clone_;
     if(array_schema_ != NULL)
       delete array_schema_;
-    if(subarray_ != NULL)
-      free(subarray_);
   }
+  if(subarray_ != NULL)
+    free(subarray_);
+  subarray_ = NULL;
 }
 
 
@@ -770,9 +771,10 @@ int Array::reset_attributes(
 
   // Set attribute ids
   if(array_schema_->get_attribute_ids(attributes_vec, attribute_ids_) 
-         != TILEDB_AS_OK)
+         != TILEDB_AS_OK) {
     tiledb_ar_errmsg = tiledb_as_errmsg;
     return TILEDB_AR_ERR;
+  }
 
   // Reset subarray so that the read/write states are flushed
   if(reset_subarray(subarray_) != TILEDB_AR_OK) 
@@ -806,7 +808,7 @@ int Array::reset_subarray(const void* subarray) {
   if(subarray == NULL) 
     memcpy(subarray_, array_schema_->domain(), subarray_size);
   else 
-    memcpy(subarray_, subarray, subarray_size);
+    memmove(subarray_, subarray, subarray_size); //subarray_ and subarray might be the same memory area - see line 780
 
   // Re-set or re-initialize fragments
   if(write_mode()) {  // WRITE MODE 
@@ -1312,4 +1314,11 @@ void Array::set_zlib_compression_level(const int level)
 {
   for(auto fragment_ptr : fragments_)
     fragment_ptr->set_zlib_compression_level(level);
+}
+
+void Array::free_array_schema()
+{
+  if(array_schema_)
+    delete array_schema_;
+  array_schema_ = NULL;
 }

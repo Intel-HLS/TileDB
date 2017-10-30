@@ -370,7 +370,10 @@ int ArrayReadState::compute_unsorted_fragment_cell_ranges_sparse(
         return TILEDB_ARS_ERR;
       }
 
-      unsorted_fragment_cell_ranges.push_back(fragment_cell_ranges);
+      //This might be empty if no cells found in fragment for the query subarray
+      //MBR overlap does not guarantee existence of cells in the subarray
+      if(!fragment_cell_ranges.empty())
+        unsorted_fragment_cell_ranges.push_back(fragment_cell_ranges);
 
       // If the end bounding coordinate is not the same as the smallest one, 
       // update the start bounding coordinate to exceed the smallest
@@ -1426,6 +1429,13 @@ int ArrayReadState::get_next_fragment_cell_ranges_sparse() {
   if(compute_unsorted_fragment_cell_ranges_sparse<T>(
          unsorted_fragment_cell_ranges) != TILEDB_ARS_OK)
     return TILEDB_ARS_ERR;
+
+  //MBR overlap does not guarantee existence of cells in the subarray
+  //compute_unsorted_fragment_cell_ranges_sparse might determine no cells
+  if(unsorted_fragment_cell_ranges.empty()) {
+    done_ = true;
+    return TILEDB_ARS_OK;
+  }
 
   // Sort fragment cell ranges
   FragmentCellRanges fragment_cell_ranges;

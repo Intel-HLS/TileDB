@@ -125,9 +125,6 @@ if(ENABLE_MUPARSERX_EXPRESSIONS)
 endif()
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-foreach(dir ${dirs})
-  message(STATUS "dir='${dir}'")
-endforeach()
 
 # Set compiler flags
 set(CMAKE_CXX_FLAGS_DEBUG "-DDEBUG -g3 -gdwarf-3 -Wall -fvisibility=hidden")

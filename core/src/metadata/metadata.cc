@@ -148,6 +148,8 @@ int Metadata::consolidate(
 int Metadata::finalize() {
   int rc = array_->finalize();
 
+  array_->free_array_schema(); //~Array() doesn't free schema because clone == NULL inside array_
+
   delete array_;
   array_ = NULL;
 
