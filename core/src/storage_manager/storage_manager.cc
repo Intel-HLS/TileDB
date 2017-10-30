@@ -105,6 +105,7 @@ int StorageManager::init(StorageManagerConfig* config) {
   if(config_set(config) != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
 
+#ifdef ENABLE_MASTER_CATALOG
   // Set the master catalog directory
   master_catalog_dir_ = tiledb_home_ + "/" + TILEDB_SM_MASTER_CATALOG;
 
@@ -121,6 +122,7 @@ int StorageManager::init(StorageManagerConfig* config) {
     if(master_catalog_create() != TILEDB_SM_OK)
       return TILEDB_SM_ERR;
   }
+#endif //ENABLE_MASTER_CATALOG
 
   // Initialize mutexes and return
   return open_array_mtx_init();
@@ -158,9 +160,11 @@ int StorageManager::workspace_create(const std::string& workspace) {
   if(create_workspace_file(workspace) != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
 
+#ifdef ENABLE_MASTER_CATALOG
   // Create master catalog entry
   if(create_master_catalog_entry(workspace, TILEDB_SM_MC_INS) != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
+#endif
 
   // Success
   return TILEDB_SM_OK;
@@ -627,6 +631,8 @@ int StorageManager::array_init(
     return TILEDB_SM_ERR;
   }
 
+  array->set_array_path_used(real_dir(array_dir));
+
   // Success
   return TILEDB_SM_OK;
 }
@@ -640,7 +646,7 @@ int StorageManager::array_finalize(Array* array) {
   int rc_finalize = array->finalize();
   int rc_close = TILEDB_SM_OK;
   if(array->read_mode())
-    rc_close = array_close(array->array_schema()->array_name());
+    rc_close = array_close(array->get_array_path_used());
 
   // Clean up
   delete array;
@@ -2483,6 +2489,7 @@ int StorageManager::workspace_delete(
     return TILEDB_SM_ERR;
   }  
 
+#ifdef ENABLE_MASTER_CATALOG
   // Master catalog should exist
   if(!is_metadata(master_catalog_real)) {
     std::string errmsg = 
@@ -2492,6 +2499,7 @@ int StorageManager::workspace_delete(
     tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
     return TILEDB_SM_ERR;
   }  
+#endif
 
   // Clear workspace 
   if(workspace_clear(workspace_real) != TILEDB_SM_OK)
@@ -2503,6 +2511,7 @@ int StorageManager::workspace_delete(
     return TILEDB_SM_ERR;
   }
 
+#ifdef ENABLE_MASTER_CATALOG
   // Update master catalog by deleting workspace 
   if(create_master_catalog_entry(workspace_real, TILEDB_SM_MC_DEL) != 
       TILEDB_SM_OK)
@@ -2511,6 +2520,7 @@ int StorageManager::workspace_delete(
   // Consolidate master catalog
   if(master_catalog_consolidate() != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
+#endif
 
   // Success
   return TILEDB_SM_OK;
@@ -2565,6 +2575,7 @@ int StorageManager::workspace_move(
     return TILEDB_SM_ERR;
   }
 
+#ifdef ENABLE_MASTER_CATALOG
   // Master catalog should exist
   if(!is_metadata(master_catalog_real)) {
     std::string errmsg =
@@ -2574,6 +2585,7 @@ int StorageManager::workspace_move(
     tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
     return TILEDB_SM_ERR;
   }  
+#endif
 
   // Rename directory 
   if(rename(old_workspace_real.c_str(), new_workspace_real.c_str())) {
@@ -2584,6 +2596,7 @@ int StorageManager::workspace_move(
     return TILEDB_SM_ERR;
   }
 
+#ifdef ENABLE_MASTER_CATALOG
   // Update master catalog by adding new workspace 
   if(create_master_catalog_entry(old_workspace_real, TILEDB_SM_MC_DEL) !=
      TILEDB_SM_OK)
@@ -2595,6 +2608,7 @@ int StorageManager::workspace_move(
   // Consolidate master catalog
   if(master_catalog_consolidate() != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
+#endif
 
   // Success
   return TILEDB_SM_OK;

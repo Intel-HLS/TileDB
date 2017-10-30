@@ -734,6 +734,8 @@ int Array::init(
   aio_thread_created_ = false;
   aio_last_handled_request_ = -1;
 
+  array_path_used_ = std::move(std::string(array_schema->array_name()));
+
   // Return
   return TILEDB_AR_OK;
 }
@@ -1321,4 +1323,14 @@ void Array::free_array_schema()
   if(array_schema_)
     delete array_schema_;
   array_schema_ = NULL;
+}
+
+void Array::set_array_path_used(const std::string path)
+{
+  array_path_used_ = path;
+}
+
+const std::string& Array::get_array_path_used() const
+{
+  return array_path_used_;
 }

@@ -486,6 +486,19 @@ class Array {
    * Free array_schema_
    */
   void free_array_schema();
+
+  /**
+   * Set path used to open array - might be different from the one in the
+   * schema if the array is moved
+   */
+  void set_array_path_used(const std::string path);
+
+  /**
+   * Get path used to open array - might be different from the one in the
+   * schema if the array is moved
+   */
+  const std::string& get_array_path_used() const;
+
  private:
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */
@@ -549,6 +562,8 @@ class Array {
    */
   Expression* expression_;
 #endif
+
+  std::string array_path_used_;
 
 
   /* ********************************* */

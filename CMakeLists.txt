@@ -33,6 +33,7 @@ set(ENABLE_BLOSC False CACHE BOOL "Enable lz4 compression")
 set(ENABLE_ZSTD False CACHE BOOL "Enable lz4 compression")
 set(ENABLE_MUPARSERX_EXPRESSIONS False CACHE BOOL "Enable MuparserX expression parsing")
 set(LIBUUID_DIR "" CACHE PATH "Path to libuuid install directory")
+set(ENABLE_MASTER_CATALOG True CACHE BOOL "Enable master catalog")
 
 # Set the cmake Module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
@@ -67,6 +68,10 @@ set(COMPRESSION_LEVEL_ZSTD "" CACHE STRING "Compression level for Zstandard.")
 set(COMPRESSION_LEVEL_BLOSC "" CACHE STRING "Compression level for Blosc.")
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
+endif()
+
+if(ENABLE_MASTER_CATALOG)
+    add_definitions(-DENABLE_MASTER_CATALOG)
 endif()
 
 # Find required library dependencies
