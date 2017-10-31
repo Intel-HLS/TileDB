@@ -796,4 +796,12 @@ int write_to_file_cmp_gzip(
     const void* buffer, 
     size_t buffer_size);
 
+
+/**
+ * Delete directories
+ * @param vector of directory paths
+ * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
+ */
+int delete_directories(const std::vector<std::string>& directories);
+
 #endif

@@ -308,12 +308,17 @@ int delete_dir(const std::string& dirname) {
     return TILEDB_UT_ERR;
   }
 
+  std::vector<std::string> all_filenames;
   while((next_file = readdir(dir))) {
     if(!strcmp(next_file->d_name, ".") ||
        !strcmp(next_file->d_name, ".."))
       continue;
     filename = dirname_real + "/" + next_file->d_name;
-    if(remove(filename.c_str())) {
+    all_filenames.emplace_back(filename);
+  }
+
+  for(const auto& curr_filename : all_filenames) {
+    if(remove(curr_filename.c_str())) {
       std::string errmsg = 
           std::string("Cannot delete file; ") + strerror(errno);
       PRINT_ERROR(errmsg);
@@ -1976,6 +1981,17 @@ int write_to_file_cmp_gzip(
   }
 
   // Success 
+  return TILEDB_UT_OK;
+}
+
+int delete_directories(const std::vector<std::string>& directories)
+{
+  // Delete old fragments
+  for(auto i=0u; i<directories.size(); ++i) {
+    if(delete_dir(directories[i]) != TILEDB_UT_OK) {
+      return TILEDB_UT_ERR;
+    }
+  }
   return TILEDB_UT_OK;
 }
 

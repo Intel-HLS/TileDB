@@ -343,7 +343,9 @@ int StorageManager::array_consolidate(const char* array_dir) {
   // Finalize array
   int rc_array_finalize = array->finalize();
   delete array;
-  
+
+  int rc_delete = delete_directories(old_fragment_names);
+
   // Errors 
   if(rc_array_consolidate != TILEDB_AR_OK) {
     tiledb_sm_errmsg = tiledb_ar_errmsg;
@@ -351,7 +353,8 @@ int StorageManager::array_consolidate(const char* array_dir) {
   }
   if(rc_array_close != TILEDB_SM_OK              ||
      rc_array_finalize != TILEDB_SM_OK           ||
-     rc_consolidation_finalize != TILEDB_SM_OK)
+     rc_consolidation_finalize != TILEDB_SM_OK   ||
+     rc_delete != TILEDB_UT_OK)
     return TILEDB_SM_ERR;
 
   // Success
@@ -820,7 +823,9 @@ int StorageManager::metadata_consolidate(const char* metadata_dir) {
   // Finalize metadata
   int rc_metadata_finalize = metadata->finalize();
   delete metadata;
-  
+
+  int rc_delete = delete_directories(old_fragment_names);
+
   // Errors 
   if(rc_metadata_consolidate != TILEDB_MT_OK) {
     tiledb_sm_errmsg = tiledb_mt_errmsg;
@@ -828,7 +833,9 @@ int StorageManager::metadata_consolidate(const char* metadata_dir) {
   }
   if(rc_array_close != TILEDB_SM_OK            ||
      rc_metadata_finalize != TILEDB_SM_OK      ||
-     rc_consolidation_finalize != TILEDB_SM_OK)
+     rc_consolidation_finalize != TILEDB_SM_OK ||
+     rc_delete != TILEDB_UT_OK
+     )
     return TILEDB_SM_ERR;
 
   // Success
@@ -1882,13 +1889,6 @@ int StorageManager::consolidation_finalize(
   if(consolidation_filelock_unlock(fd) != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
 
-  // Delete old fragments
-  for(int i=0; i<fragment_num; ++i) {
-    if(delete_dir(old_fragment_names[i]) != TILEDB_UT_OK) {
-      tiledb_sm_errmsg = tiledb_ut_errmsg;
-      return TILEDB_SM_ERR;
-    }
-  }
 
   // Success
   return TILEDB_SM_OK;
