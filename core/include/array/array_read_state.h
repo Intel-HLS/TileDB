@@ -35,6 +35,7 @@
 
 #include "array.h"
 #include "array_schema.h"
+#define __STDC_FORMAT_MACROS
 #include <cstring>
 #include <inttypes.h>
 #include <queue>
