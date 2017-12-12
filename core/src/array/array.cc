@@ -1278,7 +1278,7 @@ std::string Array::new_fragment_name() const {
   // Generate fragment name
   int n = sprintf(
               fragment_name, 
-              "%s/.__%s%"PRIu64"_%"PRIu64, 
+              "%s/.__%s%" PRIu64"_%" PRIu64,
               get_array_path_used().c_str(),
               mac.c_str(),
               tid, 
