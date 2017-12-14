@@ -1401,9 +1401,10 @@ int StorageManager::array_clear(
     if(is_metadata(filename)) {         // Metadata
       metadata_delete(filename);
     } else if(is_fragment(filename)){   // Fragment
-      if(delete_dir(filename) != TILEDB_UT_OK)
+      if(delete_dir(filename) != TILEDB_UT_OK) {
         tiledb_sm_errmsg = tiledb_ut_errmsg;
         return TILEDB_SM_ERR;
+      }
     } else {                            // Non TileDB related
       std::string errmsg =
           std::string("Cannot delete non TileDB related element '") +
