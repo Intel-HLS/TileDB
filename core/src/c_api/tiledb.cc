@@ -5,7 +5,8 @@
  *
  * The MIT License
  *
- * @copyright Copyright (c) 2016 MIT and Intel Corp.
+ * @copyright Copyright (c) 2017 TileDB, Inc.
+ * @copyright Copyright (c) 2016 MIT and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,77 +31,338 @@
  * This file defines the C API of TileDB.
  */
 
-#include "aio_request.h"
 #include "tiledb.h"
-#include "array_schema_c.h"
-#include "storage_manager.h"
-#include "storage_manager_config.h"
-#include <cassert>
-#include <cstring>
-#include <iostream>
+#include "array_metadata.h"
+#include "config.h"
+#include "kv.h"
+#include "logger.h"
+#include "query.h"
+#include "utils.h"
+
+#include <sstream>
 
 /* ****************************** */
-/*             MACROS             */
+/*            CONSTANTS           */
 /* ****************************** */
 
-#ifdef TILEDB_VERBOSE
-#  define PRINT_ERROR(x) std::cerr << TILEDB_ERRMSG << x << ".\n" 
-#else
-#  define PRINT_ERROR(x) do { } while(0) 
-#endif
+const char* tiledb_coords() {
+  return tiledb::constants::coords;
+}
 
-
-
+unsigned int tiledb_var_num() {
+  return tiledb::constants::var_num;
+}
 
 /* ****************************** */
-/*        GLOBAL VARIABLES        */
+/*            VERSION             */
 /* ****************************** */
 
-char tiledb_errmsg[TILEDB_ERRMSG_MAX_LEN];
+void tiledb_version(int* major, int* minor, int* rev) {
+  *major = tiledb::constants::version[0];
+  *minor = tiledb::constants::version[1];
+  *rev = tiledb::constants::version[2];
+}
 
+/* ********************************* */
+/*           TILEDB TYPES            */
+/* ********************************* */
 
+struct tiledb_config_t {
+  tiledb::Config* config_;
+};
 
+struct tiledb_ctx_t {
+  tiledb::StorageManager* storage_manager_;
+  tiledb::Status* last_error_;
+  std::mutex* mtx_;
+};
+
+struct tiledb_error_t {
+  // Pointer to a copy of the last TileDB error associated with a given ctx
+  const tiledb::Status* status_;
+  std::string* errmsg_;
+};
+
+struct tiledb_attribute_t {
+  tiledb::Attribute* attr_;
+};
+
+struct tiledb_array_metadata_t {
+  tiledb::ArrayMetadata* array_metadata_;
+};
+
+struct tiledb_attribute_iter_t {
+  const tiledb_array_metadata_t* array_metadata_;
+  tiledb_attribute_t* attr_;
+  unsigned int attr_num_;
+  unsigned int current_attr_;
+};
+
+struct tiledb_dimension_t {
+  tiledb::Dimension* dim_;
+};
+
+struct tiledb_dimension_iter_t {
+  const tiledb_domain_t* domain_;
+  tiledb_dimension_t* dim_;
+  unsigned int dim_num_;
+  unsigned int current_dim_;
+};
+
+struct tiledb_domain_t {
+  tiledb::Domain* domain_;
+};
+
+struct tiledb_query_t {
+  tiledb::Query* query_;
+};
+
+struct tiledb_kv_t {
+  tiledb::KV* kv_;
+};
+
+struct tiledb_vfs_t {
+  tiledb::VFS* vfs_;
+};
+
+/* ********************************* */
+/*         AUXILIARY FUNCTIONS       */
+/* ********************************* */
+
+/* Saves a status inside the context object. */
+static bool save_error(tiledb_ctx_t* ctx, const tiledb::Status& st) {
+  // No error
+  if (st.ok())
+    return false;
+
+  // Store new error
+  {
+    std::lock_guard<std::mutex> lock(*(ctx->mtx_));
+    delete ctx->last_error_;
+    ctx->last_error_ = new (std::nothrow) tiledb::Status(st);
+  }
+
+  // There is an error
+  return true;
+}
+
+inline int sanity_check(tiledb_config_t* config) {
+  if (config == nullptr || config->config_ == nullptr)
+    return TILEDB_ERR;
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx) {
+  if (ctx == nullptr)
+    return TILEDB_ERR;
+  if (ctx->storage_manager_ == nullptr) {
+    tiledb::Status st = tiledb::Status::Error("Invalid TileDB context");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_error_t* err) {
+  if (err == nullptr || err->status_ == nullptr) {
+    tiledb::Status st = tiledb::Status::Error("Invalid TileDB error struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_attribute_t* attr) {
+  if (attr == nullptr || attr->attr_ == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Invalid TileDB attribute struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(
+    tiledb_ctx_t* ctx, const tiledb_attribute_iter_t* attr_it) {
+  if (attr_it == nullptr || attr_it->array_metadata_ == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Invalid TileDB attribute iterator struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(
+    tiledb_ctx_t* ctx, const tiledb_dimension_iter_t* dim_it) {
+  if (dim_it == nullptr || dim_it->domain_ == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Invalid TileDB dimension iterator struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_dimension_t* dim) {
+  if (dim == nullptr || dim->dim_ == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Invalid TileDB dimension struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(
+    tiledb_ctx_t* ctx, const tiledb_array_metadata_t* array_metadata) {
+  if (array_metadata == nullptr || array_metadata->array_metadata_ == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Invalid TileDB array metadata struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_domain_t* domain) {
+  if (domain == nullptr || domain->domain_ == nullptr) {
+    tiledb::Status st = tiledb::Status::Error("Invalid TileDB domain struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_query_t* query) {
+  if (query == nullptr || query->query_ == nullptr) {
+    tiledb::Status st = tiledb::Status::Error("Invalid TileDB query struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_kv_t* kv) {
+  if (kv == nullptr || kv->kv_ == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Invalid TileDB in-memory key-value store struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_vfs_t* vfs) {
+  if (vfs == nullptr || vfs->vfs_ == nullptr) {
+    save_error(
+        ctx, tiledb::Status::Error("Invalid TileDB virtual filesystem struct"));
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+/* ****************************** */
+/*            CONFIG              */
+/* ****************************** */
+
+int tiledb_config_create(tiledb_config_t** config) {
+  // Create a new config struct
+  *config = new (std::nothrow) tiledb_config_t;
+  if (*config == nullptr)
+    return TILEDB_OOM;
+
+  // Create storage manager
+  (*config)->config_ = new (std::nothrow) tiledb::Config();
+  if ((*config)->config_ == nullptr)
+    return TILEDB_OOM;
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_config_free(tiledb_config_t* config) {
+  if (config != nullptr) {
+    delete config->config_;
+    delete config;
+  }
+
+  // Always succeeds
+  return TILEDB_OK;
+}
+
+int tiledb_config_set(
+    tiledb_config_t* config, const char* param, const char* value) {
+  if (sanity_check(config) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  config->config_->set(param, value);
+
+  return TILEDB_OK;
+}
+
+int tiledb_config_set_from_file(tiledb_config_t* config, const char* filename) {
+  if (sanity_check(config) == TILEDB_ERR || filename == nullptr)
+    return TILEDB_ERR;
+
+  config->config_->set_config_filename(filename);
+
+  return TILEDB_OK;
+}
+
+int tiledb_config_unset(tiledb_config_t* config, const char* param) {
+  if (sanity_check(config) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  config->config_->unset(param);
+
+  return TILEDB_OK;
+}
 
 /* ****************************** */
 /*            CONTEXT             */
 /* ****************************** */
 
-typedef struct TileDB_CTX {
-  StorageManager* storage_manager_;
-} TileDB_CTX;
-
-int tiledb_ctx_init(
-    TileDB_CTX** tiledb_ctx, 
-    const TileDB_Config* tiledb_config) {
-  // Initialize error message to empty
-  strcpy(tiledb_errmsg, "");
+int tiledb_ctx_create(tiledb_ctx_t** ctx, tiledb_config_t* config) {
+  if (config != nullptr && config->config_ == nullptr)
+    return TILEDB_ERR;
 
   // Initialize context
-  *tiledb_ctx = (TileDB_CTX*) malloc(sizeof(struct TileDB_CTX));
-  if(*tiledb_ctx == NULL) {
-    std::string errmsg = 
-        "Cannot initialize TileDB context; Failed to allocate memory "
-        "space for the context";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
+  *ctx = new (std::nothrow) tiledb_ctx_t;
+  if (*ctx == nullptr)
+    return TILEDB_OOM;
 
-  // Initialize a Config object
-  StorageManagerConfig* config = new StorageManagerConfig();
-  if(tiledb_config != NULL)
-    config->init(
-        tiledb_config->home_, 
-#ifdef HAVE_MPI
-        tiledb_config->mpi_comm_, 
-#endif
-        tiledb_config->read_method_, 
-        tiledb_config->write_method_);
+  // Create mutex
+  (*ctx)->mtx_ = new (std::nothrow) std::mutex();
 
   // Create storage manager
-  (*tiledb_ctx)->storage_manager_ = new StorageManager();
-  if((*tiledb_ctx)->storage_manager_->init(config) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
+  (*ctx)->storage_manager_ = new (std::nothrow) tiledb::StorageManager();
+  if ((*ctx)->storage_manager_ == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate storage manager in TileDB context");
+    LOG_STATUS(st);
+    save_error(*ctx, st);
+    return TILEDB_ERR;
+  }
+
+  // Initialize last error
+  (*ctx)->last_error_ = nullptr;
+
+  // Initialize storage manager
+  auto conf = (config == nullptr) ? (tiledb::Config*)nullptr : config->config_;
+  if (save_error(*ctx, ((*ctx)->storage_manager_->init(conf)))) {
+    delete (*ctx)->storage_manager_;
+    (*ctx)->storage_manager_ = nullptr;
     return TILEDB_ERR;
   }
 
@@ -108,150 +370,351 @@ int tiledb_ctx_init(
   return TILEDB_OK;
 }
 
-int tiledb_ctx_finalize(TileDB_CTX* tiledb_ctx) {
-  // Trivial case
-  if(tiledb_ctx == NULL)
-    return TILEDB_OK;
+int tiledb_ctx_free(tiledb_ctx_t* ctx) {
+  if (ctx != nullptr) {
+    delete ctx->storage_manager_;
+    delete ctx->last_error_;
+    delete ctx->mtx_;
+    delete ctx;
+  }
 
-  // Finalize storage manager
-  int rc = TILEDB_OK;
-  if(tiledb_ctx->storage_manager_ != NULL)
-    rc = tiledb_ctx->storage_manager_->finalize();
+  // Always succeeds
+  return TILEDB_OK;
+}
 
-  // Clean up
-  delete tiledb_ctx->storage_manager_;
-  free(tiledb_ctx);
+/* ********************************* */
+/*              ERROR                */
+/* ********************************* */
 
-  // Error
-  if(rc != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
+int tiledb_error_last(tiledb_ctx_t* ctx, tiledb_error_t** err) {
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
+
+  {
+    std::lock_guard<std::mutex> lock(*(ctx->mtx_));
+
+    // No last error
+    if (ctx->last_error_ == nullptr) {
+      *err = nullptr;
+      return TILEDB_OK;
+    }
+
+    // Create error struct
+    *err = new (std::nothrow) tiledb_error_t;
+    if (*err == nullptr) {
+      tiledb::Status st =
+          tiledb::Status::Error("Failed to allocate error struct");
+      LOG_STATUS(st);
+      save_error(ctx, st);
+      return TILEDB_OOM;
+    }
+
+    // Create status
+    (*err)->status_ = new (std::nothrow) tiledb::Status(*(ctx->last_error_));
+    if ((*err)->status_ == nullptr) {
+      delete *err;
+      tiledb::Status st = tiledb::Status::Error(
+          "Failed to allocate status object in TileDB error struct");
+      LOG_STATUS(st);
+      save_error(ctx, st);
+      return TILEDB_OOM;
+    }
+
+    // Set error message
+    (*err)->errmsg_ =
+        new (std::nothrow) std::string((*err)->status_->to_string());
   }
 
   // Success
   return TILEDB_OK;
 }
 
-
-
-
-/* ****************************** */
-/*          SANITY CHECKS         */
-/* ****************************** */
-
-bool sanity_check(const TileDB_CTX* tiledb_ctx) {
-  if(tiledb_ctx == NULL || tiledb_ctx->storage_manager_ == NULL) {
-    std::string errmsg = "Invalid TileDB context";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return false;
-  } else {
-    return true;
-  }
-}
-
-bool sanity_check(const TileDB_Array* tiledb_array) {
-  if(tiledb_array == NULL) {
-    std::string errmsg = "Invalid TileDB array";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return false;
-  } else {
-    return true;
-  }
-}
-
-bool sanity_check(const TileDB_ArrayIterator* tiledb_array_it) {
-  if(tiledb_array_it == NULL) {
-    std::string errmsg = "Invalid TileDB array iterator";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return false;
-  } else {
-    return true;
-  }
-}
-
-bool sanity_check(const TileDB_Metadata* tiledb_metadata) {
-  if(tiledb_metadata == NULL) {
-    std::string errmsg = "Invalid TileDB metadata";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return false;
-  } else {
-    return true;
-  }
-}
-
-bool sanity_check(const TileDB_MetadataIterator* tiledb_metadata_it) {
-  if(tiledb_metadata_it == NULL) {
-    std::string errmsg = "Invalid TileDB metadata iterator";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return false;
-  } else {
-    return true;
-  }
-}
-
-
-
-
-/* ****************************** */
-/*            WORKSPACE           */
-/* ****************************** */
-
-int tiledb_workspace_create(
-    const TileDB_CTX* tiledb_ctx,
-    const char* workspace) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
+int tiledb_error_message(
+    tiledb_ctx_t* ctx, tiledb_error_t* err, const char** errmsg) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, err) == TILEDB_ERR)
     return TILEDB_ERR;
-
-  // Check workspace name length
-  if(workspace == NULL || strlen(workspace) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid workspace name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Create the workspace
-  if(tiledb_ctx->storage_manager_->workspace_create(workspace) != 
-     TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
+  // Set error message
+  if (err->status_->ok() || err->errmsg_ == nullptr)
+    *errmsg = nullptr;
+  else
+    *errmsg = err->errmsg_->c_str();
   return TILEDB_OK;
 }
 
-
-
+int tiledb_error_free(tiledb_ctx_t* ctx, tiledb_error_t* err) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, err) == TILEDB_ERR)
+    return TILEDB_ERR;
+  delete err->status_;
+  delete err->errmsg_;
+  delete err;
+  return TILEDB_OK;
+}
 
 /* ****************************** */
 /*              GROUP             */
 /* ****************************** */
 
-int tiledb_group_create(
-    const TileDB_CTX* tiledb_ctx,
-    const char* group) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
+int tiledb_group_create(tiledb_ctx_t* ctx, const char* group) {
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
 
-  // Check group name length
-  if(group == NULL || strlen(group) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid group name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
+  // Check for error
+  if (group == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Invalid group directory argument is NULL");
+    LOG_STATUS(st);
+    save_error(ctx, st);
     return TILEDB_ERR;
   }
 
   // Create the group
-  if(tiledb_ctx->storage_manager_->group_create(group) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
+  if (save_error(ctx, ctx->storage_manager_->group_create(group)))
+    return TILEDB_ERR;
+
+  // Success
+  return TILEDB_OK;
+}
+
+/* ********************************* */
+/*            ATTRIBUTE              */
+/* ********************************* */
+
+int tiledb_attribute_create(
+    tiledb_ctx_t* ctx,
+    tiledb_attribute_t** attr,
+    const char* name,
+    tiledb_datatype_t type) {
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create an attribute struct
+  *attr = new (std::nothrow) tiledb_attribute_t;
+  if (*attr == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB attribute struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create a new Attribute object
+  (*attr)->attr_ = new (std::nothrow)
+      tiledb::Attribute(name, static_cast<tiledb::Datatype>(type));
+  if ((*attr)->attr_ == nullptr) {
+    delete *attr;
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB attribute object in struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_free(tiledb_ctx_t* ctx, tiledb_attribute_t* attr) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  delete attr->attr_;
+  delete attr;
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_set_compressor(
+    tiledb_ctx_t* ctx,
+    tiledb_attribute_t* attr,
+    tiledb_compressor_t compressor,
+    int compression_level) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  attr->attr_->set_compressor(static_cast<tiledb::Compressor>(compressor));
+  attr->attr_->set_compression_level(compression_level);
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_set_cell_val_num(
+    tiledb_ctx_t* ctx, tiledb_attribute_t* attr, unsigned int cell_val_num) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  attr->attr_->set_cell_val_num(cell_val_num);
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_get_name(
+    tiledb_ctx_t* ctx, const tiledb_attribute_t* attr, const char** name) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *name = attr->attr_->name().c_str();
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_get_type(
+    tiledb_ctx_t* ctx,
+    const tiledb_attribute_t* attr,
+    tiledb_datatype_t* type) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *type = static_cast<tiledb_datatype_t>(attr->attr_->type());
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_get_compressor(
+    tiledb_ctx_t* ctx,
+    const tiledb_attribute_t* attr,
+    tiledb_compressor_t* compressor,
+    int* compression_level) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *compressor = static_cast<tiledb_compressor_t>(attr->attr_->compressor());
+  *compression_level = attr->attr_->compression_level();
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_get_cell_val_num(
+    tiledb_ctx_t* ctx,
+    const tiledb_attribute_t* attr,
+    unsigned int* cell_val_num) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *cell_val_num = attr->attr_->cell_val_num();
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_dump(
+    tiledb_ctx_t* ctx, const tiledb_attribute_t* attr, FILE* out) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  attr->attr_->dump(out);
+  return TILEDB_OK;
+}
+
+/* ********************************* */
+/*            HYPERSPACE             */
+/* ********************************* */
+
+int tiledb_domain_create(tiledb_ctx_t* ctx, tiledb_domain_t** domain) {
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create a domain struct
+  *domain = new (std::nothrow) tiledb_domain_t;
+  if (*domain == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB domain struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create a new Domain object
+  (*domain)->domain_ = new (std::nothrow) tiledb::Domain();
+  if ((*domain)->domain_ == nullptr) {
+    delete *domain;
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB domain object in struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  return TILEDB_OK;
+}
+
+int tiledb_domain_free(tiledb_ctx_t* ctx, tiledb_domain_t* domain) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR)
+    return TILEDB_ERR;
+  delete domain->domain_;
+  delete domain;
+  return TILEDB_OK;
+}
+
+int tiledb_domain_get_type(
+    tiledb_ctx_t* ctx, const tiledb_domain_t* domain, tiledb_datatype_t* type) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *type = static_cast<tiledb_datatype_t>(domain->domain_->type());
+  return TILEDB_OK;
+}
+
+int tiledb_domain_get_rank(
+    tiledb_ctx_t* ctx, const tiledb_domain_t* domain, unsigned int* rank) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *rank = domain->domain_->dim_num();
+  return TILEDB_OK;
+}
+
+int tiledb_domain_add_dimension(
+    tiledb_ctx_t* ctx, tiledb_domain_t* domain, tiledb_dimension_t* dim) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, domain->domain_->add_dimension(dim->dim_)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_domain_dump(
+    tiledb_ctx_t* ctx, const tiledb_domain_t* domain, FILE* out) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR)
+    return TILEDB_ERR;
+  domain->domain_->dump(out);
+  return TILEDB_OK;
+}
+
+/* ********************************* */
+/*             DIMENSION             */
+/* ********************************* */
+
+int tiledb_dimension_create(
+    tiledb_ctx_t* ctx,
+    tiledb_dimension_t** dim,
+    const char* name,
+    tiledb_datatype_t type,
+    const void* dim_domain,
+    const void* tile_extent) {
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create a dimension struct
+  *dim = new (std::nothrow) tiledb_dimension_t;
+  if (*dim == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB dimension struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create a new Dimension object
+  (*dim)->dim_ = new (std::nothrow)
+      tiledb::Dimension(name, static_cast<tiledb::Datatype>(type));
+  if ((*dim)->dim_ == nullptr) {
+    delete *dim;
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB dimension object in struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Set domain
+  if (save_error(ctx, (*dim)->dim_->set_domain(dim_domain))) {
+    delete (*dim)->dim_;
+    delete *dim;
+    return TILEDB_ERR;
+  }
+
+  // Set tile extent
+  if (save_error(ctx, (*dim)->dim_->set_tile_extent(tile_extent))) {
+    delete (*dim)->dim_;
+    delete *dim;
     return TILEDB_ERR;
   }
 
@@ -259,1336 +722,1539 @@ int tiledb_group_create(
   return TILEDB_OK;
 }
 
+int tiledb_dimension_free(tiledb_ctx_t* ctx, tiledb_dimension_t* dim) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, dim) == TILEDB_ERR)
+    return TILEDB_ERR;
+  delete dim->dim_;
+  delete dim;
+  return TILEDB_OK;
+}
 
+int tiledb_dimension_get_name(
+    tiledb_ctx_t* ctx, const tiledb_dimension_t* dim, const char** name) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, dim) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *name = dim->dim_->name().c_str();
+  return TILEDB_OK;
+}
 
+int tiledb_dimension_get_type(
+    tiledb_ctx_t* ctx, const tiledb_dimension_t* dim, tiledb_datatype_t* type) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, dim) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *type = static_cast<tiledb_datatype_t>(dim->dim_->type());
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_get_domain(
+    tiledb_ctx_t* ctx, const tiledb_dimension_t* dim, void** domain) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, dim) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *domain = dim->dim_->domain();
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_get_tile_extent(
+    tiledb_ctx_t* ctx, const tiledb_dimension_t* dim, void** tile_extent) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, dim) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *tile_extent = dim->dim_->tile_extent();
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_dump(
+    tiledb_ctx_t* ctx, const tiledb_dimension_t* dim, FILE* out) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, dim) == TILEDB_ERR)
+    return TILEDB_ERR;
+  dim->dim_->dump(out);
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_from_index(
+    tiledb_ctx_t* ctx,
+    const tiledb_domain_t* domain,
+    unsigned int index,
+    tiledb_dimension_t** dim) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR) {
+    return TILEDB_ERR;
+  }
+  unsigned int ndim = domain->domain_->dim_num();
+  if (ndim == 0 && index == 0) {
+    *dim = nullptr;
+    return TILEDB_OK;
+  }
+  if (index > (ndim - 1)) {
+    std::ostringstream errmsg;
+    errmsg << "Dimension " << index << " out of bounds, domain has rank "
+           << ndim;
+    tiledb::Status st = tiledb::Status::DomainError(errmsg.str());
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  *dim = new (std::nothrow) tiledb_dimension_t;
+  if (*dim == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB dimension struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  (*dim)->dim_ =
+      new (std::nothrow) tiledb::Dimension(domain->domain_->dimension(index));
+  if ((*dim)->dim_ == nullptr) {
+    delete *dim;
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB dimension struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_from_name(
+    tiledb_ctx_t* ctx,
+    const tiledb_domain_t* domain,
+    const char* name,
+    tiledb_dimension_t** dim) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR) {
+    return TILEDB_ERR;
+  }
+  unsigned int ndim = domain->domain_->dim_num();
+  if (ndim == 0) {
+    *dim = nullptr;
+    return TILEDB_OK;
+  }
+  std::string name_string(name);
+  const tiledb::Dimension* found_dim = nullptr;
+  if (name_string.empty()) {  // anonymous dimension
+    bool found_anonymous = false;
+    for (unsigned int i = 0; i < ndim; i++) {
+      auto dim = domain->domain_->dimension(i);
+      if (dim->is_anonymous()) {
+        if (found_anonymous) {
+          tiledb::Status st = tiledb::Status::Error(
+              "Dimension from name is ambiguous when "
+              "there are multiple anonymous "
+              "dimensions; Use index instead");
+          LOG_STATUS(st);
+          save_error(ctx, st);
+          return TILEDB_ERR;
+        }
+        found_anonymous = true;
+        found_dim = dim;
+      }
+    }
+  } else {
+    found_dim = domain->domain_->dimension(name_string);
+  }
+  if (found_dim == nullptr) {
+    tiledb::Status st = tiledb::Status::DomainError(
+        std::string("Dimension \"") + name + "\" does not exist");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  *dim = new (std::nothrow) tiledb_dimension_t;
+  if (*dim == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB dimension struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  (*dim)->dim_ = new (std::nothrow) tiledb::Dimension(found_dim);
+  if ((*dim)->dim_ == nullptr) {
+    delete *dim;
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB dimension struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  return TILEDB_OK;
+}
+
+/* ********************************* */
+/*        DIMENSION ITERATOR         */
+/* ********************************* */
+
+int tiledb_dimension_iter_create(
+    tiledb_ctx_t* ctx,
+    const tiledb_domain_t* domain,
+    tiledb_dimension_iter_t** dim_it) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, domain) == TILEDB_ERR)
+    return TILEDB_ERR;
+  // Create dimension iterator struct
+  *dim_it = new (std::nothrow) tiledb_dimension_iter_t;
+  if (*dim_it == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB dimension iterator struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Initialize the iterator
+  (*dim_it)->domain_ = domain;
+  (*dim_it)->dim_num_ = domain->domain_->dim_num();
+  (*dim_it)->current_dim_ = 0;
+  if ((*dim_it)->dim_num_ == 0) {
+    (*dim_it)->dim_ = nullptr;
+  } else {
+    // Create a dimension struct inside the iterator struct
+    (*dim_it)->dim_ = new (std::nothrow) tiledb_dimension_t;
+    if ((*dim_it)->dim_ == nullptr) {
+      delete *dim_it;
+      *dim_it = nullptr;
+      tiledb::Status st = tiledb::Status::Error(
+          "Failed to allocate TileDB dimension struct "
+          "in iterator struct");
+      LOG_STATUS(st);
+      save_error(ctx, st);
+      return TILEDB_OOM;
+    }
+
+    // Create a dimension object
+    (*dim_it)->dim_->dim_ =
+        new (std::nothrow) tiledb::Dimension(domain->domain_->dimension(0));
+
+    // Check for allocation error
+    if ((*dim_it)->dim_->dim_ == nullptr) {
+      delete (*dim_it)->dim_;
+      delete *dim_it;
+      *dim_it = nullptr;
+      tiledb::Status st = tiledb::Status::Error(
+          "Failed to allocate TileDB dimension object "
+          "in iterator struct");
+      LOG_STATUS(st);
+      save_error(ctx, st);
+      return TILEDB_OOM;
+    }
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_iter_free(
+    tiledb_ctx_t* ctx, tiledb_dimension_iter_t* dim_it) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, dim_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  if (dim_it->dim_ != nullptr) {
+    if (dim_it->dim_->dim_ != nullptr)
+      delete (dim_it->dim_->dim_);
+    delete dim_it->dim_;
+  }
+  delete dim_it;
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_iter_done(
+    tiledb_ctx_t* ctx, tiledb_dimension_iter_t* dim_it, int* done) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, dim_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *done = (dim_it->current_dim_ == dim_it->dim_num_) ? 1 : 0;
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_iter_next(
+    tiledb_ctx_t* ctx, tiledb_dimension_iter_t* dim_it) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, dim_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  ++(dim_it->current_dim_);
+  if (dim_it->dim_ != nullptr) {
+    delete dim_it->dim_->dim_;
+    if (dim_it->current_dim_ < dim_it->dim_num_)
+      dim_it->dim_->dim_ = new (std::nothrow) tiledb::Dimension(
+          dim_it->domain_->domain_->dimension(dim_it->current_dim_));
+    else
+      dim_it->dim_->dim_ = nullptr;
+  }
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_iter_here(
+    tiledb_ctx_t* ctx,
+    tiledb_dimension_iter_t* dim_it,
+    const tiledb_dimension_t** dim) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, dim_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *dim = dim_it->dim_;
+  return TILEDB_OK;
+}
+
+int tiledb_dimension_iter_first(
+    tiledb_ctx_t* ctx, tiledb_dimension_iter_t* dim_it) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, dim_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  dim_it->current_dim_ = 0;
+  if (dim_it->dim_ != nullptr) {
+    delete dim_it->dim_->dim_;
+    if (dim_it->dim_num_ > 0)
+      dim_it->dim_->dim_ = new (std::nothrow)
+          tiledb::Dimension(dim_it->domain_->domain_->dimension(0));
+    else
+      dim_it->dim_->dim_ = nullptr;
+  }
+
+  return TILEDB_OK;
+}
+
+/* ****************************** */
+/*           ARRAY METADATA       */
+/* ****************************** */
+
+int tiledb_array_metadata_create(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t** array_metadata,
+    const char* array_name) {
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Check array name
+  tiledb::URI array_uri(array_name);
+  if (array_uri.is_invalid()) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to create array metadata; Invalid array URI");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+
+  // Create array metadata struct
+  *array_metadata = new (std::nothrow) tiledb_array_metadata_t;
+  if (*array_metadata == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB array metadata struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create a new ArrayMetadata object
+  (*array_metadata)->array_metadata_ =
+      new (std::nothrow) tiledb::ArrayMetadata(tiledb::URI(array_name));
+  if ((*array_metadata)->array_metadata_ == nullptr) {
+    delete *array_metadata;
+    *array_metadata = nullptr;
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB array metadata "
+        "object in struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_free(
+    tiledb_ctx_t* ctx, tiledb_array_metadata_t* array_metadata) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  delete array_metadata->array_metadata_;
+  delete array_metadata;
+
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_add_attribute(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    tiledb_attribute_t* attr) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR ||
+      sanity_check(ctx, attr) == TILEDB_ERR)
+    return TILEDB_ERR;
+  if (save_error(
+          ctx, array_metadata->array_metadata_->add_attribute(attr->attr_)))
+    return TILEDB_ERR;
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_domain(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    tiledb_domain_t* domain) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  if (save_error(
+          ctx, array_metadata->array_metadata_->set_domain(domain->domain_)))
+    return TILEDB_ERR;
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_as_kv(
+    tiledb_ctx_t* ctx, tiledb_array_metadata_t* array_metadata) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  if (save_error(ctx, array_metadata->array_metadata_->set_as_kv()))
+    return TILEDB_ERR;
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_capacity(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    uint64_t capacity) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  array_metadata->array_metadata_->set_capacity(capacity);
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_cell_order(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    tiledb_layout_t cell_order) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  array_metadata->array_metadata_->set_cell_order(
+      static_cast<tiledb::Layout>(cell_order));
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_tile_order(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    tiledb_layout_t tile_order) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  array_metadata->array_metadata_->set_tile_order(
+      static_cast<tiledb::Layout>(tile_order));
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_array_type(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    tiledb_array_type_t array_type) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  if (save_error(
+          ctx,
+          array_metadata->array_metadata_->set_array_type(
+              static_cast<tiledb::ArrayType>(array_type))))
+    return TILEDB_ERR;
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_coords_compressor(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    tiledb_compressor_t compressor,
+    int compression_level) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  array_metadata->array_metadata_->set_coords_compressor(
+      static_cast<tiledb::Compressor>(compressor));
+  array_metadata->array_metadata_->set_coords_compression_level(
+      compression_level);
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_set_offsets_compressor(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t* array_metadata,
+    tiledb_compressor_t compressor,
+    int compression_level) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  array_metadata->array_metadata_->set_cell_var_offsets_compressor(
+      static_cast<tiledb::Compressor>(compressor));
+  array_metadata->array_metadata_->set_cell_var_offsets_compression_level(
+      compression_level);
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_check(
+    tiledb_ctx_t* ctx, tiledb_array_metadata_t* array_metadata) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, array_metadata->array_metadata_->check()))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_load(
+    tiledb_ctx_t* ctx,
+    tiledb_array_metadata_t** array_metadata,
+    const char* array_name) {
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+  // Create array metadata
+  *array_metadata = new (std::nothrow) tiledb_array_metadata_t;
+  if (*array_metadata == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB array_metadata struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Load array metadata
+  auto storage_manager = ctx->storage_manager_;
+  if (save_error(
+          ctx,
+          storage_manager->load_array_metadata(
+              tiledb::URI(array_name),
+              &((*array_metadata)->array_metadata_)))) {
+    delete *array_metadata;
+    return TILEDB_ERR;
+  }
+
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_array_name(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    const char** array_name) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  const tiledb::URI& uri = array_metadata->array_metadata_->array_uri();
+  *array_name = uri.c_str();
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_array_type(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_array_type_t* array_type) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *array_type = static_cast<tiledb_array_type_t>(
+      array_metadata->array_metadata_->array_type());
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_capacity(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    uint64_t* capacity) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *capacity = array_metadata->array_metadata_->capacity();
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_cell_order(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_layout_t* cell_order) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *cell_order = static_cast<tiledb_layout_t>(
+      array_metadata->array_metadata_->cell_order());
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_coords_compressor(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_compressor_t* compressor,
+    int* compression_level) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *compressor = static_cast<tiledb_compressor_t>(
+      array_metadata->array_metadata_->coords_compression());
+  *compression_level =
+      array_metadata->array_metadata_->coords_compression_level();
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_offsets_compressor(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_compressor_t* compressor,
+    int* compression_level) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *compressor = static_cast<tiledb_compressor_t>(
+      array_metadata->array_metadata_->cell_var_offsets_compression());
+  *compression_level =
+      array_metadata->array_metadata_->cell_var_offsets_compression_level();
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_domain(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_domain_t** domain) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create a domain struct
+  *domain = new (std::nothrow) tiledb_domain_t;
+  if (*domain == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB domain struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create a new Domain object
+  (*domain)->domain_ = new (std::nothrow)
+      tiledb::Domain(array_metadata->array_metadata_->domain());
+  if ((*domain)->domain_ == nullptr) {
+    delete *domain;
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB domain object in struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_as_kv(
+    tiledb_ctx_t* ctx, tiledb_array_metadata_t* array_metadata, int* as_kv) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *as_kv = (int)array_metadata->array_metadata_->is_kv();
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_tile_order(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_layout_t* tile_order) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *tile_order = static_cast<tiledb_layout_t>(
+      array_metadata->array_metadata_->tile_order());
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_get_num_attributes(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    unsigned int* num_attributes) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *num_attributes = array_metadata->array_metadata_->attribute_num();
+  return TILEDB_OK;
+}
+
+int tiledb_array_metadata_dump(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    FILE* out) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+  array_metadata->array_metadata_->dump(out);
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_from_index(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    unsigned int index,
+    tiledb_attribute_t** attr) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR) {
+    return TILEDB_ERR;
+  }
+  unsigned int attribute_num = array_metadata->array_metadata_->attribute_num();
+  if (attribute_num == 0) {
+    *attr = nullptr;
+    return TILEDB_OK;
+  }
+  if (index > attribute_num) {
+    std::ostringstream errmsg;
+    errmsg << "Attribute index: " << index << " exceeds number of attributes("
+           << attribute_num << ") for array "
+           << array_metadata->array_metadata_->array_uri().to_string();
+    tiledb::Status st = tiledb::Status::ArrayMetadataError(errmsg.str());
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  auto found_attr = array_metadata->array_metadata_->attribute(index);
+
+  *attr = new (std::nothrow) tiledb_attribute_t;
+  if (*attr == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB attribute");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create an attribute object
+  (*attr)->attr_ = new (std::nothrow) tiledb::Attribute(found_attr);
+
+  // Check for allocation error
+  if ((*attr)->attr_ == nullptr) {
+    delete *attr;
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB attribute");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_from_name(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    const char* name,
+    tiledb_attribute_t** attr) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR) {
+    return TILEDB_ERR;
+  }
+  unsigned int attribute_num = array_metadata->array_metadata_->attribute_num();
+  if (attribute_num == 0) {
+    *attr = nullptr;
+    return TILEDB_OK;
+  }
+  std::string name_string(name);
+  auto found_attr = array_metadata->array_metadata_->attribute(name_string);
+  if (found_attr == nullptr) {
+    tiledb::Status st = tiledb::Status::ArrayMetadataError(
+        std::string("Attribute name: ") + name + " does not exist for array " +
+        array_metadata->array_metadata_->array_uri().to_string());
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+  *attr = new (std::nothrow) tiledb_attribute_t;
+  if (*attr == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB attribute");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  // Create an attribute object
+  (*attr)->attr_ = new (std::nothrow) tiledb::Attribute(found_attr);
+  // Check for allocation error
+  if ((*attr)->attr_ == nullptr) {
+    delete *attr;
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB attribute");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+  return TILEDB_OK;
+}
+
+/* ****************************** */
+/*       ATTRIBUTE ITERATOR       */
+/* ****************************** */
+
+int tiledb_attribute_iter_create(
+    tiledb_ctx_t* ctx,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_attribute_iter_t** attr_it) {
+  if (sanity_check(ctx, array_metadata) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create attribute iterator struct
+  *attr_it = new (std::nothrow) tiledb_attribute_iter_t;
+  if (*attr_it == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB attribute iterator struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Initialize the iterator for the array metadata
+  (*attr_it)->array_metadata_ = array_metadata;
+  (*attr_it)->attr_num_ = array_metadata->array_metadata_->attribute_num();
+
+  // Initialize the rest members of the iterator
+  (*attr_it)->current_attr_ = 0;
+  if ((*attr_it)->attr_num_ == 0) {
+    (*attr_it)->attr_ = nullptr;
+  } else {
+    // Create an attribute struct inside the iterator struct
+    (*attr_it)->attr_ = new (std::nothrow) tiledb_attribute_t;
+    if ((*attr_it)->attr_ == nullptr) {
+      tiledb::Status st = tiledb::Status::Error(
+          "Failed to allocate TileDB attribute struct "
+          "in iterator struct");
+      LOG_STATUS(st);
+      save_error(ctx, st);
+      delete *attr_it;
+      return TILEDB_OOM;
+    }
+
+    // Create an attribute object
+    (*attr_it)->attr_->attr_ = new (std::nothrow)
+        tiledb::Attribute(array_metadata->array_metadata_->attribute(0));
+
+    // Check for allocation error
+    if ((*attr_it)->attr_->attr_ == nullptr) {
+      delete (*attr_it)->attr_;
+      delete *attr_it;
+      tiledb::Status st = tiledb::Status::Error(
+          "Failed to allocate TileDB attribute object "
+          "in iterator struct");
+      LOG_STATUS(st);
+      save_error(ctx, st);
+      return TILEDB_OOM;
+    }
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_iter_free(
+    tiledb_ctx_t* ctx, tiledb_attribute_iter_t* attr_it) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, attr_it) == TILEDB_ERR)
+
+    if (attr_it->attr_ != nullptr) {
+      if (attr_it->attr_->attr_ != nullptr)
+        delete (attr_it->attr_->attr_);
+      delete attr_it->attr_;
+    }
+  delete attr_it;
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_iter_done(
+    tiledb_ctx_t* ctx, tiledb_attribute_iter_t* attr_it, int* done) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, attr_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *done = (attr_it->current_attr_ == attr_it->attr_num_) ? 1 : 0;
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_iter_next(
+    tiledb_ctx_t* ctx, tiledb_attribute_iter_t* attr_it) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, attr_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  ++(attr_it->current_attr_);
+  if (attr_it->attr_ != nullptr) {
+    delete attr_it->attr_->attr_;
+    if (attr_it->current_attr_ < attr_it->attr_num_) {
+      attr_it->attr_->attr_ = new (std::nothrow) tiledb::Attribute(
+          attr_it->array_metadata_->array_metadata_->attribute(
+              attr_it->current_attr_));
+    } else {
+      attr_it->attr_->attr_ = nullptr;
+    }
+  }
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_iter_here(
+    tiledb_ctx_t* ctx,
+    tiledb_attribute_iter_t* attr_it,
+    const tiledb_attribute_t** attr) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, attr_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  *attr = attr_it->attr_;
+  return TILEDB_OK;
+}
+
+int tiledb_attribute_iter_first(
+    tiledb_ctx_t* ctx, tiledb_attribute_iter_t* attr_it) {
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, attr_it) == TILEDB_ERR)
+    return TILEDB_ERR;
+  attr_it->current_attr_ = 0;
+  if (attr_it->attr_ != nullptr) {
+    delete attr_it->attr_->attr_;
+    if (attr_it->attr_num_ > 0) {
+      attr_it->attr_->attr_ = new (std::nothrow) tiledb::Attribute(
+          attr_it->array_metadata_->array_metadata_->attribute(0));
+    } else {
+      attr_it->attr_->attr_ = nullptr;
+    }
+  }
+  return TILEDB_OK;
+}
+
+/* ****************************** */
+/*              QUERY             */
+/* ****************************** */
+
+int tiledb_query_create(
+    tiledb_ctx_t* ctx,
+    tiledb_query_t** query,
+    const char* array_name,
+    tiledb_query_type_t type) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create query struct
+  *query = new (std::nothrow) tiledb_query_t;
+  if (*query == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Failed to allocate TileDB query struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create a new Query object
+  (*query)->query_ = new (std::nothrow) tiledb::Query();
+  if ((*query)->query_ == nullptr) {
+    delete *query;
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB query object in struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create query object
+  if (save_error(
+          ctx,
+          ctx->storage_manager_->query_init(
+              ((*query)->query_),
+              array_name,
+              static_cast<tiledb::QueryType>(type)))) {
+    delete (*query)->query_;
+    delete *query;
+    return TILEDB_ERR;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_query_set_subarray(
+    tiledb_ctx_t* ctx, tiledb_query_t* query, const void* subarray) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Set subarray
+  if (save_error(ctx, query->query_->set_subarray(subarray)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_query_set_buffers(
+    tiledb_ctx_t* ctx,
+    tiledb_query_t* query,
+    const char** attributes,
+    unsigned int attribute_num,
+    void** buffers,
+    uint64_t* buffer_sizes) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Set attributes and buffers
+  if (save_error(
+          ctx,
+          query->query_->set_buffers(
+              attributes, attribute_num, buffers, buffer_sizes)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_query_set_layout(
+    tiledb_ctx_t* ctx, tiledb_query_t* query, tiledb_layout_t layout) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Set layout
+  if (save_error(
+          ctx, query->query_->set_layout(static_cast<tiledb::Layout>(layout))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_query_free(tiledb_ctx_t* ctx, tiledb_query_t* query) {
+  // Trivial case
+  if (query == nullptr)
+    return TILEDB_OK;
+
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Finalize query and check error
+  int rc = TILEDB_OK;
+  if (save_error(ctx, ctx->storage_manager_->query_finalize(query->query_)))
+    rc = TILEDB_ERR;
+
+  delete query->query_;
+  delete query;
+
+  return rc;
+}
+
+int tiledb_query_set_kv(
+    tiledb_ctx_t* ctx, tiledb_query_t* query, tiledb_kv_t* kv) {
+  // Sanity checks
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, query) == TILEDB_ERR ||
+      sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Get key only in case they query reads the entire key-value store
+  bool get_key = (query->query_->subarray() == nullptr);
+  bool get_coords = (query->query_->type() == tiledb::QueryType::WRITE);
+
+  // Get query attributes
+  const char** attributes;
+  unsigned int attribute_num;
+  if (save_error(
+          ctx,
+          kv->kv_->get_array_attributes(
+              &attributes, &attribute_num, get_coords, get_key)))
+    return TILEDB_ERR;
+
+  // Get query buffers
+  void** buffers;
+  uint64_t* buffer_sizes;
+  if (save_error(ctx, kv->kv_->get_array_buffers(&buffers, &buffer_sizes)))
+    return TILEDB_ERR;
+
+  return tiledb_query_set_buffers(
+      ctx, query, attributes, attribute_num, buffers, buffer_sizes);
+}
+
+int tiledb_query_set_kv_key(
+    tiledb_ctx_t* ctx,
+    tiledb_query_t* query,
+    const void* key,
+    tiledb_datatype_t type,
+    uint64_t key_size) {
+  // Sanity checks
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+  if (!query->query_->array_metadata()->is_kv()) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Cannot query by key; The queried array is not a key-value store");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+
+  // Set key
+  uint64_t subarray[4];
+  tiledb::KV::compute_subarray(
+      key, static_cast<tiledb::Datatype>(type), key_size, subarray);
+
+  // Set query subarray
+  return tiledb_query_set_subarray(ctx, query, subarray);
+}
+
+int tiledb_query_submit(tiledb_ctx_t* ctx, tiledb_query_t* query) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Submit query
+  if (save_error(ctx, ctx->storage_manager_->query_submit(query->query_)))
+    return TILEDB_ERR;
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_query_submit_async(
+    tiledb_ctx_t* ctx,
+    tiledb_query_t* query,
+    void* (*callback)(void*),
+    void* callback_data) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Submit query
+  if (save_error(
+          ctx,
+          ctx->storage_manager_->query_submit_async(
+              query->query_, callback, callback_data)))
+    return TILEDB_ERR;
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_query_reset_buffers(
+    tiledb_ctx_t* ctx,
+    tiledb_query_t* query,
+    void** buffers,
+    uint64_t* buffer_sizes) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Reset buffers
+  query->query_->set_buffers(buffers, buffer_sizes);
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_query_get_status(
+    tiledb_ctx_t* ctx, tiledb_query_t* query, tiledb_query_status_t* status) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *status = (tiledb_query_status_t)query->query_->status();
+
+  return TILEDB_OK;
+}
+
+int tiledb_query_get_attribute_status(
+    tiledb_ctx_t* ctx,
+    const tiledb_query_t* query,
+    const char* attribute_name,
+    tiledb_query_status_t* status) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Check if the query is still in progress or failed
+  auto query_status = query->query_->status();
+  if (query_status == tiledb::QueryStatus::INPROGRESS ||
+      query_status == tiledb::QueryStatus::COMPLETED ||
+      query_status == tiledb::QueryStatus::FAILED) {
+    *status = (tiledb_query_status_t)query_status;
+    return TILEDB_OK;
+  }
+
+  unsigned int overflow;
+  if (save_error(ctx, query->query_->overflow(attribute_name, &overflow)))
+    return TILEDB_ERR;
+
+  *status = (overflow == 1) ?
+                (tiledb_query_status_t)tiledb::QueryStatus::INCOMPLETE :
+                (tiledb_query_status_t)tiledb::QueryStatus::COMPLETED;
+
+  return TILEDB_OK;
+}
 
 /* ****************************** */
 /*              ARRAY             */
 /* ****************************** */
 
-typedef struct TileDB_Array {
-  Array* array_;
-  const TileDB_CTX* tiledb_ctx_;
-} TileDB_Array;
-
-int tiledb_array_set_schema(
-    TileDB_ArraySchema* tiledb_array_schema,
-    const char* array_name,
-    const char** attributes,
-    int attribute_num,
-    int64_t capacity,
-    int cell_order,
-    const int* cell_val_num,
-    const int* compression,
-    int dense,
-    const char** dimensions, 
-    int dim_num,
-    const void* domain,
-    size_t domain_len,
-    const void* tile_extents,
-    size_t tile_extents_len,
-    int tile_order,
-    const int* types) {
-  // Sanity check
-  if(tiledb_array_schema == NULL) {
-    std::string errmsg = "Invalid array schema pointer";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Set array name
-  size_t array_name_len = strlen(array_name); 
-  if(array_name == NULL || array_name_len > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid array name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-  tiledb_array_schema->array_name_ = (char*) malloc(array_name_len+1);
-  strcpy(tiledb_array_schema->array_name_, array_name);
-
-  // Set attributes and number of attributes
-  tiledb_array_schema->attribute_num_ = attribute_num;
-  tiledb_array_schema->attributes_ = 
-      (char**) malloc(attribute_num*sizeof(char*));
-  for(int i=0; i<attribute_num; ++i) { 
-    size_t attribute_len = strlen(attributes[i]);
-    if(attributes[i] == NULL || attribute_len > TILEDB_NAME_MAX_LEN) {
-      std::string errmsg = "Invalid attribute name length";
-      PRINT_ERROR(errmsg);
-      strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-      return TILEDB_ERR;
-    }
-    tiledb_array_schema->attributes_[i] = (char*) malloc(attribute_len+1);
-    strcpy(tiledb_array_schema->attributes_[i], attributes[i]);
-  }
-
-  // Set dimensions
-  tiledb_array_schema->dim_num_ = dim_num; 
-  tiledb_array_schema->dimensions_ = (char**) malloc(dim_num*sizeof(char*));
-  for(int i=0; i<dim_num; ++i) { 
-    size_t dimension_len = strlen(dimensions[i]);
-    if(dimensions[i] == NULL || dimension_len > TILEDB_NAME_MAX_LEN) {
-      std::string errmsg = "Invalid attribute name length";
-      PRINT_ERROR(errmsg);
-      strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-      return TILEDB_ERR;
-    }
-    tiledb_array_schema->dimensions_[i] = (char*) malloc(dimension_len+1);
-    strcpy(tiledb_array_schema->dimensions_[i], dimensions[i]);
-  }
-
-  // Set dense
-  tiledb_array_schema->dense_ = dense;
-
-  // Set domain
-  tiledb_array_schema->domain_ = malloc(domain_len); 
-  memcpy(tiledb_array_schema->domain_, domain, domain_len);
-
-  // Set tile extents
-  if(tile_extents == NULL) {
-    tiledb_array_schema->tile_extents_ = NULL;
-  } else {
-    tiledb_array_schema->tile_extents_ = malloc(tile_extents_len); 
-    memcpy(tiledb_array_schema->tile_extents_, tile_extents, tile_extents_len);
-  }
-
-  // Set types
-  tiledb_array_schema->types_ = (int*) malloc((attribute_num+1)*sizeof(int));
-  for(int i=0; i<attribute_num+1; ++i)
-    tiledb_array_schema->types_[i] = types[i];
-
-  // Set cell val num
-  if(cell_val_num == NULL) {
-    tiledb_array_schema->cell_val_num_ = NULL; 
-  } else {
-    tiledb_array_schema->cell_val_num_ = 
-        (int*) malloc((attribute_num)*sizeof(int));
-    for(int i=0; i<attribute_num; ++i) {
-      tiledb_array_schema->cell_val_num_[i] = cell_val_num[i];
-    }
-  }
-
-  // Set cell and tile order
-  tiledb_array_schema->cell_order_ = cell_order;
-  tiledb_array_schema->tile_order_ = tile_order;
-
-  // Set capacity
-  tiledb_array_schema->capacity_ = capacity;
-
-  // Set compression
-  if(compression == NULL) {
-    tiledb_array_schema->compression_ = NULL; 
-  } else {
-    tiledb_array_schema->compression_ = 
-        (int*) malloc((attribute_num+1)*sizeof(int));
-    for(int i=0; i<attribute_num+1; ++i)
-      tiledb_array_schema->compression_[i] = compression[i];
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
 int tiledb_array_create(
-    const TileDB_CTX* tiledb_ctx,
-    const TileDB_ArraySchema* array_schema) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
+    tiledb_ctx_t* ctx, const tiledb_array_metadata_t* array_metadata) {
+  // Sanity checks
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, array_metadata) == TILEDB_ERR)
     return TILEDB_ERR;
 
-  // Copy array schema to a C struct
-  ArraySchemaC array_schema_c;
-  array_schema_c.array_name_ = array_schema->array_name_;
-  array_schema_c.attributes_ = array_schema->attributes_;
-  array_schema_c.attribute_num_ = array_schema->attribute_num_;
-  array_schema_c.capacity_ = array_schema->capacity_;
-  array_schema_c.cell_order_ = array_schema->cell_order_;
-  array_schema_c.cell_val_num_ = array_schema->cell_val_num_;
-  array_schema_c.compression_ = array_schema->compression_;
-  array_schema_c.dense_ = array_schema->dense_;
-  array_schema_c.dimensions_ = array_schema->dimensions_;
-  array_schema_c.dim_num_ = array_schema->dim_num_;
-  array_schema_c.domain_ = array_schema->domain_;
-  array_schema_c.tile_extents_ = array_schema->tile_extents_;
-  array_schema_c.tile_order_ = array_schema->tile_order_;
-  array_schema_c.types_ = array_schema->types_;
-
-  // Create the array
-  if(tiledb_ctx->storage_manager_->array_create(&array_schema_c) != 
-     TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
+  // Create the array_metadata
+  if (save_error(
+          ctx,
+          ctx->storage_manager_->array_create(array_metadata->array_metadata_)))
     return TILEDB_ERR;
-  }
 
-  // Success
   return TILEDB_OK;
 }
 
-int tiledb_array_init(
-    const TileDB_CTX* tiledb_ctx,
-    TileDB_Array** tiledb_array,
-    const char* array,
-    int mode,
-    const void* subarray,
-    const char** attributes,
-    int attribute_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
+int tiledb_array_consolidate(tiledb_ctx_t* ctx, const char* array_name) {
+  // Sanity checks
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
 
-  // Check array name length
-  if(array == NULL || strlen(array) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid array name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Allocate memory for the array struct
-  *tiledb_array = (TileDB_Array*) malloc(sizeof(struct TileDB_Array));
-
-  // Set TileDB context
-  (*tiledb_array)->tiledb_ctx_ = tiledb_ctx;
-
-  // Init the array
-  int rc = tiledb_ctx->storage_manager_->array_init(
-               (*tiledb_array)->array_,
-               array,
-               mode, 
-               subarray, 
-               attributes,
-               attribute_num);
-
-  // Return
-  if(rc != TILEDB_SM_OK) {
-    free(*tiledb_array);
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  } else {
-    return TILEDB_OK;
-  }
-}
-
-int tiledb_array_reset_subarray(
-    const TileDB_Array* tiledb_array,
-    const void* subarray) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
+  if (save_error(ctx, ctx->storage_manager_->array_consolidate(array_name)))
     return TILEDB_ERR;
 
-  // Reset subarray
-  if(tiledb_array->array_->reset_subarray(subarray) != TILEDB_AR_OK) {
-    strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
-    return TILEDB_ERR; 
-  }
-
-  // Success
   return TILEDB_OK;
 }
-
-int tiledb_array_reset_attributes(
-    const TileDB_Array* tiledb_array,
-    const char** attributes, 
-    int attribute_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
-    return TILEDB_ERR;
-
-  // Re-Init the array
-  if(tiledb_array->array_->reset_attributes(attributes, attribute_num) !=
-     TILEDB_AR_OK) {
-    strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
-    return TILEDB_ERR; 
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_get_schema(
-    const TileDB_Array* tiledb_array,
-    TileDB_ArraySchema* tiledb_array_schema) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
-    return TILEDB_ERR;
-
-  // Get the array schema
-  ArraySchemaC array_schema_c;
-  tiledb_array->array_->array_schema()->array_schema_export(&array_schema_c); 
-
-  // Copy the array schema C struct to the output
-  tiledb_array_schema->array_name_ = array_schema_c.array_name_;
-  tiledb_array_schema->attributes_ = array_schema_c.attributes_; 
-  tiledb_array_schema->attribute_num_ = array_schema_c.attribute_num_;
-  tiledb_array_schema->capacity_ = array_schema_c.capacity_;
-  tiledb_array_schema->cell_order_ = array_schema_c.cell_order_;
-  tiledb_array_schema->cell_val_num_ = array_schema_c.cell_val_num_;
-  tiledb_array_schema->compression_ = array_schema_c.compression_;
-  tiledb_array_schema->dense_ = array_schema_c.dense_;
-  tiledb_array_schema->dimensions_ = array_schema_c.dimensions_;
-  tiledb_array_schema->dim_num_ = array_schema_c.dim_num_;
-  tiledb_array_schema->domain_ = array_schema_c.domain_;
-  tiledb_array_schema->tile_extents_ = array_schema_c.tile_extents_;
-  tiledb_array_schema->tile_order_ = array_schema_c.tile_order_;
-  tiledb_array_schema->types_ = array_schema_c.types_;
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_load_schema(
-    const TileDB_CTX* tiledb_ctx,
-    const char* array,
-    TileDB_ArraySchema* tiledb_array_schema) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Check array name length
-  if(array == NULL || strlen(array) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid array name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Get the array schema
-  ArraySchema* array_schema;
-  if(tiledb_ctx->storage_manager_->array_load_schema(array, array_schema) !=
-     TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  } 
-  ArraySchemaC array_schema_c;
-  array_schema->array_schema_export(&array_schema_c);
-
-  // Copy the array schema C struct to the output
-  tiledb_array_schema->array_name_ = array_schema_c.array_name_;
-  tiledb_array_schema->attributes_ = array_schema_c.attributes_; 
-  tiledb_array_schema->attribute_num_ = array_schema_c.attribute_num_;
-  tiledb_array_schema->capacity_ = array_schema_c.capacity_;
-  tiledb_array_schema->cell_order_ = array_schema_c.cell_order_;
-  tiledb_array_schema->cell_val_num_ = array_schema_c.cell_val_num_;
-  tiledb_array_schema->compression_ = array_schema_c.compression_;
-  tiledb_array_schema->dense_ = array_schema_c.dense_;
-  tiledb_array_schema->dimensions_ = array_schema_c.dimensions_;
-  tiledb_array_schema->dim_num_ = array_schema_c.dim_num_;
-  tiledb_array_schema->domain_ = array_schema_c.domain_;
-  tiledb_array_schema->tile_extents_ = array_schema_c.tile_extents_;
-  tiledb_array_schema->tile_order_ = array_schema_c.tile_order_;
-  tiledb_array_schema->types_ = array_schema_c.types_;
-
-  // Clean up
-  delete array_schema;
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_free_schema(
-    TileDB_ArraySchema* tiledb_array_schema) {
-  // Trivial case
-  if(tiledb_array_schema == NULL)
-    return TILEDB_OK;
-
-  // Free array name
-  if(tiledb_array_schema->array_name_ != NULL)
-    free(tiledb_array_schema->array_name_);
-
-  // Free attributes
-  if(tiledb_array_schema->attributes_ != NULL) {
-    for(int i=0; i<tiledb_array_schema->attribute_num_; ++i)
-      if(tiledb_array_schema->attributes_[i] != NULL)
-        free(tiledb_array_schema->attributes_[i]);
-    free(tiledb_array_schema->attributes_);
-  }
-
-  // Free dimensions
-  if(tiledb_array_schema->dimensions_ != NULL) {
-    for(int i=0; i<tiledb_array_schema->dim_num_; ++i)
-      if(tiledb_array_schema->dimensions_[i] != NULL)
-        free(tiledb_array_schema->dimensions_[i]);
-    free(tiledb_array_schema->dimensions_);
-  }
-
-  // Free domain
-  if(tiledb_array_schema->domain_ != NULL)
-    free(tiledb_array_schema->domain_);
-
-  // Free tile extents
-  if(tiledb_array_schema->tile_extents_ != NULL)
-    free(tiledb_array_schema->tile_extents_);
-
-  // Free types
-  if(tiledb_array_schema->types_ != NULL)
-    free(tiledb_array_schema->types_);
-
-  // Free compression
-  if(tiledb_array_schema->compression_ != NULL)
-    free(tiledb_array_schema->compression_);
-
-  // Free cell val num
-  if(tiledb_array_schema->cell_val_num_ != NULL)
-    free(tiledb_array_schema->cell_val_num_);
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_write(
-    const TileDB_Array* tiledb_array,
-    const void** buffers,
-    const size_t* buffer_sizes) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
-    return TILEDB_ERR;
-
-  // Write
-  if(tiledb_array->array_->write(buffers, buffer_sizes) != TILEDB_AR_OK) {
-    strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-  
-  // Success 
-  return TILEDB_OK;
-}
-
-int tiledb_array_read(
-    const TileDB_Array* tiledb_array,
-    void** buffers,
-    size_t* buffer_sizes) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
-    return TILEDB_ERR;
-
-  // Read
-  if(tiledb_array->array_->read(buffers, buffer_sizes) != TILEDB_AR_OK) {
-    strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_overflow(
-    const TileDB_Array* tiledb_array,
-    int attribute_id) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
-    return TILEDB_ERR;
-
-  // Check overflow
-  return (int) tiledb_array->array_->overflow(attribute_id);
-}
-
-int tiledb_array_consolidate(
-    const TileDB_CTX* tiledb_ctx,
-    const char* array) {
-  // Check array name length
-  if(array == NULL || strlen(array) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid array name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Consolidate
-  if(tiledb_ctx->storage_manager_->array_consolidate(array) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-  else 
-    return TILEDB_OK;
-}
-
-int tiledb_array_finalize(TileDB_Array* tiledb_array) {
-  // Sanity check
-  if(!sanity_check(tiledb_array) ||
-     !sanity_check(tiledb_array->tiledb_ctx_))
-    return TILEDB_ERR;
-
-  // Finalize array
-  int rc = tiledb_array->tiledb_ctx_->storage_manager_->array_finalize(
-               tiledb_array->array_);
-
-  free(tiledb_array);
-
-  // Error
-  if(rc != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  }
-   
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_sync(TileDB_Array* tiledb_array) {
-  // Sanity check
-  if(!sanity_check(tiledb_array) ||
-     !sanity_check(tiledb_array->tiledb_ctx_))
-    return TILEDB_ERR;
-
-  // Sync
-  int rc = tiledb_array->tiledb_ctx_->storage_manager_->array_sync(
-               tiledb_array->array_);
-
-  // Error
-  if(rc != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  }
-   
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_sync_attribute(
-    TileDB_Array* tiledb_array,
-    const char* attribute) {
-  // Sanity check
-  if(!sanity_check(tiledb_array) ||
-     !sanity_check(tiledb_array->tiledb_ctx_))
-    return TILEDB_ERR;
-
-  // Sync attribute
-  int rc = tiledb_array->tiledb_ctx_->storage_manager_->array_sync_attribute(
-               tiledb_array->array_,
-               attribute);
-
-  // Error
-  if(rc != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  }
-   
-  // Success
-  return TILEDB_OK;
-}
-
-typedef struct TileDB_ArrayIterator {
-  ArrayIterator* array_it_;
-  const TileDB_CTX* tiledb_ctx_;
-} TileDB_ArrayIterator;
-
-int tiledb_array_iterator_init(
-    const TileDB_CTX* tiledb_ctx,
-    TileDB_ArrayIterator** tiledb_array_it,
-    const char* array,
-    int mode,
-    const void* subarray,
-    const char** attributes,
-    int attribute_num,
-    void** buffers,
-    size_t* buffer_sizes) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Allocate memory for the array iterator struct
-  *tiledb_array_it = 
-      (TileDB_ArrayIterator*) malloc(sizeof(struct TileDB_ArrayIterator));
-
-  // Set TileDB context
-  (*tiledb_array_it)->tiledb_ctx_ = tiledb_ctx;
-
-  // Initialize the array iterator
-  int rc = tiledb_ctx->storage_manager_->array_iterator_init(
-               (*tiledb_array_it)->array_it_,
-               array,
-               mode,
-               subarray, 
-               attributes,
-               attribute_num,
-               buffers,
-               buffer_sizes);
-
-  // Error
-  if(rc != TILEDB_SM_OK) {
-    free(*tiledb_array_it);
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_iterator_get_value(
-    TileDB_ArrayIterator* tiledb_array_it,
-    int attribute_id,
-    const void** value,
-    size_t* value_size) {
-  // Sanity check
-  if(!sanity_check(tiledb_array_it))
-    return TILEDB_ERR;
-
-  // Get value
-  if(tiledb_array_it->array_it_->get_value(
-          attribute_id, 
-          value, 
-          value_size) != TILEDB_AIT_OK) {
-    strcpy(tiledb_errmsg, tiledb_ait_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_iterator_next(
-    TileDB_ArrayIterator* tiledb_array_it) {
-  // Sanity check
-  if(!sanity_check(tiledb_array_it))
-    return TILEDB_ERR;
-
-  // Advance iterator
-  if(tiledb_array_it->array_it_->next() != TILEDB_AIT_OK) {
-    strcpy(tiledb_errmsg, tiledb_ait_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_array_iterator_end(
-    TileDB_ArrayIterator* tiledb_array_it) {
-  // Sanity check
-  if(!sanity_check(tiledb_array_it))
-    return TILEDB_ERR;
-
-  // Check if the iterator reached the end
-  return (int) tiledb_array_it->array_it_->end();
-}
-
-int tiledb_array_iterator_finalize(
-    TileDB_ArrayIterator* tiledb_array_it) {
-  // Sanity check
-  if(!sanity_check(tiledb_array_it))
-    return TILEDB_ERR;
-
-  // Finalize array
-  int rc = tiledb_array_it->tiledb_ctx_->
-               storage_manager_->array_iterator_finalize(
-                   tiledb_array_it->array_it_);
-
-  free(tiledb_array_it);
-
-  // Error
-  if(rc != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_OK;
-  }
-
-  // Success 
-  return TILEDB_OK; 
-}
-
-
-
 
 /* ****************************** */
-/*            METADATA            */
+/*       RESOURCE  MANAGEMENT     */
 /* ****************************** */
 
-typedef struct TileDB_Metadata {
-  Metadata* metadata_;
-  const TileDB_CTX* tiledb_ctx_;
-} TileDB_Metadata;
-
-int tiledb_metadata_set_schema(
-    TileDB_MetadataSchema* tiledb_metadata_schema,
-    const char* metadata_name,
-    const char** attributes,
-    int attribute_num,
-    int64_t capacity,
-    const int* cell_val_num,
-    const int* compression,
-    const int* types) {
-  // Sanity check
-  if(tiledb_metadata_schema == NULL) {
-    std::string errmsg = "Invalid metadata schema pointer";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
+int tiledb_object_type(
+    tiledb_ctx_t* ctx, const char* path, tiledb_object_t* type) {
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
-  }
-
-  // Set metadata name
-  size_t metadata_name_len = strlen(metadata_name); 
-  if(metadata_name == NULL || metadata_name_len > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid metadata name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-  tiledb_metadata_schema->metadata_name_ = (char*) malloc(metadata_name_len+1);
-  strcpy(tiledb_metadata_schema->metadata_name_, metadata_name);
-
-  /* Set attributes and number of attributes. */
-  tiledb_metadata_schema->attribute_num_ = attribute_num;
-  tiledb_metadata_schema->attributes_ = 
-      (char**) malloc(attribute_num*sizeof(char*));
-  for(int i=0; i<attribute_num; ++i) { 
-    size_t attribute_len = strlen(attributes[i]);
-    if(attributes[i] == NULL || attribute_len > TILEDB_NAME_MAX_LEN) {
-      std::string errmsg = "Invalid attribute name length";
-      PRINT_ERROR(errmsg);
-      strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-      return TILEDB_ERR;
-    }
-    tiledb_metadata_schema->attributes_[i] = (char*) malloc(attribute_len+1);
-    strcpy(tiledb_metadata_schema->attributes_[i], attributes[i]);
-  }
-
-  // Set types
-  tiledb_metadata_schema->types_ = (int*) malloc((attribute_num+1)*sizeof(int));
-  for(int i=0; i<attribute_num+1; ++i)
-    tiledb_metadata_schema->types_[i] = types[i];
-
-  // Set cell val num
-  if(cell_val_num == NULL) {
-    tiledb_metadata_schema->cell_val_num_ = NULL; 
-  } else {
-    tiledb_metadata_schema->cell_val_num_ = 
-        (int*) malloc((attribute_num)*sizeof(int));
-    for(int i=0; i<attribute_num; ++i) {
-      tiledb_metadata_schema->cell_val_num_[i] = cell_val_num[i];
-    }
-  }
-
-  // Set capacity
-  tiledb_metadata_schema->capacity_ = capacity;
-
-  // Set compression
-  if(compression == NULL) {
-    tiledb_metadata_schema->compression_ = NULL; 
-  } else {
-    tiledb_metadata_schema->compression_ = 
-        (int*) malloc((attribute_num+1)*sizeof(int));
-    for(int i=0; i<attribute_num+1; ++i)
-      tiledb_metadata_schema->compression_[i] = compression[i];
-  }
-
-  // Return
+  auto uri = tiledb::URI(path);
+  *type = static_cast<tiledb_object_t>(ctx->storage_manager_->object_type(uri));
   return TILEDB_OK;
 }
 
-int tiledb_metadata_create(
-    const TileDB_CTX* tiledb_ctx,
-    const TileDB_MetadataSchema* metadata_schema) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
+int tiledb_delete(tiledb_ctx_t* ctx, const char* path) {
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
-
-  // Copy metadata schema to the proper struct
-  MetadataSchemaC metadata_schema_c;
-  metadata_schema_c.metadata_name_ = metadata_schema->metadata_name_;
-  metadata_schema_c.attributes_ = metadata_schema->attributes_;
-  metadata_schema_c.attribute_num_ = metadata_schema->attribute_num_;
-  metadata_schema_c.capacity_ = metadata_schema->capacity_;
-  metadata_schema_c.cell_val_num_ = metadata_schema->cell_val_num_;
-  metadata_schema_c.compression_ = metadata_schema->compression_;
-  metadata_schema_c.types_ = metadata_schema->types_;
-
-  // Create the metadata
-  if(tiledb_ctx->storage_manager_->metadata_create(&metadata_schema_c) !=
-     TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
+  auto uri = tiledb::URI(path);
+  if (save_error(ctx, ctx->storage_manager_->remove_path(uri)))
     return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_init(
-    const TileDB_CTX* tiledb_ctx,
-    TileDB_Metadata** tiledb_metadata,
-    const char* metadata,
-    int mode,
-    const char** attributes,
-    int attribute_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Allocate memory for the array struct
-  *tiledb_metadata = (TileDB_Metadata*) malloc(sizeof(struct TileDB_Metadata));
-
-  // Set TileDB context
-  (*tiledb_metadata)->tiledb_ctx_ = tiledb_ctx;
-
-  // Init the metadata
-  if(tiledb_ctx->storage_manager_->metadata_init(
-         (*tiledb_metadata)->metadata_,
-         metadata,
-         mode, 
-         attributes,
-         attribute_num) != TILEDB_SM_OK) {
-    free(*tiledb_metadata);
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  } 
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_reset_attributes(
-    const TileDB_Metadata* tiledb_metadata,
-    const char** attributes, 
-    int attribute_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata))
-    return TILEDB_ERR;  
-
-  // Reset attributes
-  if(tiledb_metadata->metadata_->reset_attributes(
-               attributes, 
-               attribute_num) != TILEDB_MT_OK) {
-    strcpy(tiledb_errmsg, tiledb_mt_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_get_schema(
-    const TileDB_Metadata* tiledb_metadata,
-    TileDB_MetadataSchema* tiledb_metadata_schema) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata))
-    return TILEDB_ERR;  
-
-  // Get the metadata schema
-  MetadataSchemaC metadata_schema_c;
-  tiledb_metadata->metadata_->array_schema()->array_schema_export(
-      &metadata_schema_c); 
-
-  // Copy the metadata schema C struct to the output
-  tiledb_metadata_schema->metadata_name_ = metadata_schema_c.metadata_name_;
-  tiledb_metadata_schema->attributes_ = metadata_schema_c.attributes_; 
-  tiledb_metadata_schema->attribute_num_ = metadata_schema_c.attribute_num_;
-  tiledb_metadata_schema->capacity_ = metadata_schema_c.capacity_;
-  tiledb_metadata_schema->cell_val_num_ = metadata_schema_c.cell_val_num_;
-  tiledb_metadata_schema->compression_ = metadata_schema_c.compression_;
-  tiledb_metadata_schema->types_ = metadata_schema_c.types_;
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_load_schema(
-    const TileDB_CTX* tiledb_ctx,
-    const char* metadata,
-    TileDB_MetadataSchema* tiledb_metadata_schema) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Check metadata name length
-  if(metadata == NULL || strlen(metadata) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid metadata name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Get the array schema
-  ArraySchema* array_schema;
-  if(tiledb_ctx->storage_manager_->metadata_load_schema(
-         metadata, 
-         array_schema) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-  MetadataSchemaC metadata_schema_c;
-  array_schema->array_schema_export(&metadata_schema_c);
-
-  // Copy the metadata schema C struct to the output
-  tiledb_metadata_schema->metadata_name_ = metadata_schema_c.metadata_name_;
-  tiledb_metadata_schema->attributes_ = metadata_schema_c.attributes_; 
-  tiledb_metadata_schema->attribute_num_ = metadata_schema_c.attribute_num_;
-  tiledb_metadata_schema->capacity_ = metadata_schema_c.capacity_;
-  tiledb_metadata_schema->cell_val_num_ = metadata_schema_c.cell_val_num_;
-  tiledb_metadata_schema->compression_ = metadata_schema_c.compression_;
-  tiledb_metadata_schema->types_ = metadata_schema_c.types_;
-
-  // Clean up
-  delete array_schema;
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_free_schema(
-    TileDB_MetadataSchema* tiledb_metadata_schema) {
-  // Trivial case
-  if(tiledb_metadata_schema == NULL)
-    return TILEDB_OK;
-
-  // Free name
-  if(tiledb_metadata_schema->metadata_name_ != NULL)
-    free(tiledb_metadata_schema->metadata_name_);
-
-  // Free attributes
-  if(tiledb_metadata_schema->attributes_ != NULL) {
-    for(int i=0; i<tiledb_metadata_schema->attribute_num_; ++i)
-      if(tiledb_metadata_schema->attributes_[i] != NULL)
-        free(tiledb_metadata_schema->attributes_[i]);
-    free(tiledb_metadata_schema->attributes_);
-  }
-
-  // Free types
-  if(tiledb_metadata_schema->types_ != NULL)
-    free(tiledb_metadata_schema->types_);
-
-  // Free compression
-  if(tiledb_metadata_schema->compression_ != NULL)
-    free(tiledb_metadata_schema->compression_);
-
-  // Free cell val num
-  if(tiledb_metadata_schema->cell_val_num_ != NULL)
-    free(tiledb_metadata_schema->cell_val_num_);
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_write(
-    const TileDB_Metadata* tiledb_metadata,
-    const char* keys,
-    size_t keys_size,
-    const void** buffers,
-    const size_t* buffer_sizes) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata))
-    return TILEDB_ERR;
-
-  // Write
-  if(tiledb_metadata->metadata_->write(
-         keys, 
-         keys_size, 
-         buffers, 
-         buffer_sizes) != TILEDB_MT_OK) {
-    strcpy(tiledb_errmsg, tiledb_mt_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_read(
-    const TileDB_Metadata* tiledb_metadata,
-    const char* key,
-    void** buffers,
-    size_t* buffer_sizes) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata))
-    return TILEDB_ERR;
-
-  // Read
-  if(tiledb_metadata->metadata_->read(
-         key,
-         buffers, 
-         buffer_sizes) != TILEDB_MT_OK) {
-    strcpy(tiledb_errmsg, tiledb_mt_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_overflow(
-    const TileDB_Metadata* tiledb_metadata,
-    int attribute_id) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata))
-    return TILEDB_ERR; 
-
-  return (int) tiledb_metadata->metadata_->overflow(attribute_id);
-}
-
-int tiledb_metadata_consolidate(
-    const TileDB_CTX* tiledb_ctx,
-    const char* metadata) {
-   // Check metadata name length
-   if(metadata == NULL || strlen(metadata) > TILEDB_NAME_MAX_LEN) {
-     std::string errmsg = "Invalid metadata name length";
-     PRINT_ERROR(errmsg);
-     strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-     return TILEDB_ERR;
-   }
-
-  // Consolidate
-  if(tiledb_ctx->storage_manager_->metadata_consolidate(metadata) != 
-     TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_finalize(TileDB_Metadata* tiledb_metadata) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata))
-    return TILEDB_ERR; 
-
-  // Finalize metadata
-  int rc = tiledb_metadata->tiledb_ctx_->storage_manager_->metadata_finalize(
-               tiledb_metadata->metadata_);
-
-  // Clean up
-  free(tiledb_metadata);
-
-  // Error
-  if(rc != TILEDB_SM_OK) { 
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK; 
-}
-
-typedef struct TileDB_MetadataIterator {
-  MetadataIterator* metadata_it_;
-  const TileDB_CTX* tiledb_ctx_;
-} TileDB_MetadataIterator;
-
-int tiledb_metadata_iterator_init(
-    const TileDB_CTX* tiledb_ctx,
-    TileDB_MetadataIterator** tiledb_metadata_it,
-    const char* metadata,
-    const char** attributes,
-    int attribute_num,
-    void** buffers,
-    size_t* buffer_sizes) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Allocate memory for the metadata struct
-  *tiledb_metadata_it = 
-      (TileDB_MetadataIterator*) malloc(sizeof(struct TileDB_MetadataIterator));
-
-  // Set TileDB context
-  (*tiledb_metadata_it)->tiledb_ctx_ = tiledb_ctx;
-
-  // Initialize the metadata iterator
-  if(tiledb_ctx->storage_manager_->metadata_iterator_init(
-         (*tiledb_metadata_it)->metadata_it_,
-         metadata,
-         attributes,
-         attribute_num,
-         buffers,
-         buffer_sizes) != TILEDB_SM_OK) {
-    free(*tiledb_metadata_it);
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  } 
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_iterator_get_value(
-    TileDB_MetadataIterator* tiledb_metadata_it,
-    int attribute_id,
-    const void** value,
-    size_t* value_size) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata_it))
-    return TILEDB_ERR; 
-
-  // Get value
-  if(tiledb_metadata_it->metadata_it_->get_value(
-          attribute_id, 
-          value, 
-          value_size) != TILEDB_MIT_OK) {
-    strcpy(tiledb_errmsg, tiledb_mit_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_iterator_next(
-    TileDB_MetadataIterator* tiledb_metadata_it) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata_it))
-    return TILEDB_ERR; 
-
-  // Advance metadata iterator
-  if(tiledb_metadata_it->metadata_it_->next() != TILEDB_MIT_OK) {
-    strcpy(tiledb_errmsg, tiledb_mit_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_metadata_iterator_end(
-    TileDB_MetadataIterator* tiledb_metadata_it) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata_it))
-    return TILEDB_ERR; 
-
-  // Check if the metadata iterator reached its end
-  return (int) tiledb_metadata_it->metadata_it_->end();
-}
-
-int tiledb_metadata_iterator_finalize(
-    TileDB_MetadataIterator* tiledb_metadata_it) {
-  // Sanity check
-  if(!sanity_check(tiledb_metadata_it))
-    return TILEDB_ERR; 
-
-  // Finalize metadata iterator
-  int rc = tiledb_metadata_it->tiledb_ctx_->
-               storage_manager_->metadata_iterator_finalize(
-                   tiledb_metadata_it->metadata_it_);
-
-  // Clean up
-  free(tiledb_metadata_it);
-
-  // Error
-  if(rc != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR; 
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-
-
-
-/* ****************************** */
-/*       DIRECTORY MANAGEMENT     */
-/* ****************************** */
-
-int tiledb_clear(
-    const TileDB_CTX* tiledb_ctx,
-    const char* dir) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Check directory name length
-  if(dir == NULL || strlen(dir) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid directory name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Clear
-  if(tiledb_ctx->storage_manager_->clear(dir) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}   
-
-int tiledb_delete(
-    const TileDB_CTX* tiledb_ctx,
-    const char* dir) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Check directory name length
-  if(dir == NULL || strlen(dir) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid directory name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Delete
-  if(tiledb_ctx->storage_manager_->delete_entire(dir) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
   return TILEDB_OK;
 }
 
 int tiledb_move(
-    const TileDB_CTX* tiledb_ctx,
-    const char* old_dir,
-    const char* new_dir) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
+    tiledb_ctx_t* ctx, const char* old_path, const char* new_path, bool force) {
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
-
-  // Check old directory name length
-  if(old_dir == NULL || strlen(old_dir) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid old directory name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
+  auto old_uri = tiledb::URI(old_path);
+  auto new_uri = tiledb::URI(new_path);
+  if (save_error(ctx, ctx->storage_manager_->move(old_uri, new_uri, force)))
     return TILEDB_ERR;
-  }
-
-  // Check new directory name length
-  if(new_dir == NULL || strlen(new_dir) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid new directory name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // Move
-  if(tiledb_ctx->storage_manager_->move(old_dir, new_dir) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
   return TILEDB_OK;
 }
 
-int tiledb_ls_workspaces(
-    const TileDB_CTX* tiledb_ctx,
-    char** workspaces,
-    int* workspace_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
+int tiledb_walk(
+    tiledb_ctx_t* ctx,
+    const char* path,
+    tiledb_walk_order_t order,
+    int (*callback)(const char*, tiledb_object_t, void*),
+    void* data) {
+  // Sanity checks
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
-
-  // List workspaces
-  if(tiledb_ctx->storage_manager_->ls_workspaces(
-               workspaces,
-               *workspace_num) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
+  if (callback == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Cannot initiate walk; Invalid callback function");
+    LOG_STATUS(st);
+    save_error(ctx, st);
     return TILEDB_ERR;
   }
 
-  // Success
+  // Create an object iterator
+  tiledb::StorageManager::ObjectIter* obj_iter;
+  if (save_error(
+          ctx,
+          ctx->storage_manager_->object_iter_begin(
+              &obj_iter, path, static_cast<tiledb::WalkOrder>(order))))
+    return TILEDB_ERR;
+
+  // For as long as there is another object and the callback indicates to
+  // continue, walk over the TileDB objects in the path
+  const char* obj_name;
+  tiledb::ObjectType obj_type;
+  bool has_next;
+  int rc = 0;
+  do {
+    if (save_error(
+            ctx,
+            ctx->storage_manager_->object_iter_next(
+                obj_iter, &obj_name, &obj_type, &has_next))) {
+      ctx->storage_manager_->object_iter_free(obj_iter);
+      return TILEDB_ERR;
+    }
+    if (!has_next)
+      break;
+    rc = callback(obj_name, tiledb_object_t(obj_type), data);
+  } while (rc == 1);
+
+  // Clean up
+  ctx->storage_manager_->object_iter_free(obj_iter);
+
+  if (rc == -1)
+    return TILEDB_ERR;
   return TILEDB_OK;
 }
-
-int tiledb_ls_workspaces_c(
-    const TileDB_CTX* tiledb_ctx,
-    int* workspace_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // List workspaces
-  if(tiledb_ctx->storage_manager_->ls_workspaces_c(
-               *workspace_num) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_ls(
-    const TileDB_CTX* tiledb_ctx,
-    const char* parent_dir,
-    char** dirs,
-    int* dir_types,
-    int* dir_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Check parent directory name length
-  if(parent_dir == NULL || strlen(parent_dir) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid parent directory name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // List TileDB objects
-  if(tiledb_ctx->storage_manager_->ls(
-         parent_dir,
-         dirs,
-         dir_types,
-         *dir_num) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-  
-  // Success
-  return TILEDB_OK;
-}
-
-int tiledb_ls_c(
-    const TileDB_CTX* tiledb_ctx,
-    const char* parent_dir,
-    int* dir_num) {
-  // Sanity check
-  if(!sanity_check(tiledb_ctx))
-    return TILEDB_ERR;
-
-  // Check parent directory name length
-  if(parent_dir == NULL || strlen(parent_dir) > TILEDB_NAME_MAX_LEN) {
-    std::string errmsg = "Invalid parent directory name length";
-    PRINT_ERROR(errmsg);
-    strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
-    return TILEDB_ERR;
-  }
-
-  // List TileDB objects
-  if(tiledb_ctx->storage_manager_->ls_c(
-         parent_dir,
-         *dir_num) != TILEDB_SM_OK) {
-    strcpy(tiledb_errmsg, tiledb_sm_errmsg.c_str());
-    return TILEDB_ERR;
-  }
-
-  // Success
-  return TILEDB_OK;
-}
-
-
 
 /* ****************************** */
-/*     ASYNCHRONOUS I/O (AIO      */
+/*             KEY-VALUE          */
 /* ****************************** */
 
-int tiledb_array_aio_read(
-    const TileDB_Array* tiledb_array,
-    TileDB_AIO_Request* tiledb_aio_request) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
+int tiledb_kv_create(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t** kv,
+    unsigned int attribute_num,
+    const char** attributes,
+    tiledb_datatype_t* types,
+    unsigned int* nitems) {
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
 
-  // Copy the AIO request
-  AIO_Request* aio_request = (AIO_Request*) malloc(sizeof(struct AIO_Request));
-  aio_request->id_ = (size_t) tiledb_aio_request;
-  aio_request->buffers_ = tiledb_aio_request->buffers_;
-  aio_request->buffer_sizes_ = tiledb_aio_request->buffer_sizes_;
-  aio_request->mode_ = tiledb_array->array_->mode();
-  aio_request->status_ = &(tiledb_aio_request->status_);
-  aio_request->subarray_ = tiledb_aio_request->subarray_;
-  aio_request->completion_handle_ = tiledb_aio_request->completion_handle_;
-  aio_request->completion_data_ = tiledb_aio_request->completion_data_;
+  // Create key-value store struct
+  *kv = new (std::nothrow) tiledb_kv_t;
+  if (*kv == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB in-memory key-value store struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
 
-  // Submit the AIO read request
-  if(tiledb_array->array_->aio_read(aio_request) != TILEDB_AR_OK) {
-    strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
+  // Prepare attributes/types/nitems vectors
+  std::vector<std::string> attributes_vec;
+  std::vector<tiledb::Datatype> types_vec;
+  std::vector<unsigned int> nitems_vec;
+  for (unsigned int i = 0; i < attribute_num; ++i) {
+    attributes_vec.emplace_back(attributes[i]);
+    types_vec.emplace_back(static_cast<tiledb::Datatype>(types[i]));
+    nitems_vec.emplace_back(nitems[i]);
+  }
+
+  // Create a new KV object
+  (*kv)->kv_ = new tiledb::KV(attributes_vec, types_vec, nitems_vec);
+  if ((*kv)->kv_ == nullptr) {
+    delete *kv;
+    *kv = nullptr;
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB in-memory key-value "
+        "store object in struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_kv_free(tiledb_ctx_t* ctx, tiledb_kv_t* kv) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  delete kv->kv_;
+  delete kv;
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_add_key(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t* kv,
+    const void* key,
+    tiledb_datatype_t key_type,
+    uint64_t key_size) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Set key
+  if (save_error(
+          ctx,
+          kv->kv_->add_key(
+              key, static_cast<tiledb::Datatype>(key_type), key_size)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_add_value(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t* kv,
+    unsigned int attribute_idx,
+    const void* value) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Set value
+  if (save_error(ctx, kv->kv_->add_value(attribute_idx, value)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_add_value_var(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t* kv,
+    unsigned int attribute_idx,
+    const void* value,
+    uint64_t value_size) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Set value
+  if (save_error(ctx, kv->kv_->add_value(attribute_idx, value, value_size)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_get_key_num(tiledb_ctx_t* ctx, tiledb_kv_t* kv, uint64_t* num) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *num = kv->kv_->key_num();
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_get_value_num(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t* kv,
+    unsigned int attribute_idx,
+    uint64_t* num) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, kv->kv_->value_num(attribute_idx, num)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_get_key(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t* kv,
+    uint64_t key_idx,
+    void** key,
+    tiledb_datatype_t* key_type,
+    uint64_t* key_size) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Get the key
+  tiledb::Datatype key_type_d;
+  if (save_error(ctx, kv->kv_->get_key(key_idx, key, &key_type_d, key_size)))
+    return TILEDB_ERR;
+  *key_type = static_cast<tiledb_datatype_t>(key_type_d);
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_get_value(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t* kv,
+    uint64_t obj_idx,
+    unsigned int attr_idx,
+    void** value) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Get the value
+  if (save_error(ctx, kv->kv_->get_value(obj_idx, attr_idx, value)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_get_value_var(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_t* kv,
+    uint64_t obj_idx,
+    unsigned int attr_idx,
+    void** value,
+    uint64_t* value_size) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Get the value
+  if (save_error(ctx, kv->kv_->get_value(obj_idx, attr_idx, value, value_size)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_kv_set_buffer_size(
+    tiledb_ctx_t* ctx, tiledb_kv_t* kv, uint64_t nbytes) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, kv) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Set the buffer size
+  kv->kv_->set_buffer_alloc_size(nbytes);
+
+  return TILEDB_OK;
+}
+
+/* ****************************** */
+/*        VIRTUAL FILESYSTEM      */
+/* ****************************** */
+
+int tiledb_vfs_create(
+    tiledb_ctx_t* ctx, tiledb_vfs_t** vfs, tiledb_config_t* config) {
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (config != nullptr && config->config_ == nullptr) {
+    tiledb::Status st =
+        tiledb::Status::Error("Cannot create VFS; Invalid config");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_ERR;
+  }
+
+  // Create VFS struct
+  *vfs = new (std::nothrow) tiledb_vfs_t;
+  if (*vfs == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB virtual filesystem struct");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    return TILEDB_OOM;
+  }
+
+  // Create VFS object
+  (*vfs)->vfs_ = new tiledb::VFS();
+  if ((*vfs)->vfs_ == nullptr) {
+    tiledb::Status st = tiledb::Status::Error(
+        "Failed to allocate TileDB virtual filesystem object");
+    LOG_STATUS(st);
+    save_error(ctx, st);
+    delete *vfs;
+    return TILEDB_OOM;
+  }
+
+  // Create a config tha inherits the VFS params from storage manager,
+  // and applies on top the ones from the input config.
+  tiledb::Config new_config;
+  if (config != nullptr)
+    new_config = *(config->config_);
+  new_config.set_vfs_params(ctx->storage_manager_->config().vfs_params());
+  if (save_error(ctx, new_config.init())) {
+    delete (*vfs)->vfs_;
+    delete vfs;
+    return TILEDB_ERR;
+  }
+
+  // Initialize VFS object
+  if (save_error(ctx, (*vfs)->vfs_->init(new_config.vfs_params()))) {
+    delete (*vfs)->vfs_;
+    delete vfs;
     return TILEDB_ERR;
   }
 
@@ -1596,30 +2262,189 @@ int tiledb_array_aio_read(
   return TILEDB_OK;
 }
 
-int tiledb_array_aio_write(
-    const TileDB_Array* tiledb_array,
-    TileDB_AIO_Request* tiledb_aio_request) {
-  // Sanity check
-  if(!sanity_check(tiledb_array))
+int tiledb_vfs_free(tiledb_ctx_t* ctx, tiledb_vfs_t* vfs) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
     return TILEDB_ERR;
 
-  // Copy the AIO request
-  AIO_Request* aio_request = (AIO_Request*) malloc(sizeof(struct AIO_Request));
-  aio_request->id_ = (size_t) tiledb_aio_request;
-  aio_request->buffers_ = tiledb_aio_request->buffers_;
-  aio_request->buffer_sizes_ = tiledb_aio_request->buffer_sizes_;
-  aio_request->mode_ = tiledb_array->array_->mode();
-  aio_request->status_ = &(tiledb_aio_request->status_);
-  aio_request->subarray_ = tiledb_aio_request->subarray_;
-  aio_request->completion_handle_ = tiledb_aio_request->completion_handle_;
-  aio_request->completion_data_ = tiledb_aio_request->completion_data_;
+  delete vfs->vfs_;
+  delete vfs;
 
-  // Submit the AIO write request
-  if(tiledb_array->array_->aio_write(aio_request) != TILEDB_AR_OK) {
-    strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_create_bucket(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
     return TILEDB_ERR;
-  }
 
-  // Success
+  if (save_error(ctx, vfs->vfs_->create_bucket(tiledb::URI(uri))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_remove_bucket(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->remove_bucket(tiledb::URI(uri))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_is_bucket(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri, int* is_bucket) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *is_bucket = (int)vfs->vfs_->is_bucket(tiledb::URI(uri));
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_create_dir(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->create_dir(tiledb::URI(uri))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_is_dir(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri, int* is_dir) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *is_dir = (int)vfs->vfs_->is_dir(tiledb::URI(uri));
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_remove_dir(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->remove_path(tiledb::URI(uri))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_is_file(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri, int* is_file) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *is_file = (int)vfs->vfs_->is_file(tiledb::URI(uri));
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_remove_file(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->remove_file(tiledb::URI(uri))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_file_size(
+    tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri, uint64_t* size) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->file_size(tiledb::URI(uri), size)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_move(
+    tiledb_ctx_t* ctx,
+    tiledb_vfs_t* vfs,
+    const char* old_uri,
+    const char* new_uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(
+          ctx,
+          vfs->vfs_->move_path(tiledb::URI(old_uri), tiledb::URI(new_uri))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_read(
+    tiledb_ctx_t* ctx,
+    tiledb_vfs_t* vfs,
+    const char* uri,
+    uint64_t offset,
+    void* buffer,
+    uint64_t nbytes) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(
+          ctx, vfs->vfs_->read(tiledb::URI(uri), offset, buffer, nbytes)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_write(
+    tiledb_ctx_t* ctx,
+    tiledb_vfs_t* vfs,
+    const char* uri,
+    const void* buffer,
+    uint64_t nbytes) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->write(tiledb::URI(uri), buffer, nbytes)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_sync(tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->sync(tiledb::URI(uri))))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_supports_fs(
+    tiledb_ctx_t* ctx,
+    tiledb_vfs_t* vfs,
+    tiledb_filesystem_t fs,
+    int* supports) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  *supports = (int)vfs->vfs_->supports_fs(static_cast<tiledb::Filesystem>(fs));
+
+  return TILEDB_OK;
+}
+
+int tiledb_vfs_touch(tiledb_ctx_t* ctx, tiledb_vfs_t* vfs, const char* uri) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, vfs) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  if (save_error(ctx, vfs->vfs_->create_file(tiledb::URI(uri))))
+    return TILEDB_ERR;
+
   return TILEDB_OK;
 }

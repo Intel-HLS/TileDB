@@ -4,7 +4,8 @@
  * @section LICENSE
  *
  * The MIT License
- * 
+ *
+ * @copyright Copyright (c) 2017 TileDB, Inc.
  * @copyright Copyright (c) 2016 MIT and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,300 +25,186 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- * 
+ *
  * @section DESCRIPTION
  *
  * This file implements the Fragment class.
  */
 
 #include "fragment.h"
-#include "tiledb_constants.h"
-#include "utils.h"
-#include <cassert>
-#include <cstdio>
-#include <cstring>
+#include "logger.h"
+
 #include <iostream>
-
-
-
 
 /* ****************************** */
 /*             MACROS             */
 /* ****************************** */
 
-#ifdef TILEDB_VERBOSE
-#  define PRINT_ERROR(x) std::cerr << TILEDB_FG_ERRMSG << x << ".\n" 
-#else
-#  define PRINT_ERROR(x) do { } while(0) 
-#endif
-
-
-
-
-
-/* ****************************** */
-/*        GLOBAL VARIABLES        */
-/* ****************************** */
-
-std::string tiledb_fg_errmsg = "";
-
-
-
+namespace tiledb {
 
 /* ****************************** */
 /*   CONSTRUCTORS & DESTRUCTORS   */
 /* ****************************** */
 
-Fragment::Fragment(const Array* array)
-    : array_(array) {
-  read_state_ = NULL;
-  write_state_ = NULL;
-  book_keeping_ = NULL;
+Fragment::Fragment(Query* query)
+    : query_(query) {
+  read_state_ = nullptr;
+  write_state_ = nullptr;
+  metadata_ = nullptr;
+  consolidation_ = false;
 }
 
 Fragment::~Fragment() {
-  if(write_state_ != NULL)
+  if (write_state_ != nullptr) {
     delete write_state_;
+    delete metadata_;
+  }
 
-  if(read_state_ != NULL)
-    delete read_state_;
-
-  if(book_keeping_ != NULL && !read_mode())
-    delete book_keeping_;
+  delete read_state_;
 }
 
-
-
-
 /* ****************************** */
-/*            ACCESSORS           */
+/*               API              */
 /* ****************************** */
 
-const Array* Fragment::array() const {
-  return array_;
+const ArrayMetadata* Fragment::array_metadata() const {
+  return query_->array_metadata();
 }
 
-int64_t Fragment::cell_num_per_tile() const {
-  return (dense_) ? array_->array_schema()->cell_num_per_tile() : 
-                    array_->array_schema()->capacity(); 
+URI Fragment::attr_uri(unsigned int attribute_id) const {
+  const Attribute* attr = query_->array_metadata()->attribute(attribute_id);
+  return fragment_uri_.join_path(attr->name() + constants::file_suffix);
+}
+
+URI Fragment::attr_var_uri(unsigned int attribute_id) const {
+  const Attribute* attr = query_->array_metadata()->attribute(attribute_id);
+  return fragment_uri_.join_path(
+      attr->name() + "_var" + constants::file_suffix);
+}
+
+URI Fragment::coords_uri() const {
+  return fragment_uri_.join_path(
+      std::string(constants::coords) + constants::file_suffix);
 }
 
 bool Fragment::dense() const {
   return dense_;
 }
 
-const std::string& Fragment::fragment_name() const {
-  return fragment_name_;
+uint64_t Fragment::file_coords_size() const {
+  assert(metadata_ != nullptr);
+  auto attribute_num = query_->array_metadata()->attribute_num();
+  return metadata_->file_sizes(attribute_num);
 }
 
-int Fragment::mode() const {
-  return mode_;
+uint64_t Fragment::file_size(unsigned int attribute_id) const {
+  assert(metadata_ != nullptr);
+  return metadata_->file_sizes(attribute_id);
 }
 
-inline
-bool Fragment::read_mode() const {
-  return array_read_mode(mode_);
+uint64_t Fragment::file_var_size(unsigned int attribute_id) const {
+  assert(metadata_ != nullptr);
+  return metadata_->file_var_sizes(attribute_id);
+}
+
+Status Fragment::finalize() {
+  if (write_state_ != nullptr) {  // WRITE
+    assert(metadata_ != NULL);
+    auto storage_manager = query_->storage_manager();
+    Status st = write_state_->finalize();
+    if (st.ok())
+      st = storage_manager->store_fragment_metadata(metadata_);
+    if (st.ok() && storage_manager->is_dir(fragment_uri_))
+      st = storage_manager->create_fragment_file(fragment_uri_);
+
+    return st;
+  }
+
+  // READ - nothing to be done
+  return Status::Ok();
+}
+
+const URI& Fragment::fragment_uri() const {
+  return fragment_uri_;
+}
+
+Status Fragment::init(
+    const URI& uri, const void* subarray, bool consolidation) {
+  // Set fragment name and consolidation
+  fragment_uri_ = uri;
+  consolidation_ = consolidation;
+
+  // Check if the fragment is dense or not
+  dense_ = true;
+  const std::vector<unsigned int>& attribute_ids = query_->attribute_ids();
+  auto id_num = (unsigned int)attribute_ids.size();
+  unsigned int attribute_num = query_->array_metadata()->attribute_num();
+  for (unsigned int i = 0; i < id_num; ++i) {
+    if (attribute_ids[i] == attribute_num) {
+      dense_ = false;
+      break;
+    }
+  }
+
+  // Initialize metadata and read/write state
+  metadata_ = new FragmentMetadata(query_->array_metadata(), dense_, uri);
+  read_state_ = nullptr;
+  Status st = metadata_->init(subarray);
+  if (!st.ok()) {
+    delete metadata_;
+    metadata_ = nullptr;
+    write_state_ = nullptr;
+    return st;
+  }
+  write_state_ = new WriteState(this);
+
+  // Success
+  return Status::Ok();
+}
+
+Status Fragment::init(const URI& uri, FragmentMetadata* metadata) {
+  // Set member attributes
+  fragment_uri_ = uri;
+  metadata_ = metadata;
+  dense_ = metadata_->dense();
+
+  read_state_ = new ReadState(this, query_, metadata_);
+
+  // Success
+  return Status::Ok();
+}
+
+FragmentMetadata* Fragment::metadata() const {
+  return metadata_;
+}
+
+Query* Fragment::query() const {
+  return query_;
 }
 
 ReadState* Fragment::read_state() const {
   return read_state_;
 }
 
-size_t Fragment::tile_size(int attribute_id) const {
+uint64_t Fragment::tile_size(unsigned int attribute_id) const {
   // For easy reference
-  const ArraySchema* array_schema = array_->array_schema();
-  bool var_size = array_schema->var_size(attribute_id);
+  const ArrayMetadata* array_metadata = query_->array_metadata();
+  bool var_size = array_metadata->var_size(attribute_id);
+  uint64_t cell_var_offset_size = constants::cell_var_offset_size;
 
-  int64_t cell_num_per_tile = (dense_) ? 
-              array_schema->cell_num_per_tile() : 
-              array_schema->capacity(); 
- 
-  return (var_size) ? 
-             cell_num_per_tile * TILEDB_CELL_VAR_OFFSET_SIZE :
-             cell_num_per_tile * array_schema->cell_size(attribute_id);
+  uint64_t cell_num_per_tile =
+      (dense_) ? array_metadata->domain()->cell_num_per_tile() :
+                 array_metadata->capacity();
+
+  return (var_size) ?
+             cell_num_per_tile * cell_var_offset_size :
+             cell_num_per_tile * array_metadata->cell_size(attribute_id);
 }
 
-inline
-bool Fragment::write_mode() const {
-  return array_write_mode(mode_);
-}
-
-
-
-
-/* ****************************** */
-/*            MUTATORS            */
-/* ****************************** */
-
-int Fragment::finalize() {
-  if(write_state_ != NULL) {  // WRITE
-    assert(book_keeping_ != NULL);  
-    int rc_ws = write_state_->finalize();
-    int rc_bk = book_keeping_->finalize();
-    int rc_rn = TILEDB_FG_OK;
-    int rc_cf = TILEDB_UT_OK;
-    if(is_dir(fragment_name_)) {
-      rc_rn = rename_fragment();
-      rc_cf = create_fragment_file(fragment_name_);
-    }
-    // Errors
-    if(rc_ws != TILEDB_WS_OK) {
-      tiledb_fg_errmsg = tiledb_ws_errmsg;
-      return TILEDB_FG_ERR;
-    } 
-    if(rc_bk != TILEDB_BK_OK) {
-      tiledb_fg_errmsg = tiledb_bk_errmsg;
-      return TILEDB_FG_ERR;
-    } 
-    if(rc_cf != TILEDB_UT_OK) {
-      tiledb_fg_errmsg = tiledb_ut_errmsg;
-      return TILEDB_FG_ERR;
-    }
-    if(rc_rn != TILEDB_FG_OK)
-      return TILEDB_FG_ERR;
-
-    // Success
-    return TILEDB_FG_OK;
-  } else {                    // READ
-    // Nothing to be done
-    return TILEDB_FG_OK;
-  } 
-}
-
-int Fragment::init(
-    const std::string& fragment_name, 
-    int mode,
-    const void* subarray) {
-  // Set fragment name and mode
-  fragment_name_ = fragment_name;
-  mode_ = mode;
-
-  // Sanity check
-  if(!write_mode()) {
-    std::string errmsg = "Cannot initialize fragment;  Invalid mode";
-    PRINT_ERROR(errmsg);
-    tiledb_fg_errmsg = TILEDB_FG_ERRMSG + errmsg;
-    return TILEDB_FG_ERR;
-  }
-
-  // Check if the fragment is dense or not
-  dense_ = true;
-  const std::vector<int>& attribute_ids = array_->attribute_ids();
-  int id_num = attribute_ids.size();
-  int attribute_num = array_->array_schema()->attribute_num();
-  for(int i=0; i<id_num; ++i) {
-    if(attribute_ids[i] == attribute_num) {
-      dense_ = false;
-      break;
-    }
-  }
-
-  // Initialize book-keeping and read/write state
-  book_keeping_ = 
-      new BookKeeping(
-          array_->array_schema(),
-          dense_,
-          fragment_name,
-          mode_);
-  read_state_ = NULL;
-  if(book_keeping_->init(subarray) != TILEDB_BK_OK) {
-    delete book_keeping_;
-    book_keeping_ = NULL;
-    write_state_ = NULL;
-    tiledb_fg_errmsg = tiledb_bk_errmsg;
-    return TILEDB_FG_ERR;
-  }
-  write_state_ = new WriteState(this, book_keeping_);
-
-  // Success
-  return TILEDB_FG_OK;
-}
-
-int Fragment::init(
-    const std::string& fragment_name, 
-    BookKeeping* book_keeping) {
-  // Set member attributes
-  fragment_name_ = fragment_name;
-  mode_ = array_->mode();
-  book_keeping_ = book_keeping;
-  dense_ = book_keeping_->dense();
-  write_state_ = NULL;
-  read_state_ = new ReadState(this, book_keeping_);
-
-  // Success
-  return TILEDB_FG_OK;
-}
-
-void Fragment::reset_read_state() {
-  read_state_->reset();
-}
-
-int Fragment::sync() {
-  // Sanity check
-  assert(write_state_ != NULL);
-
-  // Sync
-  if(write_state_->sync() != TILEDB_WS_OK) {
-    tiledb_fg_errmsg = tiledb_ws_errmsg;
-    return TILEDB_FG_ERR;
-  } else {
-    return TILEDB_FG_OK;
-  }
-}
-
-int Fragment::sync_attribute(const std::string& attribute) {
-  // Sanity check
-  assert(write_state_ != NULL);
-
-  // Sync attribute
-  if(write_state_->sync_attribute(attribute) != TILEDB_WS_OK) {
-    tiledb_fg_errmsg = tiledb_ws_errmsg;
-    return TILEDB_FG_ERR;
-  } else {
-    return TILEDB_FG_OK;
-  }
-}
-
-int Fragment::write(const void** buffers, const size_t* buffer_sizes) {
+Status Fragment::write(void** buffers, uint64_t* buffer_sizes) {
   // Forward the write command to the write state
-  int rc = write_state_->write(buffers, buffer_sizes);
-
-  // Error
-  if(rc != TILEDB_WS_OK) {
-    tiledb_fg_errmsg = tiledb_ws_errmsg;
-    return TILEDB_FG_ERR;
-  }
-
-  // Success
-  return TILEDB_FG_OK;
+  RETURN_NOT_OK(write_state_->write(buffers, buffer_sizes));
+  return Status::Ok();
 }
 
-
-
-
-/* ****************************** */
-/*         PRIVATE METHODS        */
-/* ****************************** */
-
-int Fragment::rename_fragment() {
-  // Do nothing in READ mode
-  if(read_mode())
-    return TILEDB_FG_OK;
-
-  std::string parent_dir = ::parent_dir(fragment_name_);
-  std::string new_fragment_name = parent_dir + "/" +
-                                  fragment_name_.substr(parent_dir.size() + 2);
-
-  if(rename(fragment_name_.c_str(), new_fragment_name.c_str())) {
-    std::string errmsg = 
-        std::string("Cannot rename fragment directory; ") + strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_fg_errmsg = TILEDB_FG_ERRMSG + errmsg;
-    return TILEDB_FG_ERR;
-  } 
-
-  fragment_name_ = new_fragment_name;
-
-  return TILEDB_FG_OK;
-}
-
+}  // namespace tiledb

@@ -28,14 +28,14 @@
 # Function that builds an executable per example
 function(build_TileDB_example TARGET)
   add_executable(${TARGET} EXCLUDE_FROM_ALL src/${TARGET}.cc)
-  target_link_libraries(${TARGET} tiledb_static ${TILEDB_LIB_DEPENDENCIES})
+  target_link_libraries(${TARGET} tiledb_static -lpthread ${TILEDB_LIB_DEPENDENCIES} ${S3_LIB_DEPENDENCIES})
 endfunction()
 
 # Get the example sources
 file(GLOB TILEDB_EXAMPLE_SOURCES "src/*.cc")
 
 # Include TileDB C API headers
-include_directories("${CMAKE_SOURCE_DIR}/core/include/c_api/")
+include_directories(BEFORE "${CMAKE_SOURCE_DIR}/core/include/c_api/")
 
 # Initialize name for example binaries
 set(EXAMPLE_BINS)

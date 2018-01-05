@@ -31,11 +31,12 @@ cmake_minimum_required(VERSION 2.8)
 # Set the cmake Module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-# Set shared library suffix
-if(APPLE)
-  set(SHARED_LIB_SUFFIX ".dylib")
-else()
-  set(SHARED_LIB_SUFFIX ".so")
+# Default user definitions
+set(USE_HDFS False CACHE BOOL "Enables HDFS support using the official Hadoop JNI bindings")
+set(USE_S3 False CACHE BOOL "Enables S3/minio support using aws-cpp-sdk")
+set(TILEDB_VERBOSE False CACHE BOOL "Prints TileDB errors with verbosity")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
 endif()
 
 # Only for Mac OS X warnings
@@ -43,30 +44,12 @@ if(APPLE)
   set(CMAKE_MACOSX_RPATH 1)
 endif()
 
-# Default user definitions
-set(USE_MPI False CACHE BOOL "Enables MPI")
-if(APPLE)
-  set(USE_OPENMP False CACHE BOOL "Enables OpenMP")
-else()
-  set(USE_OPENMP True CACHE BOOL "Enables OpenMP")
-endif()
-set(TILEDB_VERBOSE False CACHE BOOL "Prints TileDB errors with verbosity")
-set(MAC_ADDRESS_INTERFACE "" 
-    CACHE STRING "The interface carrying the MAC address of the machine."
-)
-set(USE_PARALLEL_SORT False CACHE BOOL "Enables parallel sorting.")
-set(GTEST_FILTER "*" CACHE STRING "Filters for the Google unit tests.")
-set(COMPRESSION_LEVEL_GZIP "" CACHE STRING "Compression level for GZIP.")
-set(COMPRESSION_LEVEL_ZSTD "" CACHE STRING "Compression level for Zstandard.")
-set(COMPRESSION_LEVEL_BLOSC "" CACHE STRING "Compression level for Blosc.")
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
+set(TILEDB_LIB_DEPENDENCIES)
 
 # Find required library dependencies
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIR})
-set(TILEDB_LIB_DEPENDENCIES ${ZLIB_LIBRARIES})
+set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${ZLIB_LIBRARIES})
 find_package(LZ4 REQUIRED)
 include_directories(${LZ4_INCLUDE_DIR})
 set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${LZ4_LIBRARIES})
@@ -76,76 +59,85 @@ set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${BLOSC_LIBRARIES})
 find_package(ZSTD REQUIRED)
 include_directories(${ZSTD_INCLUDE_DIR})
 set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${ZSTD_LIBRARIES})
-find_package(OpenSSL REQUIRED)
-include_directories(${OPENSSL_INCLUDE_DIR})
-set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${OPENSSL_LIBRARIES})
+find_package(Bzip2 REQUIRED)
+include_directories(${BZIP2_INCLUDE_DIR})
+set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${BZIP2_LIBRARIES})
 
 # Find optional library dependencies
-find_package(GTest)
-find_package(Doxygen)
-if(USE_MPI)
-  find_package(MPI REQUIRED)
-  include_directories(${MPI_CXX_INCLUDE_PATH})
-  set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${MPI_CXX_LIBRARIES})
-endif()
-if(USE_OPENMP AND NOT APPLE)
-  find_package(OpenMP REQUIRED)
+if(USE_HDFS)
+  find_package(LIBJVM REQUIRED)
+  set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${LIBJVM_LIBRARIES})
+  
+  find_package(LIBHDFS REQUIRED)
+  include_directories(${LIBHDFS_INCLUDE_DIR})
+  # This variable is defined in FindJNI module included in the FindHDFS.cmake file
+  set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${LIBHDFS_LIBRARY})
 endif()
 
-# Add pthread library to dependencies
-set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} pthread)
+if(USE_S3)  
+  cmake_minimum_required(VERSION 3.2)
+  find_package(AWSSDK)
 
+  message(STATUS "AWSSDK_LIB_DIR: ${AWSSDK_LIB_DIR}")
+  message(STATUS "AWSSDK_INC_DIR: ${AWSSDK_INCLUDE_DIR}")
+  message(STATUS "AWSSDK_BIN_DIR: ${AWSSDK_BIN_DIR}")
+ 
+  set(AWS_SERVICE s3)
+  AWSSDK_LIB_DEPS(AWS_SERVICE AWS_DEPS)
+ 
+  message(STATUS "AWS service ${AWS_SERVICE} depends on libs: ${AWS_DEPS}")
+  AWSSDK_DETERMINE_LIBS_TO_LINK(AWS_SERVICE AWS_LINKED_LIBS)
+  message(STATUS "AWS linked libs: ${AWS_LINKED_LIBS}")
+  
+  set(AWS_LIBRARIES)
+  foreach(LIB ${AWS_LINKED_LIBS})
+    find_library("AWS_FOUND_${LIB}" NAMES ${LIB} PATHS ${AWSSDK_LIB_DIR} NO_DEFAULT_PATH)
+    message(STATUS "AWS LIB PATH: ${LIB} ${AWS_FOUND_${LIB}}")
+    set(AWS_LIBRARIES ${AWS_LIBRARIES} ${AWS_FOUND_${LIB}})
+  endforeach()
+
+  if (APPLE)
+    add_definitions(-DUNDER_MACOS)
+  endif()
+
+  if (WIN32)
+    add_definitions(-DUSE_IMPORT_EXPORT)
+    include_directories(${AWSSDK_INCLUDE_DIR})
+    set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${AWS_LIBRARIES})
+  else()
+    message(STATUS "AWS_DEPS_LIBRARIES: ${AWS_DEPS_LIBRARIES}")
+    message(STATUS "AWS_DEPS_INCLUDE_DIRS: ${AWS_DEPS_INCLUDE_DIRS}")
+    message(STATUS "AWS_DEPS_CFLAGS_OTHER: ${AWS_DEPS_CFLAGS_OTHER}")
+    include_directories(${AWS_DEPS_INCLUDE_DIRS})
+    set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${AWS_LIBRARIES})
+  endif()
+endif()
 
 # Set C++ 2011 flag
-include(SetCXX2011Flag)
+include(SetCXX2011Flag REQUIRED)
 
 # Set compiler flags
-set(CMAKE_CXX_FLAGS_DEBUG "-DDEBUG -g3 -gdwarf-3 -Wall -fvisibility=hidden")
-set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fvisibility=hidden")
-set(CMAKE_CXX_FLAGS_COVERAGE "-DDEBUG -g3 -gdwarf-3 --coverage")
+set(CMAKE_CXX_FLAGS_DEBUG
+    "-DDEBUG -g3 -ggdb3 -gdwarf-3 -fvisibility=hidden -Werror -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fvisibility=hidden -Werror -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_COVERAGE "-DDEBUG -g3 -gdwarf-3 --coverage -Werror -Wall -Wextra")
 if(NOT APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-literal-suffix")
-endif()
-if(USE_MPI)
-  set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-endif()
-if(USE_OPENMP AND NOT APPLE)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
 # Add definitions
 add_definitions(-D_FILE_OFFSET_BITS=64)
-if(USE_MPI)
-  add_definitions(-DHAVE_MPI)
+if(USE_HDFS)
+  add_definitions(-DHAVE_HDFS)
+  message(STATUS "The TileDB library is compiled with HDFS support.")
 endif()
-if(USE_OPENMP AND NOT APPLE)
-  add_definitions(-DHAVE_OPENMP)
+if(USE_S3)
+  add_definitions(-DHAVE_S3)
+  message(STATUS "The TileDB library is compiled with S3 support.")
 endif()
 if(TILEDB_VERBOSE)
   add_definitions(-DTILEDB_VERBOSE)
   message(STATUS "The TileDB library is compiled with verbosity.")
-endif()
-if(MAC_ADDRESS_INTERFACE)
-  add_definitions(-DTILEDB_MAC_ADDRESS_INTERFACE=${MAC_ADDRESS_INTERFACE})
-  message(STATUS "Set MAC address interface to ${MAC_ADDRESS_INTERFACE}.")
-endif()
-if(USE_PARALLEL_SORT)
-  add_definitions(-DUSE_PARALLEL_SORT)
-  message(STATUS "Will use parallel sort.")
-endif()
-if(COMPRESSION_LEVEL_GZIP)
-  add_definitions(-DTILEDB_COMPRESSION_LEVEL_GZIP=${COMPRESSION_LEVEL_GZIP})
-  message(STATUS "Set GZIP compression level to ${COMPRESSION_LEVEL_GZIP}.")
-endif()
-if(COMPRESSION_LEVEL_ZSTD)
-  add_definitions(-DTILEDB_COMPRESSION_LEVEL_ZSTD=${COMPRESSION_LEVEL_ZSTD})
-  message(STATUS 
-          "Set Zstandard compression level to ${COMPRESSION_LEVEL_ZSTD}."
-)
-endif()
-if(COMPRESSION_LEVEL_BLOSC)
-  add_definitions(-DTILEDB_COMPRESSION_LEVEL_BLOSC=${COMPRESSION_LEVEL_BLOSC})
-  message(STATUS "Set Blosc compression level to ${COMPRESSION_LEVEL_BLOSC}.")
 endif()
 
 # Enable testing
@@ -158,11 +150,36 @@ add_subdirectory(core)
 add_subdirectory(examples)
 
 # Build unit tests
-if(GTEST_FOUND)
-  add_subdirectory(test)
+add_subdirectory(test)
+
+############################################################
+# "make format" and "make check-format" targets
+############################################################
+set(SCRIPTS_DIR "${CMAKE_SOURCE_DIR}/scripts")
+
+find_package(ClangTools)
+if (${CLANG_FORMAT_FOUND})
+  # runs clang format and updates files in place.
+  add_custom_target(format ${SCRIPTS_DIR}/run-clang-format.sh ${CMAKE_CURRENT_SOURCE_DIR} ${CLANG_FORMAT_BIN} 1
+    `find ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+          ${CMAKE_CURRENT_SOURCE_DIR}/core/src
+          ${CMAKE_CURRENT_SOURCE_DIR}/test/src
+          ${CMAKE_CURRENT_SOURCE_DIR}/examples/src
+          -name \\*.cc -or -name \\*.h`)
+
+  # runs clang format and exits with a non-zero exit code if any files need to be reformatted
+  add_custom_target(check-format ${SCRIPTS_DIR}/run-clang-format.sh ${CMAKE_CURRENT_SOURCE_DIR} ${CLANG_FORMAT_BIN} 0
+    `find ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+          ${CMAKE_CURRENT_SOURCE_DIR}/core/src
+          ${CMAKE_CURRENT_SOURCE_DIR}/test/src
+          ${CMAKE_CURRENT_SOURCE_DIR}/examples/src
+          -name \\*.cc -or -name \\*.h`)
 endif()
 
+###########################################################
 # Doxygen documentation
+###########################################################
+find_package(Doxygen)
 if(DOXYGEN_FOUND)
   file(GLOB_RECURSE TILEDB_CORE_HEADERS "core/include/*.h")
   add_custom_command(
@@ -181,7 +198,9 @@ if(DOXYGEN_FOUND)
   )
 endif(DOXYGEN_FOUND)
 
+###########################################################
 # Uninstall
+###########################################################
 set(CMD "xargs printf '-- Uninstalling: %s\\\\n' <install_manifest.txt") 
 add_custom_target(
    uninstall 

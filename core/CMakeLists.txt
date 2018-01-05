@@ -27,14 +27,34 @@
 
 # Include core header directories
 file(GLOB TILEDB_CORE_INCLUDE_DIRS "include/*")
-include_directories(${TILEDB_CORE_INCLUDE_DIRS})
+include_directories(BEFORE ${TILEDB_CORE_INCLUDE_DIRS})
 
 # Gather the core source files
+file(GLOB_RECURSE TILEDB_CORE_HEADERS "include/*")
 file(GLOB_RECURSE TILEDB_CORE_SOURCES "src/*.cc")
 
+# Gather the external source files
+file(GLOB_RECURSE TILEDB_CORE_EXT_HEADERS 
+       "${CMAKE_SOURCE_DIR}/external/include/spdlog/*"
+       "${CMAKE_SOURCE_DIR}/external/include/md5/*"
+)
+file(GLOB_RECURSE TILEDB_CORE_EXT_SOURCES 
+       "${CMAKE_SOURCE_DIR}/external/src/spdlog/*"
+       "${CMAKE_SOURCE_DIR}/external/src/md5/*"
+)
+
 # Compile sources with PIC
-add_library(TILEDB_CORE_OBJECTS OBJECT ${TILEDB_CORE_SOURCES})
+add_library(TILEDB_CORE_OBJECTS OBJECT 
+    ${TILEDB_CORE_SOURCES} 
+    ${TILEDB_CORE_EXT_SOURCES} 
+    ${TILEDB_CORE_HEADERS} 
+    ${TILEDB_CORE_EXT_HEADERS}
+)
 set_property(TARGET TILEDB_CORE_OBJECTS PROPERTY POSITION_INDEPENDENT_CODE ON)
+target_include_directories(
+    TILEDB_CORE_OBJECTS PRIVATE
+    "${CMAKE_SOURCE_DIR}/external/include"
+)
 
 # Create static library
 add_library(tiledb_static STATIC $<TARGET_OBJECTS:TILEDB_CORE_OBJECTS>)
@@ -51,6 +71,5 @@ install(
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
-file(GLOB TILEDB_HEADERS "include/c_api/*.h")
+file(GLOB TILEDB_HEADERS "include/c_api/*")
 install(FILES ${TILEDB_HEADERS} DESTINATION include)
-
