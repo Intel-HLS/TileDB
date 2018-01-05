@@ -140,7 +140,7 @@ const uint64_t internal_buffer_size = 10000000;
 const uint64_t consolidation_buffer_size = 10000000;
 
 /** The maximum number of bytes written in a single I/O. */
-const uint64_t max_write_bytes = std::numeric_limits<int>::max();
+const uint64_t max_write_bytes = std::numeric_limits<int16_t>::max();
 
 /** The maximum name length. */
 const unsigned name_max_len = 256;
