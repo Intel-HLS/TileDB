@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
   tiledb_array_init(
       tiledb_ctx,                                       // Context
       &tiledb_array,                                    // Array object
-      "hdfs://oda-master:9000/temp/my_workspace/dense_arrays/my_array_A",           // Array name
+      "my_workspace/dense_arrays/my_array_A",           // Array name
       TILEDB_ARRAY_READ,                                // Mode
       NULL,                                             // Whole domain
       NULL,                                             // All attributes

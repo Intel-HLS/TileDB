@@ -127,7 +127,7 @@ void disconnect() {
 }
 
 bool is_hdfs_path(const std::string& path) {
-  return starts_with(path, "hdfs://") || starts_with(path, "s3://");
+  return starts_with(path, "hdfs://") || starts_with(path, "s3://") || starts_with(path, "gs://");
 }
 
 bool is_hdfs() {
