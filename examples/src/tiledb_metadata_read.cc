@@ -35,14 +35,21 @@
 
 int main(int argc, char** argv) {
   // Sanity check
-  if(argc != 2) {
+  if(argc < 2) {
     fprintf(stderr, "Usage: ./tiledb_metadata_read key\n");
     return -1;
   }
 
-  // Initialize context with the default configuration parameters
+  // Initialize context with home dir if specified in command line, else
+  // initialize with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
-  tiledb_ctx_init(&tiledb_ctx, NULL);
+  if (argc > 2) {
+    TileDB_Config tiledb_config;
+    tiledb_config.home_ = argv[2];
+    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
+  } else {
+    tiledb_ctx_init(&tiledb_ctx, NULL);
+  }
 
   // Subset over attributes
   const char* attributes[] = { "a1", "a2" };

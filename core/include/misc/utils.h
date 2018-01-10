@@ -209,6 +209,24 @@ int cmp_row_order(
 int create_dir(const std::string& dir);
 
 /**
+ * Creates a new file with the given flags and mode.
+ *
+ * @param filename The name of the file to be created.
+ * @param flags Status and Access mode flags for the file.
+ * @param mode Permissions for the file to be created
+ * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
+ */
+int create_file(const std::string& filename, int flags, mode_t mode);
+
+/**
+ * Deletes a file from the filesystem
+ *
+ * @param filename The name of the file to be deleted.
+ * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
+ */
+int delete_file(std::string& filename);
+
+/**
  * Creates a special file to indicate that the input directory is a
  * TileDB fragment.
  *
@@ -273,7 +291,7 @@ void expand_mbr(T* mbr, const T* coords, int dim_num);
  * @param filename The name of the file whose size is to be retrieved.
  * @return The file size on success, and TILEDB_UT_ERR for error.
  */
-off_t file_size(const std::string& filename);
+size_t file_size(const std::string& filename);
 
 /** Returns the names of the directories inside the input directory. */
 std::vector<std::string> get_dirs(const std::string& dir);
@@ -582,20 +600,21 @@ int read_from_file(
     void* buffer,
     size_t length);
 
-/**
- * Reads data from a file into a buffer, using memory map (mmap).
- *
- * @param filename The name of the file
- * @param offset The offset in the file from which the read will start.
- * @param buffer The buffer into which the data will be written.
- * @param length The size of the data to be read from the file.
+/*
+ * Reads an entire file into a buffer after decompressing. Memory is allocated by this
+ * routine and a pointer to the buffer and the buffer size are returned. It is the caller's
+ * responsibility to free the buffer when it is no longer needed.
+ * @param filename The name of the file.
+ * @param buffer Pointer to the allocated buffer for the decompressed data.
+ * @param length Pointer to the size of the buffer.
  * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
  */
-int read_from_file_with_mmap(
+int read_from_file_after_decompression(
     const std::string& filename,
-    off_t offset,
-    void* buffer,
-    size_t length);
+    void** buffer,
+    size_t &buffer_size,
+    const int compression);
+
 
 /**
  * Returns the absolute canonicalized directory path of the input directory.
@@ -784,6 +803,21 @@ int write_to_file(
     size_t buffer_size);
 
 /** 
+ * Writes the input buffer after compression to a file.
+ * 
+ * @param filename The name of the file.
+ * @param buffer The input buffer.
+ * @param buffer_size The size of the input buffer.
+ * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
+ */
+int write_to_file_after_compression(
+    const char* filename,
+    const void* buffer,
+    size_t buffer_size,
+    const int compression);
+
+
+/** 
  * Write the input buffer to a file, compressed with GZIP.
  * 
  * @param filename The name of the file.
@@ -791,17 +825,28 @@ int write_to_file(
  * @param buffer_size The size of the input buffer.
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
+/* TODO: Dead Code
 int write_to_file_cmp_gzip(
     const char* filename,
     const void* buffer, 
     size_t buffer_size);
-
+*/
 
 /**
  * Delete directories
+ *
  * @param vector of directory paths
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
 int delete_directories(const std::vector<std::string>& directories);
+
+/**
+ * Move(Rename) Path.
+ *
+ * @param original path to be moved
+ * @param name of new path
+ * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
+ */
+int move_path(const std::string& old_path, const std::string& new_path);
 
 #endif

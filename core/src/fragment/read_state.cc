@@ -1147,6 +1147,7 @@ int ReadState::compute_bytes_to_copy(
   // Calculate number of cells in the current tile for this attribute
   int64_t cell_num = book_keeping_->cell_num(fetched_tile_[attribute_id]);  
 
+  // TODO: Refine this algorithm!
   // Calculate bytes to copy from the variable tile
   const size_t* start_offset;
   const size_t* end_offset;
@@ -1164,7 +1165,7 @@ int ReadState::compute_bytes_to_copy(
            end_offset) != TILEDB_RS_OK)
       return TILEDB_RS_ERR;
     bytes_var_to_copy = *end_offset - *start_offset;
-  } else { 
+  } else {
     bytes_var_to_copy = tiles_var_sizes_[attribute_id] - *start_offset;
   }
 
@@ -1909,7 +1910,7 @@ int ReadState::GET_CELL_PTR_FROM_OFFSET_TILE(
   }
 
   // Get coordinates pointer
-  offset = &tmp_offset_;
+  offset = tiles_file_offsets_[attribute_id] + &tmp_offset_;
 
   // Error
   if(rc != TILEDB_UT_OK) {
@@ -2921,7 +2922,7 @@ int ReadState::READ_FROM_TILE_VAR(
   if(read_method == TILEDB_IO_READ) {
     rc = read_from_file(
              filename, 
-             tiles_var_file_offsets_[attribute_id] + tile_offset, 
+             tile_offset, 
              buffer, 
              bytes_to_copy);
   } else if(read_method == TILEDB_IO_MPI) {
@@ -2929,7 +2930,7 @@ int ReadState::READ_FROM_TILE_VAR(
     rc = mpi_io_read_from_file(
              mpi_comm,
              filename, 
-             tiles_var_file_offsets_[attribute_id] + tile_offset, 
+             tile_offset, 
              buffer, 
              bytes_to_copy);
 #else
@@ -3047,12 +3048,15 @@ void ReadState::shift_var_offsets(int attribute_id) {
   // For easy reference
   int64_t cell_num = tiles_sizes_[attribute_id] / TILEDB_CELL_VAR_OFFSET_SIZE;
   size_t* tile_s = static_cast<size_t*>(tiles_[attribute_id]);
-  size_t first_offset = tile_s[0];
-  
-  // Shift offsets
-  for(int64_t i=0; i<cell_num; ++i)
-    tile_s[i] -= first_offset;
-}
+
+  if (tile_s) {
+    size_t first_offset = tile_s[0];
+    
+    // Shift offsets
+    for(int64_t i=0; i<cell_num; ++i)
+      tile_s[i] -= first_offset;    
+  }
+} 
 
 void ReadState::shift_var_offsets(
     void* buffer, 
@@ -3064,7 +3068,7 @@ void ReadState::shift_var_offsets(
 
   // Shift offsets
   for(int64_t i=0; i<offset_num; ++i) 
-    buffer_s[i] = buffer_s[i] - start_offset + new_start_offset;
+      buffer_s[i] = buffer_s[i] - start_offset + new_start_offset;
 }
 
 

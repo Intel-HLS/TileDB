@@ -1,11 +1,11 @@
 /**
- * @file   tiledb_array_consolidate.cc
+ * @file   trace.h
  *
  * @section LICENSE
  *
  * The MIT License
- * 
- * @copyright Copyright (c) 2016 MIT and Intel Corporation
+ *
+ * @copyright Copyright (c) 2017 Omics Data Automation, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,31 +27,18 @@
  * 
  * @section DESCRIPTION
  *
- * It shows how to consolidate arrays.
+ * Trace Macros if TILEDB_TRACE is defined
  */
 
-#include "tiledb.h"
+#ifndef __TDB_TRACE_H__
+#define __TDB_TRACE_H__
 
-int main(int argc, char *argv[]) {
-  // Initialize context with home dir if specified in command line, else
-  // initialize with the default configuration parameters
-  TileDB_CTX* tiledb_ctx;
-  if (argc > 1) {
-    TileDB_Config tiledb_config;
-    tiledb_config.home_ = argv[1];
-    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
-  } else {
-    tiledb_ctx_init(&tiledb_ctx, NULL);
-  }
+#ifdef TILEDB_TRACE
+#  define TRACE_FN std::cerr << "Trace - Function:" << __func__ << " File:" << __FILE__ << ":" << __LINE__ << "\n" << std::flush
+#  define TRACE_FN_ARG(X) std::cerr << "Trace - Function:" << __func__ <<  " File:" << __FILE__ << ":" << __LINE__ << " " << X << "\n" << std::flush
+#else
+#  define TRACE_FN
+#  define TRACE_FN_ARG(X)
+#endif
 
-  // Consolidate the dense array
-  tiledb_array_consolidate(tiledb_ctx, "my_workspace/dense_arrays/my_array_A");
-
-  // Consolidate the sparse array
-  tiledb_array_consolidate(tiledb_ctx, "my_workspace/sparse_arrays/my_array_B");
-
-  // Finalize context
-  tiledb_ctx_finalize(tiledb_ctx);
-
-  return 0;
-}
+#endif /*__TDB_TRACE_H__*/

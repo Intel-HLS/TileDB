@@ -33,11 +33,18 @@
 #include "tiledb.h"
 #include <cstdio>
 
-int main() {
+int main(int argc, char *argv[]) {
 #ifdef ENABLE_MUPARSERX_EXPRESSIONS
-  // Initialize context with the default configuration parameters
+  // Initialize context with home dir if specified in command line, else
+  // initialize with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
-  tiledb_ctx_init(&tiledb_ctx, NULL);
+  if (argc > 1) {
+    TileDB_Config tiledb_config;
+    tiledb_config.home_ = argv[1];
+    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
+  } else {
+    tiledb_ctx_init(&tiledb_ctx, NULL);
+  }
 
   // Initialize the filter expression object
   TileDB_Exression* expression;

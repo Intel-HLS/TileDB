@@ -422,14 +422,14 @@ int WriteState::write(const void** buffers, const size_t* buffer_sizes) {
       if(array_schema->var_size(attribute_ids[i])) {
         filename = file_prefix + array_schema->attribute(attribute_ids[i]) + 
                    "_var" + TILEDB_FILE_SUFFIX;
-        FILE* fptr = fopen(filename.c_str(), "a");
-        if(fptr == 0) {
-          std::string errmsg = "Cannot write to file; Error opening file";
-          PRINT_ERROR(errmsg);
-          tiledb_ws_errmsg = TILEDB_WS_ERRMSG + errmsg;
-          return TILEDB_WS_ERR;
+        if (!is_file(filename)) {
+          if (create_file(filename, O_WRONLY | O_CREAT | O_SYNC, S_IRWXU) == TILEDB_UT_ERR) {
+            std::string errmsg = "Cannot write to file; Error opening file";
+            PRINT_ERROR(errmsg);
+            tiledb_ws_errmsg = TILEDB_WS_ERRMSG + errmsg;
+            return TILEDB_WS_ERR;
+          }
         }
-        fclose(fptr);
       }
     }
   }
@@ -531,6 +531,34 @@ int WriteState::compress_tile(
                tile_compressed_size);
 
   // Error
+  std::string compression_type;
+  switch (compression) {
+    case TILEDB_NO_COMPRESSION:
+      compression_type.assign("no compression"); break;
+    case TILEDB_GZIP:
+      compression_type.assign("gzip"); break;
+    case  TILEDB_ZSTD:
+      compression_type.assign("zstd"); break;
+    case  TILEDB_LZ4:
+      compression_type.assign("lz4"); break;
+    case  TILEDB_BLOSC:
+      compression_type.assign("blosc"); break;
+    case  TILEDB_BLOSC_LZ4:
+      compression_type.assign("blosc_lz4"); break;
+    case  TILEDB_BLOSC_LZ4HC:
+      compression_type.assign("blosc_lz4hc"); break;
+    case  TILEDB_BLOSC_SNAPPY:
+      compression_type.assign("blosc_snappy"); break;
+    case  TILEDB_BLOSC_ZLIB:
+      compression_type.assign("blosc_zlib"); break;
+    case  TILEDB_BLOSC_ZSTD:
+      compression_type.assign("blosc_zstd"); break;
+    case  TILEDB_RLE:
+      compression_type.assign("rle"); break;
+    default:
+      compression_type.assign("unknown compression type");
+  }
+  std::cerr << "Unsupported compression type:" << compression_type << "\n";
   assert(0);
   return TILEDB_WS_ERR;
 }

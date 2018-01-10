@@ -38,6 +38,8 @@
 #ifdef ENABLE_MUPARSERX_EXPRESSIONS
 #include "expression.h"
 #endif
+#include "trace.h"
+
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -79,6 +81,12 @@ typedef struct TileDB_CTX {
 int tiledb_ctx_init(
     TileDB_CTX** tiledb_ctx, 
     const TileDB_Config* tiledb_config) {
+  if (tiledb_config && tiledb_config->home_) {
+    TRACE_FN_ARG("Home=" << tiledb_config->home_);
+  } else {
+    TRACE_FN;
+  }
+
   // Initialize error message to empty
   strcpy(tiledb_errmsg, "");
 
@@ -116,6 +124,8 @@ int tiledb_ctx_init(
 }
 
 int tiledb_ctx_finalize(TileDB_CTX* tiledb_ctx) {
+  TRACE_FN;
+
   // Trivial case
   if(tiledb_ctx == NULL)
     return TILEDB_OK;
@@ -211,6 +221,8 @@ bool sanity_check(const TileDB_MetadataIterator* tiledb_metadata_it) {
 int tiledb_workspace_create(
     const TileDB_CTX* tiledb_ctx,
     const char* workspace) {
+  TRACE_FN_ARG("Workspace=" << workspace);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -244,6 +256,8 @@ int tiledb_workspace_create(
 int tiledb_group_create(
     const TileDB_CTX* tiledb_ctx,
     const char* group) {
+  TRACE_FN_ARG("Group=" << group);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -302,6 +316,8 @@ int tiledb_array_set_schema(
     size_t tile_extents_len,
     int tile_order,
     const int* types) {
+  TRACE_FN_ARG("ArrayName=" << array_name);
+
   // Sanity check
   if(tiledb_array_schema == NULL) {
     std::string errmsg = "Invalid array schema pointer";
@@ -410,6 +426,8 @@ int tiledb_array_set_schema(
 int tiledb_array_create(
     const TileDB_CTX* tiledb_ctx,
     const TileDB_ArraySchema* array_schema) {
+  TRACE_FN_ARG("Array Name=" << array_schema->array_name_);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -450,6 +468,8 @@ int tiledb_array_init(
     const void* subarray,
     const char** attributes,
     int attribute_num) {
+  TRACE_FN_ARG("Array=" << array);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -490,6 +510,8 @@ int tiledb_array_init(
 int tiledb_array_reset_subarray(
     const TileDB_Array* tiledb_array,
     const void* subarray) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array))
     return TILEDB_ERR;
@@ -526,6 +548,8 @@ int tiledb_array_reset_attributes(
 int tiledb_array_get_schema(
     const TileDB_Array* tiledb_array,
     TileDB_ArraySchema* tiledb_array_schema) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array))
     return TILEDB_ERR;
@@ -533,6 +557,8 @@ int tiledb_array_get_schema(
   // Get the array schema
   ArraySchemaC array_schema_c;
   tiledb_array->array_->array_schema()->array_schema_export(&array_schema_c); 
+
+  TRACE_FN_ARG("ArrayName=" << array_schema_c.array_name_);
 
   // Copy the array schema C struct to the output
   tiledb_array_schema->array_name_ = array_schema_c.array_name_;
@@ -558,6 +584,8 @@ int tiledb_array_load_schema(
     const TileDB_CTX* tiledb_ctx,
     const char* array,
     TileDB_ArraySchema* tiledb_array_schema) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -579,6 +607,8 @@ int tiledb_array_load_schema(
   } 
   ArraySchemaC array_schema_c;
   array_schema->array_schema_export(&array_schema_c);
+
+  TRACE_FN_ARG("Workspace=" << array_schema_c.array_workspace_ << " ArrayName=" << array_schema_c.array_name_);
 
   // Copy the array schema C struct to the output
   tiledb_array_schema->array_workspace_ = array_schema_c.array_workspace_;
@@ -606,6 +636,8 @@ int tiledb_array_load_schema(
 
 int tiledb_array_free_schema(
     TileDB_ArraySchema* tiledb_array_schema) {
+  TRACE_FN;
+
   // Trivial case
   if(tiledb_array_schema == NULL)
     return TILEDB_OK;
@@ -701,6 +733,7 @@ int tiledb_array_filter(
     const TileDB_Array* tiledb_array,
     void** buffers,
     size_t* buffer_sizes) {
+  TRACE_FN;
 
   // Sanity check
   if(!sanity_check(tiledb_array))
@@ -720,6 +753,8 @@ int tiledb_array_filter(
 int tiledb_array_overflow(
     const TileDB_Array* tiledb_array,
     int attribute_id) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array))
     return TILEDB_ERR;
@@ -731,6 +766,8 @@ int tiledb_array_overflow(
 int tiledb_array_consolidate(
     const TileDB_CTX* tiledb_ctx,
     const char* array) {
+  TRACE_FN_ARG("Array Name=" << array);
+
   // Check array name length
   if(array == NULL || strlen(array) > TILEDB_NAME_MAX_LEN) {
     std::string errmsg = "Invalid array name length";
@@ -749,6 +786,8 @@ int tiledb_array_consolidate(
 }
 
 int tiledb_array_finalize(TileDB_Array* tiledb_array) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array) ||
      !sanity_check(tiledb_array->tiledb_ctx_))
@@ -771,6 +810,8 @@ int tiledb_array_finalize(TileDB_Array* tiledb_array) {
 }
 
 int tiledb_array_sync(TileDB_Array* tiledb_array) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array) ||
      !sanity_check(tiledb_array->tiledb_ctx_))
@@ -793,6 +834,8 @@ int tiledb_array_sync(TileDB_Array* tiledb_array) {
 int tiledb_array_sync_attribute(
     TileDB_Array* tiledb_array,
     const char* attribute) {
+  TRACE_FN_ARG("attribute=" << attribute);
+
   // Sanity check
   if(!sanity_check(tiledb_array) ||
      !sanity_check(tiledb_array->tiledb_ctx_))
@@ -828,6 +871,8 @@ int tiledb_array_iterator_init(
     int attribute_num,
     void** buffers,
     size_t* buffer_sizes) {
+  TRACE_FN_ARG("Array=" << array << " SubArray=" << subarray);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -866,6 +911,8 @@ int tiledb_array_iterator_get_value(
     int attribute_id,
     const void** value,
     size_t* value_size) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array_it))
     return TILEDB_ERR;
@@ -911,6 +958,8 @@ int tiledb_array_iterator_end(
 
 int tiledb_array_iterator_finalize(
     TileDB_ArrayIterator* tiledb_array_it) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array_it))
     return TILEDB_ERR;
@@ -1427,6 +1476,8 @@ int tiledb_metadata_iterator_finalize(
 int tiledb_clear(
     const TileDB_CTX* tiledb_ctx,
     const char* dir) {
+  TRACE_FN_ARG("Dir=" << dir);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -1452,6 +1503,8 @@ int tiledb_clear(
 int tiledb_delete(
     const TileDB_CTX* tiledb_ctx,
     const char* dir) {
+  TRACE_FN_ARG("Dir=" << dir);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -1478,6 +1531,8 @@ int tiledb_move(
     const TileDB_CTX* tiledb_ctx,
     const char* old_dir,
     const char* new_dir) {
+  TRACE_FN_ARG("Dir=" << old_dir << " to Dir=" << new_dir);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -1512,6 +1567,8 @@ int tiledb_ls_workspaces(
     const TileDB_CTX* tiledb_ctx,
     char** workspaces,
     int* workspace_num) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -1552,6 +1609,8 @@ int tiledb_ls(
     char** dirs,
     int* dir_types,
     int* dir_num) {
+  TRACE_FN_ARG("From Dir=" << parent_dir);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -1582,6 +1641,8 @@ int tiledb_ls_c(
     const TileDB_CTX* tiledb_ctx,
     const char* parent_dir,
     int* dir_num) {
+  TRACE_FN_ARG("From Dir=" << parent_dir);
+
   // Sanity check
   if(!sanity_check(tiledb_ctx))
     return TILEDB_ERR;
@@ -1615,6 +1676,8 @@ int tiledb_ls_c(
 int tiledb_array_aio_read(
     const TileDB_Array* tiledb_array,
     TileDB_AIO_Request* tiledb_aio_request) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array))
     return TILEDB_ERR;
@@ -1643,6 +1706,8 @@ int tiledb_array_aio_read(
 int tiledb_array_aio_write(
     const TileDB_Array* tiledb_array,
     TileDB_AIO_Request* tiledb_aio_request) {
+  TRACE_FN;
+
   // Sanity check
   if(!sanity_check(tiledb_array))
     return TILEDB_ERR;
@@ -1677,5 +1742,7 @@ void tiledb_array_set_zlib_compression_level(
     TileDB_Array* tiledb_array,
     const int level)
 {
+  TRACE_FN;
+
   tiledb_array->array_->set_zlib_compression_level(level);
 }

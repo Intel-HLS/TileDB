@@ -32,6 +32,10 @@
 
 #include "tiledb_constants.h"
 #include "utils.h"
+#include "hdfs_utils.h"
+#include "fs_utils.h"
+#include "trace.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -91,11 +95,6 @@ std::string tiledb_ut_errmsg = "";
 /* ****************************** */
 /*           FUNCTIONS            */
 /* ****************************** */
-
-void adjacent_slashes_dedup(std::string& value) {
-  value.erase(std::unique(value.begin(), value.end(), both_slashes),
-              value.end()); 
-}
 
 bool array_read_mode(int mode) {
   return mode == TILEDB_ARRAY_READ || 
@@ -236,36 +235,37 @@ int cmp_row_order(
 }
 
 int create_dir(const std::string& dir) {
-  // Get real directory path
-  std::string real_dir = ::real_dir(dir);
+  TRACE_FN_ARG("Dir=" << dir);
+  if (hdfs::is_hdfs()) {
+    return hdfs::create_dir(dir);
+  } else {
+    return fs::create_dir(dir);
+  }
+}
 
-  // If the directory does not exist, create it
-  if(!is_dir(real_dir)) { 
-    if(mkdir(real_dir.c_str(), S_IRWXU)) {
-      std::string errmsg = 
-          std::string("Cannot create directory '") + real_dir + "'; " + 
-          strerror(errno);
-      PRINT_ERROR(errmsg);
-      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-      return TILEDB_UT_ERR;
-    } else {
-      return TILEDB_UT_OK;
-    }
-  } else { // Error
-    std::string errmsg = 
-        std::string("Cannot create directory '") + real_dir +
-        "'; Directory already exists";
-    PRINT_ERROR(errmsg); 
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+int create_file(const std::string& filename, int flags, mode_t mode) {
+  TRACE_FN_ARG("Filename=" << filename);
+  if (hdfs::is_hdfs()) {
+    return hdfs::create_file(filename, flags);
+  } else {
+    return fs::create_file(filename, flags, mode);
+  }
+}
+
+int delete_file(std::string& filename) {
+  TRACE_FN_ARG("Filename=" << filename);
+  if (hdfs::is_hdfs()) {
+    return hdfs::delete_file(filename);
+  } else {
+    return fs::delete_file(filename);
   }
 }
 
 int create_fragment_file(const std::string& dir) {
+  TRACE_FN_ARG("Dir=" << dir);
   // Create the special fragment file
   std::string filename = std::string(dir) + "/" + TILEDB_FRAGMENT_FILENAME;
-  int fd = ::open(filename.c_str(), O_WRONLY | O_CREAT | O_SYNC, S_IRWXU);
-  if(fd == -1 || ::close(fd)) {
+  if (create_file(filename, O_WRONLY | O_CREAT | O_SYNC,  S_IRWXU) == TILEDB_UT_ERR) {
     std::string errmsg = 
         std::string("Failed to create fragment file; ") +
         strerror(errno);
@@ -278,75 +278,22 @@ int create_fragment_file(const std::string& dir) {
   return TILEDB_UT_OK;
 }
 
-std::string current_dir() {
-  std::string dir = "";
-  char* path = getcwd(NULL,0);
-
-
-  if(path != NULL) {
-    dir = path;
-    free(path);
+int delete_dir(const std::string& dirname) {
+  TRACE_FN_ARG("Dir=" << dirname);
+  if (hdfs::is_hdfs()) {
+    return hdfs::delete_dir(dirname);
+  } else {
+    return fs::delete_dir(dirname);
   }
-
-  return dir; 
 }
 
-int delete_dir(const std::string& dirname) {
-  // Get real path
-  std::string dirname_real = ::real_dir(dirname); 
-
-  // Delete the contents of the directory
-  std::string filename; 
-  struct dirent *next_file;
-  DIR* dir = opendir(dirname_real.c_str());
-
-  if(dir == NULL) {
-    std::string errmsg = 
-        std::string("Cannot open directory; ") + strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+int move_path(const std::string& old_path, const std::string& new_path) {
+  TRACE_FN_ARG("OldPath=" << old_path << " NewPath=" << new_path);
+  if(hdfs::is_hdfs()) {
+    return hdfs::move_path(old_path, new_path);
+  } else {
+    return fs::move_path(old_path, new_path);
   }
-
-  std::vector<std::string> all_filenames;
-  while((next_file = readdir(dir))) {
-    if(!strcmp(next_file->d_name, ".") ||
-       !strcmp(next_file->d_name, ".."))
-      continue;
-    filename = dirname_real + "/" + next_file->d_name;
-    all_filenames.emplace_back(filename);
-  }
-
-  for(const auto& curr_filename : all_filenames) {
-    if(remove(curr_filename.c_str())) {
-      std::string errmsg = 
-          std::string("Cannot delete file; ") + strerror(errno);
-      PRINT_ERROR(errmsg);
-      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-      return TILEDB_UT_ERR;
-    }
-  } 
- 
-  // Close directory 
-  if(closedir(dir)) {
-    std::string errmsg = 
-        std::string("Cannot close directory; ") + strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-
-  // Remove directory
-  if(rmdir(dirname.c_str())) {
-    std::string errmsg = 
-        std::string("Cannot delete directory; ") + strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-
-  // Success
-  return TILEDB_UT_OK;
 }
 
 template<class T>
@@ -390,70 +337,42 @@ void expand_mbr(T* mbr, const T* coords, int dim_num) {
   }	
 } 
 
-off_t file_size(const std::string& filename) {
-  int fd = open(filename.c_str(), O_RDONLY);
-  if(fd == -1) {
-    std::string errmsg = "Cannot get file size; File opening error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+size_t file_size(const std::string& filename) {
+  if (hdfs::is_hdfs()) {
+    return hdfs::file_size(filename);
+  } else {
+    return fs::file_size(filename);
   }
+}
 
-  struct stat st;
-  fstat(fd, &st);
-  off_t file_size = st.st_size;
-  
-  close(fd);
-
-  return file_size;
+std::string current_dir() {
+  TRACE_FN;
+  if (hdfs::is_hdfs()) {
+    return hdfs::current_dir();
+  } else {
+    return fs::current_dir();
+  }
 }
 
 std::vector<std::string> get_dirs(const std::string& dir) {
-  std::vector<std::string> dirs;
-  std::string new_dir; 
-  struct dirent *next_file;
-  DIR* c_dir = opendir(dir.c_str());
-
-  if(c_dir == NULL) 
-    return std::vector<std::string>();
-
-  while((next_file = readdir(c_dir))) {
-    if(!strcmp(next_file->d_name, ".") ||
-       !strcmp(next_file->d_name, "..") ||
-       !is_dir(dir + "/" + next_file->d_name))
-      continue;
-    new_dir = dir + "/" + next_file->d_name;
-    dirs.push_back(new_dir);
-  } 
-
-  // Close array directory  
-  closedir(c_dir);
-
-  // Return
-  return dirs;
+  TRACE_FN_ARG("Dir=" << dir);
+  if (hdfs::is_hdfs()) {
+    return hdfs::get_dirs(dir);
+  } else {
+    return fs::get_dirs(dir);
+  }
 }
 
 std::vector<std::string> get_fragment_dirs(const std::string& dir) {
-  std::vector<std::string> dirs;
-  std::string new_dir; 
-  struct dirent *next_file;
-  DIR* c_dir = opendir(dir.c_str());
-
-  if(c_dir == NULL) 
-    return std::vector<std::string>();
-
-  while((next_file = readdir(c_dir))) {
-    new_dir = dir + "/" + next_file->d_name;
-
-    if(is_fragment(new_dir)) 
-      dirs.push_back(new_dir);
-  } 
-
-  // Close array directory  
-  closedir(c_dir);
-
-  // Return
-  return dirs;
+  TRACE_FN_ARG("Dir=" << dir);
+  std::vector<std::string> dirs = get_dirs(dir);
+  std::vector<std::string> fragment_dirs;
+  for (auto const& dir: dirs) { 
+    if (is_fragment(dir)) {
+      fragment_dirs.push_back(dir);
+    }
+  }
+  return fragment_dirs;
 }
 
 #if defined(__APPLE__) && defined(__MACH__)
@@ -598,7 +517,7 @@ int gunzip(
   strm.avail_out = avail_out;
   ret = inflate(&strm, Z_FINISH);
 
-  if(ret == Z_STREAM_ERROR || ret != Z_STREAM_END) {
+  if(ret != Z_STREAM_END) {
     std::string errmsg = "Cannot decompress with GZIP";
     PRINT_ERROR(errmsg);
     tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
@@ -665,13 +584,19 @@ bool is_contained(
 }
 
 bool is_dir(const std::string& dir) {
-  struct stat st;
-  return stat(dir.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+  if (hdfs::is_hdfs()) {
+    return hdfs::is_dir(dir);
+  } else {
+    return fs::is_dir(dir);
+  }
 }
 
 bool is_file(const std::string& file) {
-  struct stat st;
-  return (stat(file.c_str(), &st) == 0)  && !S_ISDIR(st.st_mode);
+  if (hdfs::is_hdfs()) {
+    return hdfs::is_file(file);
+  } else {
+    return fs::is_file(file);
+  }
 }
 
 bool is_fragment(const std::string& dir) {
@@ -1002,187 +927,117 @@ std::string parent_dir(const std::string& dir) {
   return real_dir.substr(0, pos); 
 }
 
-void purge_dots_from_path(std::string& path) {
-  // For easy reference
-  size_t path_size = path.size(); 
-
-  // Trivial case
-  if(path_size == 0 || path == "/")
-    return;
-
-  // It expects an absolute path
-  assert(path[0] == '/');
-
-  // Tokenize
-  const char* token_c_str = path.c_str() + 1;
-  std::vector<std::string> tokens, final_tokens;
-  std::string token;
-
-  for(size_t i=1; i<path_size; ++i) {
-    if(path[i] == '/') {
-      path[i] = '\0';
-      token = token_c_str;
-      if(token != "")
-        tokens.push_back(token); 
-      token_c_str = path.c_str() + i + 1;
-    }
-  }
-  token = token_c_str;
-  if(token != "")
-    tokens.push_back(token); 
-
-  // Purge dots
-  int token_num = tokens.size();
-  for(int i=0; i<token_num; ++i) {
-    if(tokens[i] == ".") { // Skip single dots
-      continue;
-    } else if(tokens[i] == "..") {
-      if(final_tokens.size() == 0) {
-        // Invalid path
-        path = "";
-        return;
-      } else {
-        final_tokens.pop_back();
-      }
-    } else {
-      final_tokens.push_back(tokens[i]);
-    }
-  } 
-
-  // Assemble final path
-  path = "/";
-  int final_token_num = final_tokens.size();
-  for(int i=0; i<final_token_num; ++i) 
-    path += ((i != 0) ? "/" : "") + final_tokens[i]; 
-}
-
 int read_from_file(
     const std::string& filename,
     off_t offset,
     void* buffer,
     size_t length) {
-  // Open file
-  int fd = open(filename.c_str(), O_RDONLY);
-  if(fd == -1) {
-    std::string errmsg = "Cannot read from file; File opening error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+  if (hdfs::is_hdfs()) {
+    return hdfs::read_from_file(filename, offset, buffer, length);
+  } else {
+    return fs::read_from_file(filename, offset, buffer, length);
   }
-
-  // Read
-  lseek(fd, offset, SEEK_SET); 
-  ssize_t bytes_read = ::read(fd, buffer, length);
-  if(bytes_read != ssize_t(length)) {
-    std::string errmsg = "Cannot read from file; File reading error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-  
-  // Close file
-  if(close(fd)) {
-    std::string errmsg = "Cannot read from file; File closing error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-
-  // Success
-  return TILEDB_UT_OK;
 }
 
-int read_from_file_with_mmap(
-    const std::string& filename,
-    off_t offset,
-    void* buffer,
-    size_t length) {
-  // Calculate offset considering the page size
-  size_t page_size = sysconf(_SC_PAGE_SIZE);
-  off_t start_offset = (offset / page_size) * page_size;
-  size_t extra_offset = offset - start_offset;
-  size_t new_length = length + extra_offset;
+#define windowBits 15
+#define GZIP_ENCODING 16
 
-  // Open file
-  int fd = open(filename.c_str(), O_RDONLY);
-  if(fd == -1) {
-    std::string errmsg = "Cannot read from file; File opening error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+int read_from_file_after_decompression(const std::string& filename, void** buffer, size_t &buffer_size, const int compression) {
+  switch (compression) {
+    case TILEDB_GZIP:
+    case TILEDB_NO_COMPRESSION:
+      break;
+    default:
+      std::string errmsg = std::string("Compression type not supported");
+      PRINT_ERROR(errmsg);
+      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+      return TILEDB_UT_ERR;
   }
- 
-  // Map
-  void* addr = 
-      mmap(NULL, new_length, PROT_READ, MAP_SHARED, fd, start_offset);
-  if(addr == MAP_FAILED) {
-    std::string errmsg = "Cannot read from file; Memory map error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
+  
+  size_t size = file_size(filename);
+  unsigned char *in = (unsigned char *)malloc(size);
 
-  // Give advice for sequential access
-  if(madvise(addr, new_length, MADV_SEQUENTIAL)) {
-    std::string errmsg = "Cannot read from file; Memory advice error";
+  if (read_from_file(filename, 0, in, size) == TILEDB_UT_ERR) {
+    free(in);
+    std::string errmsg = std::string("Could not read from file");
     PRINT_ERROR(errmsg);
     tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
     return TILEDB_UT_ERR;
   }
 
-  // Copy bytes 
-  memcpy(buffer, static_cast<char*>(addr) + extra_offset, length);
+  if (compression == TILEDB_NO_COMPRESSION) {
+    *buffer = in;
+    buffer_size = size;
+    return TILEDB_UT_OK;
+  }
 
-  // Close file
-  if(close(fd)) {
-    std::string errmsg = "Cannot read from file; File closing error";
+  unsigned char out[TILEDB_GZIP_CHUNK_SIZE];
+
+  /* allocate inflate state */
+  z_stream strm = {0};
+  strm.zalloc = Z_NULL;
+  strm.zfree = Z_NULL;
+  strm.opaque = Z_NULL;
+  strm.avail_in = 0;
+  strm.next_in = Z_NULL;
+    
+  if (inflateInit2(&strm, (windowBits + 32)) != Z_OK) {
+    free(in);
+    std::string errmsg = std::string("Could not inflate file");
     PRINT_ERROR(errmsg);
     tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
     return TILEDB_UT_ERR;
   }
 
-  // Unmap
-  if(munmap(addr, new_length)) {
-    std::string errmsg = "Cannot read from file; Memory unmap error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
+  /* decompress until deflate stream ends or end of file */
+  strm.avail_in = size;
+  strm.next_in = in;
+  *buffer = NULL;
+  buffer_size = 0;
+    
+  /* run inflate() on input until output buffer not full */
+  int rc;
+  unsigned have;
+  do {
+    strm.avail_out = TILEDB_GZIP_CHUNK_SIZE;
+    strm.next_out = out;
+    rc = inflate(&strm, Z_NO_FLUSH);
+    assert(rc != Z_STREAM_ERROR);  /* state not clobbered */
+    switch (rc) {
+      case Z_NEED_DICT:
+        rc = Z_DATA_ERROR;     /* and fall through */
+      case Z_DATA_ERROR:
+      case Z_MEM_ERROR:
+        free(in);
+        inflateEnd(&strm);
+        std::string errmsg = std::string("Error encountered during inflate");
+        PRINT_ERROR(errmsg);
+        tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+        return TILEDB_UT_ERR;
+    }
 
-  // Success
+    have = TILEDB_GZIP_CHUNK_SIZE - strm.avail_out;
+    *buffer =  (unsigned char *)realloc(*buffer, buffer_size+have);
+    memcpy((char *)(*buffer) + buffer_size, out, have);
+    buffer_size += have;
+      
+  } while (strm.avail_out == 0);
+
+  /* clean up and return */
+  free(in);
+  inflateEnd(&strm);
+
+  assert(rc == Z_STREAM_END); // All bytes have been decompressed
+  
   return TILEDB_UT_OK;
 }
 
 std::string real_dir(const std::string& dir) {
-  // Initialize current, home and root
-  std::string current = current_dir();
-  auto env_home_ptr = getenv("HOME");
-  std::string home = env_home_ptr ? env_home_ptr : current;
-  std::string root = "/";
-
-  // Easy cases
-  if(dir == "" || dir == "." || dir == "./")
-    return current;
-  else if(dir == "~")
-    return home;
-  else if(dir == "/")
-    return root; 
-
-  // Other cases
-  std::string ret_dir;
-  if(starts_with(dir, "/"))
-    ret_dir = root + dir;
-  else if(starts_with(dir, "~/"))
-    ret_dir = home + dir.substr(1, dir.size()-1);
-  else if(starts_with(dir, "./"))
-    ret_dir = current + dir.substr(1, dir.size()-1);
-  else 
-    ret_dir = current + "/" + dir;
-
-  adjacent_slashes_dedup(ret_dir);
-  purge_dots_from_path(ret_dir);
-
-  return ret_dir;
+  if (hdfs::is_hdfs()) {
+    return hdfs::real_dir(dir);
+  } else {
+    return fs::real_dir(dir);
+  }
 }
 
 int64_t RLE_compress(
@@ -1827,160 +1682,89 @@ bool starts_with(const std::string& value, const std::string& prefix) {
 }
 
 int sync(const char* filename) {
-  // Open file
-  int fd;
-  if(is_dir(filename))       // DIRECTORY 
-    fd = open(filename, O_RDONLY, S_IRWXU);
-  else if(is_file(filename)) // FILE
-    fd = open(filename, O_WRONLY | O_APPEND | O_CREAT, S_IRWXU);
-  else
-    return TILEDB_UT_OK;     // If file does not exist, exit
-
-  // Handle error
-  if(fd == -1) {
-    std::string errmsg = 
-        std::string("Cannot sync file '") + filename + 
-        "'; File opening error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+  if (hdfs::is_hdfs()) {
+    return hdfs::sync(filename);
+  } else {
+    return fs::sync(filename);
   }
-
-  // Sync
-  if(fsync(fd)) {
-    std::string errmsg = 
-        std::string("Cannot sync file '") + filename + 
-        "'; File syncing error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-
-  // Close file
-  if(close(fd)) {
-    std::string errmsg = 
-        std::string("Cannot sync file '") + filename + 
-        "'; File closing error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-
-  // Success 
-  return TILEDB_UT_OK;
 }
 
 int write_to_file(
     const char* filename,
     const void* buffer,
     size_t buffer_size) {
-  // Open file
-  int fd = open(
-      filename, 
-      O_WRONLY | O_APPEND | O_CREAT, 
-      S_IRWXU);
-  if(fd == -1) {
-    std::string errmsg = 
-        std::string("Cannot write to file '") + filename + 
-        "'; File opening error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+  if (hdfs::is_hdfs()) {
+    return hdfs::write_to_file(filename, buffer, buffer_size);
+  } else {
+    return fs::write_to_file(filename, buffer, buffer_size);
   }
-
-  // Append data to the file in batches of TILEDB_UT_MAX_WRITE_COUNT
-  // bytes at a time
-  ssize_t bytes_written;
-  while(buffer_size > TILEDB_UT_MAX_WRITE_COUNT) {
-    bytes_written = ::write(fd, buffer, TILEDB_UT_MAX_WRITE_COUNT);
-    if(bytes_written != TILEDB_UT_MAX_WRITE_COUNT) {
-      std::string errmsg = 
-          std::string("Cannot write to file '") + filename + 
-          "'; File writing error";
-      PRINT_ERROR(errmsg);
-      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-      return TILEDB_UT_ERR;
-    }
-    buffer_size -= TILEDB_UT_MAX_WRITE_COUNT;
-  }
-  bytes_written = ::write(fd, buffer, buffer_size);
-  if(bytes_written != ssize_t(buffer_size)) {
-    std::string errmsg = 
-        std::string("Cannot write to file '") + filename + 
-        "'; File writing error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-
-  // Close file
-  if(close(fd)) {
-    std::string errmsg = 
-        std::string("Cannot write to file '") + filename + 
-        "'; File closing error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
-
-  // Success 
-  return TILEDB_UT_OK;
 }
 
-int write_to_file_cmp_gzip(
-    const char* filename,
-    const void* buffer,
-    size_t buffer_size) {
-  // Open file
-  char * mode = new char [4];
-  //sprintf(mode, "w%dh", g_TileDB_compression_level);
-  gzFile fd = gzopen(filename, mode);
-  if(fd == NULL) {
-    std::string errmsg = 
-        std::string("Cannot write to file '") + filename + 
-        "'; File opening error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
+int write_to_file_after_compression(const char* filename, const void* buffer, size_t buffer_size, const int compression) {
+  switch (compression) {
+    case TILEDB_GZIP:
+      break;
+    case TILEDB_NO_COMPRESSION:
+      return write_to_file(filename, buffer, buffer_size);
+    default:
+      std::string errmsg = std::string("Compression type not supported");
+      PRINT_ERROR(errmsg);
+      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+      return TILEDB_UT_ERR;
   }
 
+  unsigned have;
+  z_stream strm;
+  unsigned char out[TILEDB_GZIP_CHUNK_SIZE];
 
-  // Append data to the file in batches of TILEDB_UT_MAX_WRITE_COUNT
-  // bytes at a time
-  ssize_t bytes_written;
-  while(buffer_size > TILEDB_UT_MAX_WRITE_COUNT) {
-    bytes_written = gzwrite(fd, buffer, TILEDB_UT_MAX_WRITE_COUNT);
-    if(bytes_written != TILEDB_UT_MAX_WRITE_COUNT) {
-      std::string errmsg = 
-          std::string("Cannot write to file '") + filename + 
-          "'; File writing error";
+  /* allocate deflate state */
+  strm.zalloc = Z_NULL;
+  strm.zfree = Z_NULL;
+  strm.opaque = Z_NULL;
+
+  if (deflateInit2 (&strm, TILEDB_COMPRESSION_LEVEL_GZIP, Z_DEFLATED, windowBits | GZIP_ENCODING, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+      std::string errmsg = std::string("Could not initialize for gzip compression");
+      PRINT_ERROR(errmsg);
+      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+      return TILEDB_UT_ERR;
+  }
+
+  /* compress until end of file */
+  strm.avail_in = buffer_size;
+  strm.next_in = (unsigned char *)buffer;
+
+  /* run deflate() on input until output buffer not full, finish
+     compression if all of source has been read in */
+  int rc;
+  do {
+    strm.avail_out = TILEDB_GZIP_CHUNK_SIZE;
+    strm.next_out = out;
+    
+    if ((rc = deflate(&strm, Z_FINISH)) == Z_STREAM_ERROR) {
+      deflateEnd(&strm);
+      std::string errmsg = std::string("Encountered Z_STREAM_ERROR; Could not compress file");
       PRINT_ERROR(errmsg);
       tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
       return TILEDB_UT_ERR;
     }
-    buffer_size -= TILEDB_UT_MAX_WRITE_COUNT;
-  }
-  bytes_written = gzwrite(fd, buffer, buffer_size);
-  if(bytes_written != ssize_t(buffer_size)) {
-    std::string errmsg = 
-        std::string("Cannot write to file '") + filename + 
-        "'; File writing error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
+    
+    have = TILEDB_GZIP_CHUNK_SIZE - strm.avail_out;
+    if (write_to_file(filename, (unsigned char *)out, have) == TILEDB_UT_ERR) {
+      deflateEnd(&strm);
+      std::string errmsg = std::string("Could not write compressed bytes to file");
+      PRINT_ERROR(errmsg);
+      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+      return TILEDB_UT_ERR;
+    }
+  } while (strm.avail_out == 0);
+  
+  assert(strm.avail_in == 0);     /* all input is used */
+  assert(rc == Z_STREAM_END);     /* stream is complete */
 
-  // Close file
-  if(gzclose(fd)) {
-    std::string errmsg = 
-        std::string("Cannot write to file '") + filename + 
-        "'; File closing error";
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
+  sync(filename);
 
-  // Success 
+  /* clean up and return */
+  deflateEnd(&strm);
   return TILEDB_UT_OK;
 }
 

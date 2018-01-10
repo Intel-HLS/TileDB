@@ -1,11 +1,11 @@
 /**
- * @file   tiledb_array_consolidate.cc
+ * @file   url.h
  *
  * @section LICENSE
  *
  * The MIT License
- * 
- * @copyright Copyright (c) 2016 MIT and Intel Corporation
+ *
+ * @copyright Copyright (c) 2017 Omics Data Automation, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,34 +24,36 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- * 
- * @section DESCRIPTION
  *
- * It shows how to consolidate arrays.
+ * @section DESCRIPTION
+ *  
+ * URL Parsing Header File
  */
 
-#include "tiledb.h"
+#ifndef URL_HH_
+#define URL_HH_    
+#include <string>
 
-int main(int argc, char *argv[]) {
-  // Initialize context with home dir if specified in command line, else
-  // initialize with the default configuration parameters
-  TileDB_CTX* tiledb_ctx;
-  if (argc > 1) {
-    TileDB_Config tiledb_config;
-    tiledb_config.home_ = argv[1];
-    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
-  } else {
-    tiledb_ctx_init(&tiledb_ctx, NULL);
-  }
+struct url {
+  url(const std::string& url_s);
 
-  // Consolidate the dense array
-  tiledb_array_consolidate(tiledb_ctx, "my_workspace/dense_arrays/my_array_A");
+  // Accessors
+  std::string protocol();
+  std::string host();
+  std::string port();
+  int16_t nport();
+  std::string path();
+  std::string query();
 
-  // Consolidate the sparse array
-  tiledb_array_consolidate(tiledb_ctx, "my_workspace/sparse_arrays/my_array_B");
+ private:
+  void parse(const std::string& url_s);
 
-  // Finalize context
-  tiledb_ctx_finalize(tiledb_ctx);
-
-  return 0;
-}
+ private:
+  std::string protocol_;
+  std::string host_;
+  std::string port_;
+  int16_t nport_ = 0;
+  std::string path_;
+  std::string query_;
+};
+#endif /* URL_HH_ */

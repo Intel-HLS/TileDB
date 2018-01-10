@@ -308,9 +308,9 @@ int Fragment::rename_fragment() {
   std::string new_fragment_name = parent_dir + "/" +
                                   ::real_dir(fragment_name_).substr(parent_dir.size() + 2);
 
-  if(rename(fragment_name_.c_str(), new_fragment_name.c_str())) {
+  if(move_path(fragment_name_, new_fragment_name) == TILEDB_UT_ERR) {
     std::string errmsg = 
-        std::string("Cannot rename fragment directory; ") + strerror(errno);
+        std::string("Cannot rename fragment directory");
     PRINT_ERROR(errmsg);
     tiledb_fg_errmsg = TILEDB_FG_ERRMSG + errmsg;
     return TILEDB_FG_ERR;

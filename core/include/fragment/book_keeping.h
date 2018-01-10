@@ -280,123 +280,120 @@ class BookKeeping {
   std::vector<std::vector<size_t> > tile_var_sizes_;
 
 
-
+  /**
+   * Buffer Cache for holding book-keeping information until a load or finalize is completed.
+   */
+  void *buffer = nullptr;
+  int64_t buffer_size = 0;
+  int64_t buffer_offset = 0;
 
   /* ********************************* */
   /*           PRIVATE METHODS         */
   /* ********************************* */
 
   /**
-   * Writes the bounding coordinates in the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Writes the bounding coordinates to the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int flush_bounding_coords(gzFile fd) const;
+  int flush_bounding_coords();
 
  /**
-   * Writes the cell number of the last tile in the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Writes the cell number of the last tile to the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int flush_last_tile_cell_num(gzFile fd) const;
+  int flush_last_tile_cell_num();
 
  /**
-   * Writes the MBRs in the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Writes the MBRs to the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int flush_mbrs(gzFile fd) const;
+  int flush_mbrs();
 
  /**
-   * Writes the non-empty domain in the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Writes the non-empty domain to the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int flush_non_empty_domain(gzFile fd) const;
+  int flush_non_empty_domain();
 
  /**
-   * Writes the tile offsets in the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Writes the tile offsets to the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int flush_tile_offsets(gzFile fd) const;
+  int flush_tile_offsets();
 
  /**
-   * Writes the variable tile offsets in the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Writes the variable tile offsets to the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int flush_tile_var_offsets(gzFile fd) const;
+  int flush_tile_var_offsets();
 
  /**
-   * Writes the variable tile sizes in the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Writes the variable tile sizes to the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int flush_tile_var_sizes(gzFile fd) const;
+  int flush_tile_var_sizes();
 
   /**
-   * Loads the bounding coordinates from the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Loads the bounding coordinates from the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int load_bounding_coords(gzFile fd);
+  int load_bounding_coords();
 
   /**
-   * Loads the cell number of the last tile from the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Loads the cell number of the last tile from the book-keeping buffer
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int load_last_tile_cell_num(gzFile fd);
+  int load_last_tile_cell_num();
 
   /**
-   * Loads the MBRs from the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Loads the MBRs from the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int load_mbrs(gzFile fd);
+  int load_mbrs();
 
   /**
-   * Loads the non-empty domain from the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Loads the non-empty domain from the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int load_non_empty_domain(gzFile fd);
+  int load_non_empty_domain();
 
   /**
-   * Loads the tile offsets from the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Loads the tile offsets from the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int load_tile_offsets(gzFile fd);
+  int load_tile_offsets();
 
   /**
-   * Loads the variable tile offsets from the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Loads the variable tile offsets from the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int load_tile_var_offsets(gzFile fd);
+  int load_tile_var_offsets();
 
   /**
-   * Loads the variable tile sizes from the book-keeping file on disk.
-   *
-   * @param fd The descriptor of the book-keeping file.
+   * Loads the variable tile sizes from the book-keeping buffer.
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int load_tile_var_sizes(gzFile fd);
+  int load_tile_var_sizes();
+
+  /**
+   * Reads data from the cached buffer into bytes.
+   * @param bytes The buffer into which the data will be written.
+   * @param length The size of the data to be read from the cached buffer.
+   */
+  int read_buffer(void *bytes, int64_t size);
+
+  /**
+   * Appends data from bytes into the cached buffer.
+   * @param bytes The buffer for the data.
+   * @param length The size of the data to be written into the cached buffer.
+   */
+  int write_buffer(void *bytes, int64_t size);
+
+  /**
+   * Frees the allocated cached buffer and reinitializes all associated varaibles.
+   */
+  void free_buffer();
+  
 };
 
 #endif

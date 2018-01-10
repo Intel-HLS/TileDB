@@ -1,11 +1,11 @@
 /**
- * @file   tiledb_array_consolidate.cc
+ * @file   fs_utils.h
  *
  * @section LICENSE
  *
  * The MIT License
- * 
- * @copyright Copyright (c) 2016 MIT and Intel Corporation
+ *
+ * @copyright Copyright (c) 2017 Omics Data Automation Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,31 +27,38 @@
  * 
  * @section DESCRIPTION
  *
- * It shows how to consolidate arrays.
+ * This file contains default posix filesystem utility functions.
  */
 
-#include "tiledb.h"
+#ifndef __FS_UTILS_H__
+#define __FS_UTILS_H__
 
-int main(int argc, char *argv[]) {
-  // Initialize context with home dir if specified in command line, else
-  // initialize with the default configuration parameters
-  TileDB_CTX* tiledb_ctx;
-  if (argc > 1) {
-    TileDB_Config tiledb_config;
-    tiledb_config.home_ = argv[1];
-    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
-  } else {
-    tiledb_ctx_init(&tiledb_ctx, NULL);
-  }
+#include "utils.h"
 
-  // Consolidate the dense array
-  tiledb_array_consolidate(tiledb_ctx, "my_workspace/dense_arrays/my_array_A");
+#include <string>
 
-  // Consolidate the sparse array
-  tiledb_array_consolidate(tiledb_ctx, "my_workspace/sparse_arrays/my_array_B");
+namespace fs {
+  std::string current_dir();
+  
+  bool is_dir(const std::string& dir);
+  bool is_file(const std::string& file);
+  std::string real_dir(const std::string& dir);
+  
+  int create_dir(const std::string& dir);
+  int delete_dir(const std::string& dir);
+  std::vector<std::string> get_dirs(const std::string& dir);
+    
+  int create_file(const std::string& filename, int flags, mode_t mode);
+  int delete_file(const std::string& filename);
 
-  // Finalize context
-  tiledb_ctx_finalize(tiledb_ctx);
+  size_t file_size(const std::string& filename);
 
-  return 0;
+  int read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length);
+  int write_to_file(const char *filename, const void *buffer, size_t buffer_size);
+
+  int move_path(const std::string& old_path, const std::string& new_path);
+    
+  int sync(const char* filename);
 }
+
+#endif /* __FS_UTILS_H__ */

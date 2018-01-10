@@ -33,17 +33,24 @@
 #include "tiledb.h"
 #include <cstdio>
 
-int main() {
-  // Initialize context with the default configuration parameters
+int main(int argc, char *argv[]) {
+  // Initialize context with home dir if specified in command line, else
+  // initialize with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
-  tiledb_ctx_init(&tiledb_ctx, NULL);
+  if (argc > 1) {
+    TileDB_Config tiledb_config;
+    tiledb_config.home_ = argv[1];
+    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
+  } else {
+    tiledb_ctx_init(&tiledb_ctx, NULL);
+  }
 
   // Initialize array 
   TileDB_Array* tiledb_array;
   tiledb_array_init(
       tiledb_ctx,                                       // Context
       &tiledb_array,                                    // Array object
-      "my_workspace/dense_arrays/my_array_A",           // Array name
+      "hdfs://oda-master:9000/temp/my_workspace/dense_arrays/my_array_A",           // Array name
       TILEDB_ARRAY_READ,                                // Mode
       NULL,                                             // Whole domain
       NULL,                                             // All attributes

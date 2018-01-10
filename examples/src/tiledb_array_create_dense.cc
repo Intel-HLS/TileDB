@@ -32,10 +32,17 @@
 
 #include "tiledb.h"
 
-int main() {
-  // Initialize context with the default configuration parameters
+int main(int argc, char *argv[]) {
+  // Initialize context with home dir if specified in command line, else
+  // initialize with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
-  tiledb_ctx_init(&tiledb_ctx, NULL);
+  if (argc > 1) {
+    TileDB_Config tiledb_config;
+    tiledb_config.home_ = argv[1];
+    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
+  } else {
+    tiledb_ctx_init(&tiledb_ctx, NULL);
+  }
 
   // Prepare parameters for array schema
   const char* array_name = "my_workspace/dense_arrays/my_array_A";
@@ -54,9 +61,18 @@ int main() {
   };
   const int compression[] = 
   { 
-        TILEDB_GZIP,              // a1 
+        TILEDB_GZIP,              // a1
+#ifdef ENABLE_ZSTD
         TILEDB_ZSTD,              // a2
+#else
+        TILEDB_GZIP,              // a2
+#endif
+#ifdef ENABLE_LZ4
         TILEDB_LZ4,               // a3
+#else
+        TILEDB_GZIP,              // a3
+#endif
+        
         TILEDB_NO_COMPRESSION     // coordinates
   };
   int64_t tile_extents[] = 
