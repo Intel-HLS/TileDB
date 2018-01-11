@@ -41,6 +41,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <hdfs.h>
 #include <limits.h>
 #include <string.h>
 #include <thread>
@@ -544,7 +545,7 @@ void disconnect() {
 }
 
 bool is_hdfs_path(const std::string& path) {
-  if (starts_with(path, "hdfs://") || starts_with(path, "s3://") || starts_with(path, "gs://") {
+  if (starts_with(path, "hdfs://") || starts_with(path, "s3://") || starts_with(path, "gs://")) {
     assert(false && "No support for HDFS paths");
   }
   return false;

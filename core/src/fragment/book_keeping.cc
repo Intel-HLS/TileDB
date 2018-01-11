@@ -32,7 +32,6 @@
 
 #include "book_keeping.h"
 #include "utils.h"
-#include "hdfs_utils.h"
 #include <cassert>
 #include <cstring>
 #include <fcntl.h>

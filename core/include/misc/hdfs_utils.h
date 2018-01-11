@@ -35,7 +35,6 @@
 
 #include "utils.h"
 
-#include <hdfs.h>
 #include <string>
 
 namespace hdfs {
