@@ -552,7 +552,6 @@ bool is_hdfs_path(const std::string& path) {
 }
 
 bool is_hdfs() {
-  assert(false && "No support for HDFS");
   return false;
 }
 
