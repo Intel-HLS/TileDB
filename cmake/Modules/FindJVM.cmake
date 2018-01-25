@@ -1,8 +1,8 @@
 #
+
 # The MIT License
 #
-# Copyright (c) UCLA. License pursuant to original Intel MIT license.
-#           (c) 2017 UCLA All rights reserved
+# Copyright (c) 2018 UCLA. License pursuant to original Intel MIT license.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
