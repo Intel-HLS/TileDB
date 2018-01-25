@@ -1763,6 +1763,12 @@ int StorageManager::config_set(StorageManagerConfig* config) {
 
 int StorageManager::consolidation_filelock_create(
     const std::string& dir) const {
+   // TODO
+  if (hdfs::is_hdfs()) {
+    TRACE_FN_ARG("Consolidation - Not yet implemented for distributed file systems at the level of TileDB.");
+    return TILEDB_SM_OK;
+  }
+  
   // Create file
   std::string filename = dir + "/" + TILEDB_SM_CONSOLIDATION_FILELOCK_NAME;
   if (create_file(filename, O_WRONLY | O_CREAT | O_SYNC, S_IRWXU) == TILEDB_UT_ERR) {

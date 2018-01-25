@@ -5,7 +5,7 @@
  *
  * The MIT License
  *
- * @copyright Copyright (c) 2018 UCLA. License pursuant to original Intel MIT license.
+ * @copyright Copyright (c) 2017 UCLA. License pursuant to original Intel MIT license.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -330,12 +330,30 @@ int read_from_file_kernel(hdfsFile file, void* buffer, size_t length, off_t offs
 
 int read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
   TRACE_FN_ARG("filename:"<<std::string(filename) << " offset=" << offset << " length=" << length);
+
+  // Workaround for error messages of the type -
+  // readDirect: FSDataInputStream#read error:
+  // java.lang.UnsupportedOperationException: Byte-buffer read unsupported by input stream
+  //	at org.apache.hadoop.fs.FSDataInputStream.read(FSDataInputStream.java:146)
+
+  int old_fd, new_fd;
+  fflush(stderr);
+  old_fd = dup(2);
+  new_fd = open("/dev/null", O_WRONLY);
+  dup2(new_fd, 2);
+  close(new_fd);
   
   hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_RDONLY, length, 0, 0);
+
+  fflush(stderr);
+  dup2(old_fd, 2);
+  close(old_fd);
+
   if (!file) {
     snprintf(errmsg, ERR_MSG_LEN, "cannot open file %s for read", filename.c_str());
     return print_errmsg();
   }
+
 
   size_t size = file_size(filename);
   if(read_from_file_kernel(file, buffer, length>size?size:length, offset)) {
@@ -456,6 +474,11 @@ int write_to_file(const char *filename, const void *buffer, size_t buffer_size) 
       return print_errmsg();
     }
   }
+
+  if (hdfsHSync(hdfs_handle, file)) {
+    snprintf(errmsg, ERR_MSG_LEN, "cannot synch file %s after write", filename);
+    return print_errmsg();
+  }
   
   if (hdfsCloseFile(hdfs_handle, file)) {
     snprintf(errmsg, ERR_MSG_LEN, "cannot close file %s after write", filename);
@@ -465,7 +488,11 @@ int write_to_file(const char *filename, const void *buffer, size_t buffer_size) 
   return TILEDB_UT_OK;    
 }
 
-int sync(const char* filename) { 
+int sync(const char* filename) {
+  // We are synch'ing during write, so this is a no-op.
+  return TILEDB_UT_OK;
+
+  /*
   TRACE_FN_ARG("filename:"<<std::string(filename));;
   if (!(is_file(std::string(filename)))) {
     if (hdfsExists(hdfs_handle, filename) == -1) {
@@ -497,7 +524,8 @@ int sync(const char* filename) {
     return print_errmsg();
   }
 
-  return TILEDB_UT_OK;        
+  return TILEDB_UT_OK;
+  */
 }
 
 int move_to_fs(const std::string& hdfs_path, const std::string& fs_path) {

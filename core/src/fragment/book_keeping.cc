@@ -95,9 +95,6 @@ BookKeeping::~BookKeeping() {
       free(bounding_coords_[i]);
 }
 
-
-
-
 /* ****************************** */
 /*             ACCESSORS          */
 /* ****************************** */
@@ -218,62 +215,6 @@ void BookKeeping::append_tile_var_size(
   tile_var_sizes_[attribute_id].push_back(size);
 }
 
-int BookKeeping::read_buffer(void *bytes, int64_t size) {
-  assert(bytes != nullptr);
-  assert(buffer != nullptr);
-  assert(size > 0);
-  
-  if (buffer_offset + size > buffer_size) {
-    free_buffer();
-    std::string errmsg = "Cannot read from book-keeping buffer; End of file reached";
-    PRINT_ERROR(errmsg);
-    tiledb_bk_errmsg = TILEDB_BK_ERRMSG + errmsg;
-    return TILEDB_BK_ERR;  
-  }
-
-  void *pmem = memcpy(bytes, (char *)buffer+buffer_offset, size);
-  assert(pmem == bytes);
-
-  buffer_offset += size;
-  
-  return TILEDB_BK_OK;
-}
-
-#define CHUNK 1024
-int BookKeeping::write_buffer(void *bytes, int64_t size) {
-  assert(bytes != nullptr);
-  assert(size > 0);
-  
-  if (buffer == nullptr || buffer_offset+size > buffer_size) {
-    int64_t alloc_size = buffer_size + ((size/CHUNK)+1)*CHUNK;
-    buffer = realloc(buffer, alloc_size);
-    if (buffer == nullptr) {
-      free_buffer();
-      std::string errmsg =
-          "Cannot write to book-keeping buffer; Mem allocation error";
-      PRINT_ERROR(errmsg);
-      tiledb_bk_errmsg = TILEDB_BK_ERRMSG + errmsg;
-      return TILEDB_BK_ERR;
-    }
-
-    buffer_size = alloc_size;
-  }
-
-  void *pmem = memcpy((char *)buffer+buffer_offset, bytes, size);
-  assert(pmem == (char *)buffer+buffer_offset);
-  
-  buffer_offset += size;
-
-  return TILEDB_BK_OK;
-}
-
-void BookKeeping::free_buffer() {
-  free(buffer);
-  buffer = nullptr;
-  buffer_offset = 0;
-  buffer_size = 0;
-}
-
 /* FORMAT:
  * non_empty_domain_size(size_t) non_empty_domain(void*)  
  * mbr_num(int64_t)
@@ -342,7 +283,7 @@ int BookKeeping::finalize() {
                          TILEDB_BOOK_KEEPING_FILENAME + 
                          TILEDB_FILE_SUFFIX + TILEDB_GZIP_SUFFIX;
 
-  if(write_to_file_after_compression(filename.c_str(), buffer, buffer_offset, TILEDB_GZIP) == TILEDB_UT_ERR) {
+  if(write_to_file_after_compression(filename.c_str(), get_buffer(), get_buffer_size(), TILEDB_GZIP) == TILEDB_UT_ERR) {
     std::string errmsg =
         "Cannot finalize book-keeping; Failure to write to file " + filename;
     PRINT_ERROR(errmsg);
@@ -439,15 +380,14 @@ int BookKeeping::load() {
     return TILEDB_BK_ERR;
   }
 
-  if (read_from_file_after_decompression(filename, &buffer, size, TILEDB_GZIP) == TILEDB_UT_ERR) {
+  void *buf;
+  if (read_from_file_after_decompression(filename, &buf, size, TILEDB_GZIP) == TILEDB_UT_ERR) {
     std::string errmsg = "Cannot read book-keeping file; Read failure for " + filename;
     PRINT_ERROR(errmsg);
     tiledb_bk_errmsg = TILEDB_BK_ERRMSG + errmsg;
     return TILEDB_BK_ERR;
   }
-
-  buffer_offset = 0;
-  buffer_size = size;
+  set_buffer(buf, size);
 
   // Load non-empty domain
   if(load_non_empty_domain() != TILEDB_BK_OK)
@@ -501,7 +441,7 @@ int BookKeeping::flush_bounding_coords() {
   int64_t bounding_coords_num = bounding_coords_.size();
 
   // Write number of bounding coordinates
-  if(write_buffer(&bounding_coords_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+  if(append_buffer(&bounding_coords_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
     std::string errmsg = 
         "Cannot finalize book-keeping; Writing number of bounding "
         "coordinates failed";
@@ -512,7 +452,7 @@ int BookKeeping::flush_bounding_coords() {
 
   // Write bounding coordinates
   for(int64_t i=0; i<bounding_coords_num; ++i) {
-    if(write_buffer(bounding_coords_[i], bounding_coords_size) == TILEDB_BK_ERR) {
+    if(append_buffer(bounding_coords_[i], bounding_coords_size) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot finalize book-keeping; Writing bounding coordinates failed";
       PRINT_ERROR(errmsg);
@@ -538,7 +478,7 @@ int BookKeeping::flush_last_tile_cell_num() {
   int64_t last_tile_cell_num = 
       (last_tile_cell_num_ == 0) ? cell_num_per_tile : last_tile_cell_num_;
 
-  if(write_buffer(&last_tile_cell_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+  if(append_buffer(&last_tile_cell_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
     std::string errmsg = 
         "Cannot finalize book-keeping; Writing last tile cell number failed";
     PRINT_ERROR(errmsg);
@@ -560,7 +500,7 @@ int BookKeeping::flush_mbrs() {
   int64_t mbr_num = mbrs_.size();
 
   // Write number of MBRs
-  if(write_buffer(&mbr_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+  if(append_buffer(&mbr_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
     std::string errmsg = 
         "Cannot finalize book-keeping; Writing number of MBRs failed";
     PRINT_ERROR(errmsg);
@@ -570,7 +510,7 @@ int BookKeeping::flush_mbrs() {
 
   // Write MBRs
   for(int64_t i=0; i<mbr_num; ++i) {
-    if(write_buffer(mbrs_[i], mbr_size) == TILEDB_BK_ERR) {
+    if(append_buffer(mbrs_[i], mbr_size) == TILEDB_BF_ERR) {
       std::string errmsg = "Cannot finalize book-keeping; Writing MBR failed";
       PRINT_ERROR(errmsg);
       tiledb_bk_errmsg = TILEDB_BK_ERRMSG + errmsg;
@@ -591,7 +531,7 @@ int BookKeeping::flush_non_empty_domain() {
                            : array_schema_->coords_size() * 2;
 
   // Write non-empty domain size
-  if (write_buffer(&domain_size, sizeof(size_t)) == TILEDB_BK_ERR) {
+  if (append_buffer(&domain_size, sizeof(size_t)) == TILEDB_BF_ERR) {
     std::string errmsg =
         "Cannot finalize book-keeping; Writing domain size failed";
     PRINT_ERROR(errmsg);
@@ -601,7 +541,7 @@ int BookKeeping::flush_non_empty_domain() {
 
   // Write non-empty domain
   if(non_empty_domain_ != NULL) {
-    if(write_buffer(non_empty_domain_, domain_size) == TILEDB_BK_ERR) {
+    if(append_buffer(non_empty_domain_, domain_size) == TILEDB_BF_ERR) {
       std::string errmsg =
           "Cannot finalize book-keeping; Writing domain failed";
       PRINT_ERROR(errmsg);
@@ -631,7 +571,7 @@ int BookKeeping::flush_tile_offsets() {
   for(int i=0; i<attribute_num+1; ++i) {
     // Write number of tile offsets
     tile_offsets_num = tile_offsets_[i].size(); 
-    if (write_buffer(&tile_offsets_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+    if (append_buffer(&tile_offsets_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot finalize book-keeping; Writing number of tile offsets failed";
       PRINT_ERROR(errmsg);
@@ -643,7 +583,7 @@ int BookKeeping::flush_tile_offsets() {
       continue;
 
     // Write tile offsets
-    if(write_buffer(&tile_offsets_[i][0], tile_offsets_num * sizeof(off_t)) == TILEDB_BK_ERR) {
+    if(append_buffer(&tile_offsets_[i][0], tile_offsets_num * sizeof(off_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot finalize book-keeping; Writing tile offsets failed";
       PRINT_ERROR(errmsg);
@@ -673,7 +613,7 @@ int BookKeeping::flush_tile_var_offsets() {
   for(int i=0; i<attribute_num; ++i) {
     // Write number of offsets
     tile_var_offsets_num = tile_var_offsets_[i].size(); 
-    if(write_buffer(&tile_var_offsets_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+    if(append_buffer(&tile_var_offsets_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot finalize book-keeping; Writing number of "
           "variable tile offsets failed";
@@ -686,7 +626,7 @@ int BookKeeping::flush_tile_var_offsets() {
       continue;
 
     // Write tile offsets
-    if(write_buffer(&tile_var_offsets_[i][0], tile_var_offsets_num * sizeof(off_t)) == TILEDB_BK_ERR) {
+    if(append_buffer(&tile_var_offsets_[i][0], tile_var_offsets_num * sizeof(off_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot finalize book-keeping; Writing variable tile offsets failed";
       PRINT_ERROR(errmsg);
@@ -716,7 +656,7 @@ int BookKeeping::flush_tile_var_sizes() {
   for(int i=0; i<attribute_num; ++i) {
     // Write number of sizes
     tile_var_sizes_num = tile_var_sizes_[i].size(); 
-    if(write_buffer(&tile_var_sizes_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+    if(append_buffer(&tile_var_sizes_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot finalize book-keeping; Writing number of "
            "variable tile sizes failed";
@@ -729,7 +669,7 @@ int BookKeeping::flush_tile_var_sizes() {
       continue;
 
     // Write tile sizes
-    if(write_buffer(&tile_var_sizes_[i][0], tile_var_sizes_num * sizeof(size_t)) == TILEDB_BK_ERR) {
+    if(append_buffer(&tile_var_sizes_[i][0], tile_var_sizes_num * sizeof(size_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot finalize book-keeping; Writing variable tile sizes failed";
       PRINT_ERROR(errmsg);
@@ -752,7 +692,7 @@ int BookKeeping::load_bounding_coords() {
 
   // Get number of bounding coordinates
   int64_t bounding_coords_num;
-  if(read_buffer(&bounding_coords_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+  if(read_buffer(&bounding_coords_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
     std::string errmsg = 
        "Cannot load book-keeping; Reading number of "
        "bounding coordinates failed";
@@ -766,7 +706,7 @@ int BookKeeping::load_bounding_coords() {
   bounding_coords_.resize(bounding_coords_num);
   for(int64_t i=0; i<bounding_coords_num; ++i) {
     bounding_coords = malloc(bounding_coords_size);
-    if(read_buffer(bounding_coords, bounding_coords_size) == TILEDB_BK_ERR) {
+    if(read_buffer(bounding_coords, bounding_coords_size) == TILEDB_BF_ERR) {
       free(bounding_coords);
       std::string errmsg = 
           "Cannot load book-keeping; Reading bounding coordinates failed";
@@ -786,7 +726,7 @@ int BookKeeping::load_bounding_coords() {
  */
 int BookKeeping::load_last_tile_cell_num() {
   // Get last tile cell number
-  if(read_buffer(&last_tile_cell_num_, sizeof(int64_t)) == TILEDB_BK_ERR) {
+  if(read_buffer(&last_tile_cell_num_, sizeof(int64_t)) == TILEDB_BF_ERR) {
     std::string errmsg = 
         "Cannot load book-keeping; Reading last tile cell number failed";
     PRINT_ERROR(errmsg);
@@ -808,7 +748,7 @@ int BookKeeping::load_mbrs() {
 
   // Get number of MBRs
   int64_t mbr_num;
-  if(read_buffer(&mbr_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+  if(read_buffer(&mbr_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
     std::string errmsg = 
         "Cannot load book-keeping; Reading number of MBRs failed";
     PRINT_ERROR(errmsg);
@@ -821,7 +761,7 @@ int BookKeeping::load_mbrs() {
   mbrs_.resize(mbr_num);
   for(int64_t i=0; i<mbr_num; ++i) {
     mbr = malloc(mbr_size);
-    if(read_buffer(mbr, mbr_size) == TILEDB_BK_ERR) {
+    if(read_buffer(mbr, mbr_size) == TILEDB_BF_ERR) {
       free(mbr);
       std::string errmsg = 
           "Cannot load book-keeping; Reading MBR failed";
@@ -842,7 +782,7 @@ int BookKeeping::load_mbrs() {
 int BookKeeping::load_non_empty_domain() {
   // Get domain size
   size_t domain_size;
-  if(read_buffer(&domain_size, sizeof(size_t)) == TILEDB_BK_ERR) {
+  if(read_buffer(&domain_size, sizeof(size_t)) == TILEDB_BF_ERR) {
     std::string errmsg = "Cannot load book-keeping; Reading domain size failed";
     PRINT_ERROR(errmsg);
     tiledb_bk_errmsg = TILEDB_BK_ERRMSG + errmsg;
@@ -854,7 +794,7 @@ int BookKeeping::load_non_empty_domain() {
     non_empty_domain_ = NULL;
   } else {
     non_empty_domain_ = malloc(domain_size);    
-    if(read_buffer(non_empty_domain_, domain_size) == TILEDB_BK_ERR) {
+    if(read_buffer(non_empty_domain_, domain_size) == TILEDB_BF_ERR) {
       free(non_empty_domain_);
       std::string errmsg = "Cannot load book-keeping; Reading domain failed";
       PRINT_ERROR(errmsg);
@@ -895,7 +835,7 @@ int BookKeeping::load_tile_offsets() {
   // For all attributes, get the tile offsets
   for(int i=0; i<attribute_num+1; ++i) {
     // Get number of tile offsets
-    if(read_buffer(&tile_offsets_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+    if(read_buffer(&tile_offsets_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot load book-keeping; Reading number of tile offsets failed";
       PRINT_ERROR(errmsg);
@@ -908,7 +848,7 @@ int BookKeeping::load_tile_offsets() {
 
     // Get tile offsets
     tile_offsets_[i].resize(tile_offsets_num);
-    if(read_buffer(&tile_offsets_[i][0], tile_offsets_num * sizeof(off_t)) == TILEDB_BK_ERR) { 
+    if(read_buffer(&tile_offsets_[i][0], tile_offsets_num * sizeof(off_t)) == TILEDB_BF_ERR) { 
       std::string errmsg = 
           "Cannot load book-keeping; Reading tile offsets failed";
       PRINT_ERROR(errmsg);
@@ -940,7 +880,7 @@ int BookKeeping::load_tile_var_offsets() {
   // For all attributes, get the variable tile offsets
   for(int i=0; i<attribute_num; ++i) {
     // Get number of tile offsets
-    if(read_buffer(&tile_var_offsets_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+    if(read_buffer(&tile_var_offsets_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot load book-keeping; Reading number of variable tile "
           "offsets failed";
@@ -954,7 +894,7 @@ int BookKeeping::load_tile_var_offsets() {
 
     // Get variable tile offsets
     tile_var_offsets_[i].resize(tile_var_offsets_num);
-    if(read_buffer(&tile_var_offsets_[i][0], tile_var_offsets_num * sizeof(off_t)) == TILEDB_BK_ERR) {
+    if(read_buffer(&tile_var_offsets_[i][0], tile_var_offsets_num * sizeof(off_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
       "Cannot load book-keeping; Reading variable tile offsets failed";
       PRINT_ERROR(errmsg);
@@ -986,7 +926,7 @@ int BookKeeping::load_tile_var_sizes() {
   // For all attributes, get the variable tile sizes
   for(int i=0; i<attribute_num; ++i) {
     // Get number of tile sizes
-    if(read_buffer(&tile_var_sizes_num, sizeof(int64_t)) == TILEDB_BK_ERR) {
+    if(read_buffer(&tile_var_sizes_num, sizeof(int64_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot load book-keeping; Reading number of variable tile "
            "sizes failed";
@@ -1000,7 +940,7 @@ int BookKeeping::load_tile_var_sizes() {
 
     // Get variable tile sizes
     tile_var_sizes_[i].resize(tile_var_sizes_num);
-    if(read_buffer(&tile_var_sizes_[i][0], tile_var_sizes_num * sizeof(size_t)) == TILEDB_BK_ERR) {
+    if(read_buffer(&tile_var_sizes_[i][0], tile_var_sizes_num * sizeof(size_t)) == TILEDB_BF_ERR) {
       std::string errmsg = 
           "Cannot load book-keeping; Reading variable tile sizes failed";
       PRINT_ERROR(errmsg);

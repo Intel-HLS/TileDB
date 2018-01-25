@@ -394,6 +394,11 @@ class ReadState {
   BookKeeping* book_keeping_;
   /** The size of the array coordinates. */
   size_t coords_size_;
+
+  /** Internal buffers associated with the attribute files */
+  std::vector<Buffer *> file_buffer_;
+  std::vector<Buffer *> file_var_buffer_;
+  
   /** Indicates if the read operation on this fragment finished. */
   bool done_;
   /** Keeps track of which tile is in main memory for each attribute. */ 
@@ -493,6 +498,23 @@ class ReadState {
   /* ********************************* */
   /*          PRIVATE METHODS          */
   /* ********************************* */
+
+  /**
+   * Resets all internal buffers associated with attribute files.
+   */
+  void reset_file_buffers();
+
+  /**
+   * Reads a segment from the file associated with the attribute,
+   * given an offset and size.
+   * @param attribute_id The id of the attribute.
+   * @param is_var Boolean to specify whether the attribute is var.
+   * @param offset The offset of the segment to be read from the file.
+   * @param segment Pointer to preallocated segment.
+   * @param length Length of the preallocated segment.
+   * @return TILEDB_RS_OK on success and TILEDB_RS_ERR on error.
+   */
+  int read_segment(int attribute_id, bool is_var, off_t offset, void *segment, size_t length);
 
   /**
    * Compares input coordinates to coordinates from the search tile.

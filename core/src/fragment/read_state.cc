@@ -29,7 +29,6 @@
  *
  * This file implements the ReadState class.
  */
-
 #include "utils.h"
 #include "read_state.h"
 #ifdef ENABLE_BLOSC
@@ -50,9 +49,6 @@
 #ifdef ENABLE_ZSTD
 #include <zstd.h>
 #endif
-
-
-
 
 /* ****************************** */
 /*             MACROS             */
@@ -140,18 +136,24 @@ ReadState::ReadState(
 
   compute_tile_search_range();
 
-  // Check empty attributes
   std::string fragment_name = fragment_->fragment_name();
   std::string filename;
+  // Check empty attributes
   is_empty_attribute_.resize(attribute_num_+1);
   for(int i=0; i<attribute_num_+1; ++i) {
     filename = 
         fragment_name + "/" + array_schema_->attribute(i) + TILEDB_FILE_SUFFIX;
     is_empty_attribute_[i] = !is_file(filename);
   }
+
+  file_buffer_.resize(attribute_num_+1);
+  file_var_buffer_.resize(attribute_num_+1);
+  reset_file_buffers();
 }
 
-ReadState::~ReadState() { 
+ReadState::~ReadState() {
+  reset_file_buffers();
+ 
   if(last_tile_coords_ != NULL)
     free(last_tile_coords_);
 
@@ -245,6 +247,8 @@ bool ReadState::subarray_area_covered() const {
 /* ****************************** */
 
 void ReadState::reset() {
+  reset_file_buffers();
+
   if(last_tile_coords_ != NULL) {
     free(last_tile_coords_);
     last_tile_coords_ = NULL;
@@ -1075,6 +1079,100 @@ void ReadState::get_next_overlapping_tile_sparse(
 /*         PRIVATE METHODS        */
 /* ****************************** */
 
+void ReadState::reset_file_buffers() {
+  for(int i=0; i<attribute_num_+1; ++i) {
+    if (file_buffer_[i] != NULL) {
+      delete file_buffer_[i];
+      file_buffer_[i] = NULL;
+    }
+    if (file_var_buffer_[i] != NULL) {
+      delete file_var_buffer_[i];
+      file_var_buffer_[i] = NULL;
+    }
+  }
+}
+
+Buffer *read_file(std::string &filename) {
+  void *buf;
+  size_t size;
+  if (read_from_file_after_decompression(filename, &buf, size, TILEDB_NO_COMPRESSION) == TILEDB_UT_ERR) {
+    std::string errmsg = "Cannot seem to read file " + filename + " into memory. Will try read directly from file";
+    PRINT_ERROR(errmsg);
+    return NULL;
+  }
+  return new Buffer(buf, size);
+}
+
+int ReadState::read_segment(int attribute_num, bool is_var, off_t offset, void *segment, size_t length) {
+  int rc = TILEDB_RS_OK;
+
+  // Special case for coords
+  if (attribute_num==attribute_num_+1) {
+    attribute_num = attribute_num_;
+  }
+
+  // Construct the attribute file name
+  std::string filename;
+  if (attribute_num == attribute_num_) {
+    filename = fragment_->fragment_name() + "/" + TILEDB_COORDS + TILEDB_FILE_SUFFIX;
+  } else {
+    filename = fragment_->fragment_name() + "/" + array_schema_->attribute(attribute_num) + (is_var?"_var":"") +TILEDB_FILE_SUFFIX;
+  }
+
+  Buffer *file_buffer;
+  if (is_var) {
+    assert((attribute_num < attribute_num_) && "Coords attribute cannot be variable");
+    if (file_var_buffer_[attribute_num] == NULL) {
+      file_var_buffer_[attribute_num]= read_file(filename);
+    }
+    file_buffer = file_var_buffer_[attribute_num];
+  } else {
+    if (file_buffer_[attribute_num] == NULL) {
+      file_buffer_[attribute_num] = read_file(filename);
+    }
+    file_buffer = file_buffer_[attribute_num];
+  }
+
+  // Read from file buffers if possible
+  if (file_buffer != NULL && file_buffer->get_buffer() != NULL) {
+    if (file_buffer->read_buffer(offset, segment, length) == TILEDB_BF_ERR) {
+      std::string errmsg = "Cannot read attribute file " + filename + " from memory. Will try read directly from file";
+      PRINT_ERROR(errmsg);
+      tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
+    } else {
+      return rc;
+    }
+  }
+  
+  // Read segment directly
+  int read_method = array_->config()->read_method();
+#ifdef HAVE_MPI
+  MPI_Comm* mpi_comm = array_->config()->mpi_comm();
+#endif
+
+  if(read_method == TILEDB_IO_READ || read_method == TILEDB_IO_MMAP) {
+    rc = read_from_file(filename, offset, segment, length);
+  } else if(read_method == TILEDB_IO_MPI) {
+#ifdef HAVE_MPI
+    rc = mpi_io_read_from_file(mpi_comm, filename, offset, segment, length);
+#else
+    // Error: MPI not supported
+    std::string errmsg = "Cannot read MPI file as MPI is not supported";
+    PRINT_ERROR(errmsg);
+    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
+    return TILEDB_RS_ERR;
+#endif
+  }
+  
+  if (rc == TILEDB_UT_ERR) {
+    std::string errmsg = "Cannot read segment from attribute file " + filename;
+    PRINT_ERROR(errmsg);
+    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
+  }
+
+  return rc;
+}
+
 int ReadState::CMP_COORDS_TO_SEARCH_TILE(
     const void* buffer,
     size_t tile_offset) {
@@ -1084,44 +1182,10 @@ int ReadState::CMP_COORDS_TO_SEARCH_TILE(
   // The tile is in main memory
   if(tile != NULL) {
     return !memcmp(buffer, tile + tile_offset, coords_size_);
-  } 
-
-  // We need to read from the disk
-  std::string filename = 
-      fragment_->fragment_name() + "/" + TILEDB_COORDS + TILEDB_FILE_SUFFIX;
-  int rc = TILEDB_UT_OK;
-  int read_method = array_->config()->read_method();
-#ifdef HAVE_MPI
-  MPI_Comm* mpi_comm = array_->config()->mpi_comm();
-#endif
-
-  if(read_method == TILEDB_IO_READ) {
-    rc = read_from_file(
-             filename, 
-             tiles_file_offsets_[attribute_num_+1] + tile_offset, 
-             tmp_coords_, 
-             coords_size_);
-  } else if(read_method == TILEDB_IO_MPI) {
-#ifdef HAVE_MPI
-    rc = mpi_io_read_from_file(
-             mpi_comm,
-             filename, 
-             tiles_file_offsets_[attribute_num_+1] + tile_offset, 
-             tmp_coords_, 
-             coords_size_);
-#else
-    // Error: MPI not supported
-    std::string errmsg = 
-        "Cannot compare coordinates to search tile; MPI not supported";
-    PRINT_ERROR(errmsg);
-    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
-    return TILEDB_RS_ERR;
-#endif
   }
 
-  // Error
-  if(rc != TILEDB_UT_OK) {
-    tiledb_rs_errmsg = tiledb_ut_errmsg;
+  // Read from file
+  if (read_segment(attribute_num_, false, tiles_file_offsets_[attribute_num_+1]+tile_offset, tmp_coords_, coords_size_) == TILEDB_RS_ERR) {
     return TILEDB_RS_ERR;
   }
 
@@ -1813,49 +1877,15 @@ int ReadState::GET_COORDS_PTR_FROM_SEARCH_TILE(
   if(tile != NULL) {
     coords = tile + i*coords_size_;
     return TILEDB_RS_OK;
-  } 
+  }
 
-  // We need to read from the disk
-  std::string filename = 
-      fragment_->fragment_name() + "/" + TILEDB_COORDS + TILEDB_FILE_SUFFIX;
-  int rc = TILEDB_UT_OK;
-  int read_method = array_->config()->read_method();
-#ifdef HAVE_MPI
-  MPI_Comm* mpi_comm = array_->config()->mpi_comm();
-#endif
-
-  if(read_method == TILEDB_IO_READ) {
-    rc = read_from_file(
-             filename, 
-             tiles_file_offsets_[attribute_num_+1] + i*coords_size_, 
-             tmp_coords_, 
-             coords_size_);
-  } else if(read_method == TILEDB_IO_MPI) {
-#ifdef HAVE_MPI
-    rc = mpi_io_read_from_file(
-             mpi_comm,
-             filename, 
-             tiles_file_offsets_[attribute_num_+1] + i*coords_size_, 
-             tmp_coords_, 
-             coords_size_);
-#else
-    // Error: MPI not supported
-    std::string errmsg = 
-        "Cannot get coordinates from search tile; MPI not supported";
-    PRINT_ERROR(errmsg);
-    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
+  // Read from file
+  if (read_segment(attribute_num_, false, tiles_file_offsets_[attribute_num_+1] + i*coords_size_, tmp_coords_, coords_size_) == TILEDB_RS_ERR) {
     return TILEDB_RS_ERR;
-#endif
   }
 
   // Get coordinates pointer
   coords = tmp_coords_;
-
-  // Error
-  if(rc != TILEDB_UT_OK) {
-    tiledb_rs_errmsg = tiledb_ut_errmsg;
-    return TILEDB_RS_ERR;
-  }
 
   // Success
   return TILEDB_RS_OK;
@@ -1872,51 +1902,15 @@ int ReadState::GET_CELL_PTR_FROM_OFFSET_TILE(
   if(tile != NULL) {
     offset = (const size_t*) (tile + i*sizeof(size_t));
     return TILEDB_RS_OK;
-  } 
+  }
 
-  // We need to read from the disk
-  std::string filename = 
-      fragment_->fragment_name() + "/" + 
-      array_schema_->attribute(attribute_id) + 
-      TILEDB_FILE_SUFFIX;
-  int rc = TILEDB_UT_OK;
-  int read_method = array_->config()->read_method();
-#ifdef HAVE_MPI
-  MPI_Comm* mpi_comm = array_->config()->mpi_comm();
-#endif
-
-  if(read_method == TILEDB_IO_READ) {
-    rc = read_from_file(
-             filename, 
-             tiles_file_offsets_[attribute_id] + i*sizeof(size_t), 
-             &tmp_offset_, 
-             sizeof(size_t));
-  } else if(read_method == TILEDB_IO_MPI) {
-#ifdef HAVE_MPI
-    rc = mpi_io_read_from_file(
-             mpi_comm,
-             filename, 
-             tiles_file_offsets_[attribute_id] + i*sizeof(size_t), 
-             &tmp_offset_, 
-             sizeof(size_t));
-#else
-    // Error: MPI not supported
-    std::string errmsg = 
-        "Cannot get cell pointer from offset tile; MPI not supported";
-    PRINT_ERROR(errmsg);
-    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
+  // Read attribute
+  if (read_segment(attribute_id, false, tiles_file_offsets_[attribute_id] + i*sizeof(size_t), &tmp_offset_, sizeof(size_t)) == TILEDB_RS_ERR) {
     return TILEDB_RS_ERR;
-#endif
   }
 
   // Get coordinates pointer
   offset = tiles_file_offsets_[attribute_id] + &tmp_offset_;
-
-  // Error
-  if(rc != TILEDB_UT_OK) {
-    tiledb_rs_errmsg = tiledb_ut_errmsg;
-    return TILEDB_RS_ERR;
-  }
 
   // Success
   return TILEDB_RS_OK;
@@ -2759,47 +2753,16 @@ int ReadState::prepare_tile_for_reading_var_cmp_none(
   off_t start_tile_var_offset = *tile_s; 
   off_t end_tile_var_offset = 0;
   size_t tile_var_size;
-  std::string filename = 
-        fragment_->fragment_name() + "/" +
-        array_schema_->attribute(attribute_id) + 
-        TILEDB_FILE_SUFFIX;
-
+  
   if(tile_i != tile_num - 1) { // Not the last tile
-    if(read_method == TILEDB_IO_READ ||
-       read_method == TILEDB_IO_MMAP) {
-      if(read_from_file(
-             filename, file_offset + full_tile_size, 
-             &end_tile_var_offset, 
-             TILEDB_CELL_VAR_OFFSET_SIZE) != TILEDB_UT_OK) {
-        tiledb_rs_errmsg = tiledb_ut_errmsg;
-        return TILEDB_RS_ERR;
-      }
-    } else if(read_method == TILEDB_IO_MPI) {
-#ifdef HAVE_MPI
-       if(mpi_io_read_from_file(
-             array_->config()->mpi_comm(),
-             filename, file_offset + full_tile_size, 
-             &end_tile_var_offset, 
-             TILEDB_CELL_VAR_OFFSET_SIZE) != TILEDB_UT_OK) {
-        tiledb_rs_errmsg = tiledb_ut_errmsg;
-        return TILEDB_RS_ERR;
-      }
-#else
-    // Error: MPI not supported
-    std::string errmsg = 
-        "Cannot prepare variable tile for reading; MPI not supported";
-    PRINT_ERROR(errmsg);
-    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
-    return TILEDB_RS_ERR;
-#endif
+    if (read_segment(attribute_id, false, file_offset + full_tile_size, 
+             &end_tile_var_offset, TILEDB_CELL_VAR_OFFSET_SIZE) == TILEDB_RS_ERR) {
+      return TILEDB_RS_ERR;
     }
     tile_var_size = end_tile_var_offset - tile_s[0];
   } else {                  // Last tile
     // Prepare variable attribute file name
-    std::string filename = 
-        fragment_->fragment_name() + "/" +
-        array_schema_->attribute(attribute_id) + "_var" +
-        TILEDB_FILE_SUFFIX;
+    std::string filename = fragment_->fragment_name() + "/" + array_schema_->attribute(attribute_id) + "_var" + TILEDB_FILE_SUFFIX;
     tile_var_size = file_size(filename) - tile_s[0];
   }
 
@@ -2849,49 +2812,7 @@ int ReadState::READ_FROM_TILE(
   } 
 
   // We need to read from the disk
-  std::string filename = 
-      fragment_->fragment_name() + "/" +
-      array_schema_->attribute(attribute_id) + 
-      TILEDB_FILE_SUFFIX;
-  int rc = TILEDB_UT_OK;
-  int read_method = array_->config()->read_method();
-
-#ifdef HAVE_MPI
-  MPI_Comm* mpi_comm = array_->config()->mpi_comm();
-#endif
-
-  if(read_method == TILEDB_IO_READ) {
-    rc = read_from_file(
-             filename, 
-             tiles_file_offsets_[attribute_id] + tile_offset, 
-             buffer, 
-             bytes_to_copy);
-  } else if(read_method == TILEDB_IO_MPI) {
-#ifdef HAVE_MPI
-    rc = mpi_io_read_from_file(
-             mpi_comm,
-             filename, 
-             tiles_file_offsets_[attribute_id] + tile_offset, 
-             buffer, 
-             bytes_to_copy);
-#else
-    // Error: MPI not supported
-    std::string errmsg = 
-        "Cannot read from tile; MPI not supported";
-    PRINT_ERROR(errmsg);
-    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
-    return TILEDB_RS_ERR;
-#endif
-  }
-
-  // Error
-  if(rc != TILEDB_UT_OK) {
-    tiledb_rs_errmsg = tiledb_ut_errmsg;
-    return TILEDB_RS_ERR;
-  }
-
-  // Success
-  return TILEDB_RS_OK;
+  return read_segment(attribute_id, false, tiles_file_offsets_[attribute_id] + tile_offset, buffer, bytes_to_copy);
 }
 
 int ReadState::READ_FROM_TILE_VAR(
@@ -2909,48 +2830,7 @@ int ReadState::READ_FROM_TILE_VAR(
   } 
 
   // We need to read from the disk
-  std::string filename = 
-      fragment_->fragment_name() + "/" +
-      array_schema_->attribute(attribute_id) + "_var" +
-      TILEDB_FILE_SUFFIX;
-  int rc = TILEDB_UT_OK;
-  int read_method = array_->config()->read_method();
-#ifdef HAVE_MPI
-  MPI_Comm* mpi_comm = array_->config()->mpi_comm();
-#endif
-
-  if(read_method == TILEDB_IO_READ) {
-    rc = read_from_file(
-             filename, 
-             tile_offset, 
-             buffer, 
-             bytes_to_copy);
-  } else if(read_method == TILEDB_IO_MPI) {
-#ifdef HAVE_MPI
-    rc = mpi_io_read_from_file(
-             mpi_comm,
-             filename, 
-             tile_offset, 
-             buffer, 
-             bytes_to_copy);
-#else
-    // Error: MPI not supported
-    std::string errmsg = 
-        "Cannot read from variable tile; MPI not supported";
-    PRINT_ERROR(errmsg);
-    tiledb_rs_errmsg = TILEDB_RS_ERRMSG + errmsg;
-    return TILEDB_RS_ERR;
-#endif
-  }
-
-  // Error
-  if(rc != TILEDB_UT_OK) {
-    tiledb_rs_errmsg = tiledb_ut_errmsg;
-    return TILEDB_RS_ERR;
-  }
-
-  // Success
-  return TILEDB_RS_OK;
+  return read_segment(attribute_id, true, tile_offset, buffer, bytes_to_copy);
 }
 
 int ReadState::read_tile_from_file_cmp(
@@ -2974,21 +2854,8 @@ int ReadState::read_tile_from_file_cmp(
     tile_compressed_allocated_size_ = tile_size;
   }
 
-  // Prepare attribute file name
-  std::string filename = 
-      fragment_->fragment_name() + "/" +
-      array_schema_->attribute(attribute_id_real) +
-      TILEDB_FILE_SUFFIX;
-
   // Read from file
-  if(read_from_file(filename, offset, tile_compressed_, tile_size) !=
-     TILEDB_UT_OK) {
-    tiledb_rs_errmsg = tiledb_ut_errmsg;
-    return TILEDB_RS_ERR;
-  }
-
-  // Success
-  return TILEDB_RS_OK;
+  return read_segment(attribute_id_real, false, offset, tile_compressed_, tile_size);
 }
 
 int ReadState::read_tile_from_file_var_cmp(
@@ -3007,21 +2874,7 @@ int ReadState::read_tile_from_file_var_cmp(
     tile_compressed_allocated_size_ = tile_size;
   }
 
-  // Prepare attribute file name
-  std::string filename = 
-      fragment_->fragment_name() + "/" +
-      array_schema_->attribute(attribute_id) + "_var" +
-      TILEDB_FILE_SUFFIX;
-
-  // Read from file
-  if(read_from_file(filename, offset, tile_compressed_, tile_size) !=
-     TILEDB_UT_OK) {
-    tiledb_rs_errmsg = tiledb_ut_errmsg;
-    return TILEDB_RS_ERR;
-  }
-
-  // Success
-  return TILEDB_RS_OK;
+  return read_segment(attribute_id, true, offset, tile_compressed_, tile_size);
 }
 
 int ReadState::set_tile_file_offset(

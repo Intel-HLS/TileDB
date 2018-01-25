@@ -34,6 +34,7 @@
 #define __BOOK_KEEPING_H__
 
 #include "array_schema.h"
+#include "buffer.h"
 #include "tiledb_constants.h"
 #include <vector>
 #include <zlib.h>
@@ -68,7 +69,7 @@ extern std::string tiledb_bk_errmsg;
 
 
 /** Stores the book-keeping structures of a fragment. */
-class BookKeeping {
+class BookKeeping : public Buffer {
  public:
   /* ********************************* */
   /*     CONSTRUCTORS & DESTRUCTORS    */
@@ -280,13 +281,6 @@ class BookKeeping {
   std::vector<std::vector<size_t> > tile_var_sizes_;
 
 
-  /**
-   * Buffer Cache for holding book-keeping information until a load or finalize is completed.
-   */
-  void *buffer = nullptr;
-  int64_t buffer_size = 0;
-  int64_t buffer_offset = 0;
-
   /* ********************************* */
   /*           PRIVATE METHODS         */
   /* ********************************* */
@@ -374,26 +368,6 @@ class BookKeeping {
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
   int load_tile_var_sizes();
-
-  /**
-   * Reads data from the cached buffer into bytes.
-   * @param bytes The buffer into which the data will be written.
-   * @param length The size of the data to be read from the cached buffer.
-   */
-  int read_buffer(void *bytes, int64_t size);
-
-  /**
-   * Appends data from bytes into the cached buffer.
-   * @param bytes The buffer for the data.
-   * @param length The size of the data to be written into the cached buffer.
-   */
-  int write_buffer(void *bytes, int64_t size);
-
-  /**
-   * Frees the allocated cached buffer and reinitializes all associated varaibles.
-   */
-  void free_buffer();
-  
 };
 
 #endif
