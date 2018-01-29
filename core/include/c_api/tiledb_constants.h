@@ -95,7 +95,7 @@
 /**@}*/
 
 /** The maximum length for the names of TileDB objects. */
-#define TILEDB_NAME_MAX_LEN                        256
+#define TILEDB_NAME_MAX_LEN                        4096
 
 /** Size of the buffer used during consolidation. */
 #define TILEDB_CONSOLIDATION_BUFFER_SIZE      10000000 // ~10 MB
