@@ -1033,7 +1033,10 @@ int read_from_file_after_decompression(const std::string& filename, void** buffe
 }
 
 std::string real_dir(const std::string& dir) {
-  if (hdfs::is_hdfs()) {
+  if (hdfs::is_hdfs_path(dir)) {
+    //Absolute hdfs path, return as-is
+    return dir;
+  } else if (hdfs::is_hdfs()) {
     return hdfs::real_dir(dir);
   } else {
     return fs::real_dir(dir);

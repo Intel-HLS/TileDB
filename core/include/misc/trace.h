@@ -33,9 +33,12 @@
 #ifndef __TDB_TRACE_H__
 #define __TDB_TRACE_H__
 
+#include <sys/types.h>
+#include <sys/syscall.h>
+
 #ifdef TILEDB_TRACE
-#  define TRACE_FN std::cerr << "Trace - Function:" << __func__ << " File:" << __FILE__ << ":" << __LINE__ << "\n" << std::flush
-#  define TRACE_FN_ARG(X) std::cerr << "Trace - Function:" << __func__ <<  " File:" << __FILE__ << ":" << __LINE__ << " " << X << "\n" << std::flush
+#  define TRACE_FN std::cerr << "Trace - Function:" << __func__ << " File:" << __FILE__ << ":" << __LINE__ << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
+#  define TRACE_FN_ARG(X) std::cerr << "Trace - Function:" << __func__ <<  " File:" << __FILE__ << ":" << __LINE__ << " " << X << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
 #else
 #  define TRACE_FN
 #  define TRACE_FN_ARG(X)

@@ -933,14 +933,7 @@ int StorageManager::metadata_create(const ArraySchema* array_schema) const {
     return TILEDB_SM_ERR;
   }
 
-  // Open metadata schema file
   std::string filename = dir + "/" + TILEDB_METADATA_SCHEMA_FILENAME;
-  if (create_file(filename,  O_WRONLY | O_CREAT | O_SYNC, S_IRWXU) == TILEDB_UT_ERR) {
-    std::string errmsg = std::string("Cannot create metadata");
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
-  }
 
   // Serialize metadata schema
   void* array_schema_bin;
@@ -1384,53 +1377,22 @@ int StorageManager::array_clear(
     return TILEDB_SM_ERR;
   }
 
-  // Delete the entire array directory except for the array schema file
-  std::string filename; 
-  struct dirent *next_file;
-  DIR* dir = opendir(array_real.c_str());
-  
-  if(dir == NULL) {
-    std::string errmsg = 
-        std::string("Cannot open array directory; ") + 
-        strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
-  }
-
-  while((next_file = readdir(dir))) {
-    if(!strcmp(next_file->d_name, ".") ||
-       !strcmp(next_file->d_name, "..") ||
-       !strcmp(next_file->d_name, TILEDB_ARRAY_SCHEMA_FILENAME) ||
-       !strcmp(next_file->d_name, TILEDB_SM_CONSOLIDATION_FILELOCK_NAME))
-      continue;
-    filename = array_real + "/" + next_file->d_name;
-    if(is_metadata(filename)) {         // Metadata
-      metadata_delete(filename);
-    } else if(is_fragment(filename)){   // Fragment
-      if(delete_dir(filename) != TILEDB_UT_OK)
-        tiledb_sm_errmsg = tiledb_ut_errmsg;
-        return TILEDB_SM_ERR;
-    } else {                            // Non TileDB related
+  std::vector<std::string> all_dirs = ::get_dirs(array_real);
+  for(auto const& dir: all_dirs) {
+    if(is_metadata(dir)) {
+      metadata_delete(dir);
+    } else if(is_fragment(dir)) {
+      delete_dir(dir);
+    } else {
       std::string errmsg =
           std::string("Cannot delete non TileDB related element '") +
-          filename + "'";
+          dir + "'";
       PRINT_ERROR(errmsg);
       tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
       return TILEDB_SM_ERR;
     }
-  } 
-
-  // Close array directory  
-  if(closedir(dir)) {
-    std::string errmsg = 
-        std::string("Cannot close the array directory; ") + 
-        strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
   }
-
+  
   // Success
   return TILEDB_SM_OK;
 }
@@ -2000,52 +1962,22 @@ int StorageManager::group_clear(
   }
 
   // Delete all groups, arrays and metadata inside the group directory
-  std::string filename; 
-  struct dirent *next_file;
-  DIR* dir = opendir(group_real.c_str());
-  
-  if(dir == NULL) {
-    std::string errmsg = 
-        std::string("Cannot open group directory '") + 
-        group_real + "'; " + strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
-  }
-
-  while((next_file = readdir(dir))) {
-    if(!strcmp(next_file->d_name, ".") ||
-       !strcmp(next_file->d_name, "..") ||
-       !strcmp(next_file->d_name, TILEDB_GROUP_FILENAME))
-      continue;
-    filename = group_real + "/" + next_file->d_name;
-    if(is_group(filename)) {            // Group
-      if(group_delete(filename) != TILEDB_SM_OK)
-        return TILEDB_SM_ERR;
-    } else if(is_metadata(filename)) {  // Metadata
-      if(metadata_delete(filename) != TILEDB_SM_OK)
-        return TILEDB_SM_ERR;
-    } else if(is_array(filename)){      // Array
-      if(array_delete(filename) != TILEDB_SM_OK)
-        return TILEDB_SM_ERR;
+  std::vector<std::string> all_dirs = ::get_dirs(group_real);
+  for(auto const& dir: all_dirs) {
+    if(is_group(dir)) {
+      group_delete(dir);
+    } else if(is_metadata(dir)) {
+      metadata_delete(dir);
+    } else if(is_array(dir)){
+      array_delete(dir);
     } else {                            // Non TileDB related
       std::string errmsg = 
           std::string("Cannot delete non TileDB related element '") +
-          filename + "'";
+          dir + "'";
       PRINT_ERROR(errmsg);
       tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
       return TILEDB_SM_ERR;
     }
-  } 
-
-  // Close group directory  
-  if(closedir(dir)) {
-    std::string errmsg = 
-        std::string("Cannot close the group directory; ") + 
-        strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
   }
 
   // Success
@@ -2179,52 +2111,20 @@ int StorageManager::metadata_clear(
     return TILEDB_SM_ERR;
   }
 
-  // Delete the entire metadata directory except for the array schema file
-  std::string filename; 
-  struct dirent *next_file;
-  DIR* dir = opendir(metadata_real.c_str());
-  
-  if(dir == NULL) {
-    std::string errmsg = 
-        std::string("Cannot open metadata directory; ") + strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
-  }
-
-  while((next_file = readdir(dir))) {
-    if(!strcmp(next_file->d_name, ".") ||
-       !strcmp(next_file->d_name, "..") ||
-       !strcmp(next_file->d_name, TILEDB_METADATA_SCHEMA_FILENAME) ||
-       !strcmp(next_file->d_name, TILEDB_SM_CONSOLIDATION_FILELOCK_NAME))
-      continue;
-    filename = metadata_real + "/" + next_file->d_name;
-    if(is_fragment(filename)) {  // Fragment
-      if(delete_dir(filename) != TILEDB_UT_OK) {
-        tiledb_sm_errmsg = tiledb_ut_errmsg;
-        return TILEDB_SM_ERR;
-      }
-    } else {                     // Non TileDB related
-      std::string errmsg = 
+  std::vector<std::string> all_dirs = ::get_dirs(metadata_real);
+  for(auto const& dir: all_dirs) {
+    if(is_fragment(dir)) {
+      delete_dir(dir);
+    } else {
+      std::string errmsg =
           std::string("Cannot delete non TileDB related element '") +
-          filename + "'";
+          dir + "'";
       PRINT_ERROR(errmsg);
       tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
       return TILEDB_SM_ERR;
     }
-  } 
-
-  // Close metadata directory  
-  if(closedir(dir)) {
-    std::string errmsg = 
-        std::string("Cannot close the metadata directory; ") + 
-        strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
   }
 
-  // Success
   return TILEDB_SM_OK;
 }
 
@@ -2427,56 +2327,25 @@ void StorageManager::sort_fragment_names(
 
 int StorageManager::workspace_clear(const std::string& workspace) const {
   // Get real workspace path
-  std::string workspace_real = real_dir(workspace); 
+  std::string workspace_real = real_dir(workspace);
 
   // Delete all groups, arrays and metadata inside the workspace directory
-  std::string filename; 
-  struct dirent *next_file;
-  DIR* dir = opendir(workspace_real.c_str());
-  
-  if(dir == NULL) {
-    std::string errmsg = 
-        std::string("Cannot open workspace directory '") + 
-        workspace_real + "'; " + strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
-  }
-
-  while((next_file = readdir(dir))) {
-    if(!strcmp(next_file->d_name, ".") ||
-       !strcmp(next_file->d_name, "..") ||
-       !strcmp(next_file->d_name, TILEDB_WORKSPACE_FILENAME) ||
-       !strcmp(next_file->d_name, TILEDB_GROUP_FILENAME))
-      continue;
-    filename = workspace_real + "/" + next_file->d_name;
-    if(is_group(filename)) {            // Group
-      if(group_delete(filename) != TILEDB_SM_OK)
-        return TILEDB_SM_ERR;
-    } else if(is_metadata(filename)) {  // Metadata
-      if(metadata_delete(filename) != TILEDB_SM_OK)
-        return TILEDB_SM_ERR;
-    } else if(is_array(filename)){      // Array
-      if(array_delete(filename) != TILEDB_SM_OK)
-        return TILEDB_SM_ERR;
+  std::vector<std::string> all_dirs = ::get_dirs(workspace_real);
+  for(auto const& dir: all_dirs) {
+    if(is_group(dir)) {
+      group_delete(dir);
+    } else if(is_metadata(dir)) {
+      metadata_delete(dir);
+    } else if(is_array(dir)){
+      array_delete(dir);
     } else {                            // Non TileDB related
       std::string errmsg = 
           std::string("Cannot delete non TileDB related element '") +
-          filename + "'";
+          dir + "'";
       PRINT_ERROR(errmsg);
       tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
       return TILEDB_SM_ERR;
     }
-  } 
-
-  // Close workspace directory  
-  if(closedir(dir)) {
-    std::string errmsg = 
-        std::string("Cannot close the workspace directory; ") + 
-        strerror(errno);
-    PRINT_ERROR(errmsg);
-    tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
-    return TILEDB_SM_ERR;
   }
 
   // Success
