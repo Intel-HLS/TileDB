@@ -1,11 +1,9 @@
 /**
- * @file   trace.h
+ * @file tiledb_storage.h
  *
  * @section LICENSE
  *
  * The MIT License
- *
- * @copyright Copyright (c) 2018 UCLA. License pursuant to original Intel MIT license.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,22 +25,27 @@
  * 
  * @section DESCRIPTION
  *
- * Trace Macros if TILEDB_TRACE is defined
+ * Storage Prototypes to expose some of the filesystem functionality implemented in TileDB.
+ * The implementation is in tiledb.cc.
+ *
  */
 
-#ifndef __TDB_TRACE_H__
-#define __TDB_TRACE_H__
+#ifndef __TILEDB_STORAGE_H__
+#define  __TILEDB_STORAGE_H__
 
-#include <sys/syscall.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include "tiledb.h"
+#include <string>
 
-#ifdef TILEDB_TRACE
-#  define TRACE_FN std::cerr << "Trace - Function:" << __func__ << " File:" << __FILE__ << ":" << __LINE__ << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
-#  define TRACE_FN_ARG(X) std::cerr << "Trace - Function:" << __func__ <<  " File:" << __FILE__ << ":" << __LINE__ << " " << X << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
-#else
-#  define TRACE_FN
-#  define TRACE_FN_ARG(X)
-#endif
+bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string dir);
 
-#endif /*__TDB_TRACE_H__*/
+bool is_file(const TileDB_CTX* tiledb_ctx, const std::string file);
+
+std::string parent_dir(const TileDB_CTX* tiledb_ctx, const std::string path);
+
+size_t file_size(const TileDB_CTX* tiledb_ctx, const std::string file);
+
+int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length);
+
+int write_to_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size);
+
+#endif /*  __TILEDB_STORAGE_H__ */

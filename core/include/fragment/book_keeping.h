@@ -35,6 +35,7 @@
 
 #include "array_schema.h"
 #include "buffer.h"
+#include "storage_fs.h"
 #include "tiledb_constants.h"
 #include <vector>
 #include <zlib.h>
@@ -197,10 +198,11 @@ class BookKeeping : public Buffer {
 
   /**
    * Finalizes the book-keeping structures, properly flushing them to the disk.
+   * @param fs The Storage File System class.
    *
    * @return TILEDB_BK_OK on success and TILEDB_BK_ERR on error.
    */
-  int finalize();
+  int finalize(StorageFS *fs);
 
   /**
    * Initializes the book-keeping structures.
@@ -213,10 +215,11 @@ class BookKeeping : public Buffer {
 
   /**
    * Loads the book-keeping structures from the disk.
+   * @param fs The Storage File System class.
    *
    * @return TILEDB_BK_OK for success, and TILEDB_OK_ERR for error.
    */
-  int load();
+  int load(StorageFS *fs);
 
   /**
    * Simply sets the number of cells for the last tile.

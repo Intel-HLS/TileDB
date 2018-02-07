@@ -36,6 +36,7 @@
 #include "array_schema_c.h"
 #include "metadata_schema_c.h"
 #include "hilbert_curve.h"
+#include "storage_fs.h"
 #include <limits>
 #include <string>
 #include <typeinfo>
@@ -89,7 +90,7 @@ class ArraySchema {
   /* ********************************* */
 
   /** Constructor. */
-  ArraySchema();
+  ArraySchema(StorageFS *fs);
   
   /** Destructor. */
   ~ArraySchema();  
@@ -814,7 +815,8 @@ class ArraySchema {
   int compression_level;
   /** Array schema version **/
   unsigned version_tag_;
-
+  /** The Storage Filesystem */
+  StorageFS *fs_;
 
 
 

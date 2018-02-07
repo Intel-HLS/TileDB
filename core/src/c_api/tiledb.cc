@@ -39,6 +39,7 @@
 #include "expression.h"
 #endif
 #include "trace.h"
+#include "utils.h"
 
 #include <cassert>
 #include <cstring>
@@ -156,7 +157,7 @@ int tiledb_ctx_finalize(TileDB_CTX* tiledb_ctx) {
 /*          SANITY CHECKS         */
 /* ****************************** */
 
-bool sanity_check(const TileDB_CTX* tiledb_ctx) {
+inline bool sanity_check(const TileDB_CTX* tiledb_ctx) {
   if(tiledb_ctx == NULL || tiledb_ctx->storage_manager_ == NULL) {
     std::string errmsg = "Invalid TileDB context";
     PRINT_ERROR(errmsg);
@@ -167,7 +168,7 @@ bool sanity_check(const TileDB_CTX* tiledb_ctx) {
   }
 }
 
-bool sanity_check(const TileDB_Array* tiledb_array) {
+inline bool sanity_check(const TileDB_Array* tiledb_array) {
   if(tiledb_array == NULL) {
     std::string errmsg = "Invalid TileDB array";
     PRINT_ERROR(errmsg);
@@ -178,7 +179,7 @@ bool sanity_check(const TileDB_Array* tiledb_array) {
   }
 }
 
-bool sanity_check(const TileDB_ArrayIterator* tiledb_array_it) {
+inline bool sanity_check(const TileDB_ArrayIterator* tiledb_array_it) {
   if(tiledb_array_it == NULL) {
     std::string errmsg = "Invalid TileDB array iterator";
     PRINT_ERROR(errmsg);
@@ -189,7 +190,7 @@ bool sanity_check(const TileDB_ArrayIterator* tiledb_array_it) {
   }
 }
 
-bool sanity_check(const TileDB_Metadata* tiledb_metadata) {
+inline bool sanity_check(const TileDB_Metadata* tiledb_metadata) {
   if(tiledb_metadata == NULL) {
     std::string errmsg = "Invalid TileDB metadata";
     PRINT_ERROR(errmsg);
@@ -200,7 +201,7 @@ bool sanity_check(const TileDB_Metadata* tiledb_metadata) {
   }
 }
 
-bool sanity_check(const TileDB_MetadataIterator* tiledb_metadata_it) {
+inline bool sanity_check(const TileDB_MetadataIterator* tiledb_metadata_it) {
   if(tiledb_metadata_it == NULL) {
     std::string errmsg = "Invalid TileDB metadata iterator";
     PRINT_ERROR(errmsg);
@@ -1746,3 +1747,63 @@ void tiledb_array_set_zlib_compression_level(
 
   tiledb_array->array_->set_zlib_compression_level(level);
 }
+
+// Expose some filesystem functionality implemented in TileDB.
+inline bool sanity_check_fs(const TileDB_CTX* tiledb_ctx) {
+  if (tiledb_ctx && tiledb_ctx->storage_manager_
+      && tiledb_ctx->storage_manager_->get_config()
+      &&  tiledb_ctx->storage_manager_->get_config()->get_filesystem()) {
+    return true;
+  }
+
+  std::string errmsg = "TileDB configured incorrectly";
+  PRINT_ERROR(errmsg);
+  strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
+
+  return false;
+}
+
+bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string dir) {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return is_dir(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return false;
+}
+
+bool is_file(const TileDB_CTX* tiledb_ctx, std::string file) {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return is_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), file);
+  }
+  return false;
+}
+
+std::string parent_dir(const TileDB_CTX* tiledb_ctx, std::string path) {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return parent_dir(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), path);
+  }
+  return NULL;
+}
+
+size_t file_size(const TileDB_CTX* tiledb_ctx, std::string file) {
+  if (sanity_check_fs(tiledb_ctx)) {;
+    return file_size(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), file);
+  }
+  return 0;
+}
+
+int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length) {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return read_from_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, offset, buffer, length);
+  }
+  return TILEDB_ERR;
+}
+
+int write_to_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size) {
+  if (sanity_check(tiledb_ctx)) {
+    return write_to_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, buffer, buffer_size);
+  }
+  return TILEDB_ERR;
+}
+
+
+

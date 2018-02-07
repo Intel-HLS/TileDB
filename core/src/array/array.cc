@@ -402,7 +402,7 @@ int Array::consolidate(
   // Consolidate on a per-attribute basis
   for(int i=0; i<array_schema_->attribute_num()+1; ++i) {
     if(consolidate(new_fragment, i) != TILEDB_AR_OK) {
-      delete_dir(new_fragment->fragment_name());
+      delete_dir(config_->get_filesystem(), new_fragment->fragment_name());
       delete new_fragment;
       return TILEDB_AR_ERR;
     }
@@ -649,7 +649,7 @@ int Array::init(
     if(sparse                   && 
        array_clone == NULL      && 
        !coords_found            && 
-       !is_metadata(get_array_path_used()))
+       !is_metadata(config_->get_filesystem(), get_array_path_used()))
       attributes_vec.push_back(TILEDB_COORDS);
   }
 

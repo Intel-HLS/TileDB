@@ -241,13 +241,13 @@ void BookKeeping::append_tile_var_size(
  *     tile_var_sizes_attr#<attribute_num-1>_#2 (size_t) ...
  * last_tile_cell_num(int64_t)
  */
-int BookKeeping::finalize() {
+int BookKeeping::finalize(StorageFS *fs) {
   // Nothing to do in READ mode
   if(read_mode())
     return TILEDB_BK_OK;
 
   // Do nothing if the fragment directory does not exist (fragment empty) 
-  if(!is_dir(fragment_name_))
+  if(!is_dir(fs, fragment_name_))
     return TILEDB_BK_OK;
   
   // Write non-empty domain
@@ -283,7 +283,7 @@ int BookKeeping::finalize() {
                          TILEDB_BOOK_KEEPING_FILENAME + 
                          TILEDB_FILE_SUFFIX + TILEDB_GZIP_SUFFIX;
 
-  if(write_to_file_after_compression(filename.c_str(), get_buffer(), get_buffer_size(), TILEDB_GZIP) == TILEDB_UT_ERR) {
+  if(write_to_file_after_compression(fs, filename.c_str(), get_buffer(), get_buffer_size(), TILEDB_GZIP) == TILEDB_UT_ERR) {
     std::string errmsg =
         "Cannot finalize book-keeping; Failure to write to file " + filename;
     PRINT_ERROR(errmsg);
@@ -365,14 +365,14 @@ int BookKeeping::init(const void* non_empty_domain) {
  *     tile_var_sizes_attr#<attribute_num-1>_#2 (size_t) ...
  * last_tile_cell_num(int64_t)
  */
-int BookKeeping::load() {
+int BookKeeping::load(StorageFS *fs) {
   // Prepare file name
   std::string filename = fragment_name_ + "/" +
                          TILEDB_BOOK_KEEPING_FILENAME + 
                          TILEDB_FILE_SUFFIX + TILEDB_GZIP_SUFFIX;
 
   // Open book-keeping file
-  size_t size = file_size(filename);
+  size_t size = file_size(fs, filename);
   if (size <= 0) {
     std::string errmsg = "Cannot read book-keeping file; Filesize for " + filename + " is zero or undetermined";
     PRINT_ERROR(errmsg);
@@ -381,7 +381,7 @@ int BookKeeping::load() {
   }
 
   void *buf;
-  if (read_from_file_after_decompression(filename, &buf, size, TILEDB_GZIP) == TILEDB_UT_ERR) {
+  if (read_from_file_after_decompression(fs, filename, &buf, size, TILEDB_GZIP) == TILEDB_UT_ERR) {
     std::string errmsg = "Cannot read book-keeping file; Read failure for " + filename;
     PRINT_ERROR(errmsg);
     tiledb_bk_errmsg = TILEDB_BK_ERRMSG + errmsg;

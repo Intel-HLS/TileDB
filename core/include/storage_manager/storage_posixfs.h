@@ -1,11 +1,9 @@
 /**
- * @file   trace.h
+ * @file local_fs.h
  *
  * @section LICENSE
  *
  * The MIT License
- *
- * @copyright Copyright (c) 2018 UCLA. License pursuant to original Intel MIT license.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,22 +25,41 @@
  * 
  * @section DESCRIPTION
  *
- * Trace Macros if TILEDB_TRACE is defined
+ * LocalFS derived from StorageFS for Posix Filesystem
+ *
  */
 
-#ifndef __TDB_TRACE_H__
-#define __TDB_TRACE_H__
+#ifndef __STORAGE_POSIXFS_H__
+#define  __STORAGE_POSIXFS_H__
 
-#include <sys/syscall.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include "storage_fs.h"
 
-#ifdef TILEDB_TRACE
-#  define TRACE_FN std::cerr << "Trace - Function:" << __func__ << " File:" << __FILE__ << ":" << __LINE__ << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
-#  define TRACE_FN_ARG(X) std::cerr << "Trace - Function:" << __func__ <<  " File:" << __FILE__ << ":" << __LINE__ << " " << X << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
-#else
-#  define TRACE_FN
-#  define TRACE_FN_ARG(X)
-#endif
+class PosixFS : public StorageFS {
+ public:
+  std::string current_dir();
 
-#endif /*__TDB_TRACE_H__*/
+  bool is_dir(const std::string& dir);
+  bool is_file(const std::string& file);
+  std::string real_dir(const std::string& dir);
+               
+  int create_dir(const std::string& dir);
+  int delete_dir(const std::string& dir);
+  std::vector<std::string> get_dirs(const std::string& dir);
+  
+  int create_file(const std::string& filename, int flags, mode_t mode);
+  int delete_file(const std::string& filename);
+
+  size_t file_size(const std::string& filename);
+
+  int read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length);
+  int write_to_file(const std::string& filename, const void *buffer, size_t buffer_size);
+  
+  int move_path(const std::string& old_path, const std::string& new_path);
+    
+  int sync(const std::string& path);
+
+  bool consolidation_support();
+};
+
+#endif /* __STORAGE_POSIXFS_H__ */
+

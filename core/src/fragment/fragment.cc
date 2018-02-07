@@ -151,14 +151,15 @@ bool Fragment::write_mode() const {
 
 int Fragment::finalize() {
   if(write_state_ != NULL) {  // WRITE
+    StorageFS *fs = array_->config()->get_filesystem();
     assert(book_keeping_ != NULL);  
     int rc_ws = write_state_->finalize();
-    int rc_bk = book_keeping_->finalize();
+    int rc_bk = book_keeping_->finalize(fs);
     int rc_rn = TILEDB_FG_OK;
     int rc_cf = TILEDB_UT_OK;
-    if(is_dir(fragment_name_)) {
+    if(is_dir(fs, fragment_name_)) {
       rc_rn = rename_fragment();
-      rc_cf = create_fragment_file(fragment_name_);
+      rc_cf = create_fragment_file(fs, fragment_name_);
     }
     // Errors
     if(rc_ws != TILEDB_WS_OK) {
@@ -304,11 +305,13 @@ int Fragment::rename_fragment() {
   if(read_mode())
     return TILEDB_FG_OK;
 
-  std::string parent_dir = ::parent_dir(fragment_name_);
-  std::string new_fragment_name = parent_dir + "/" +
-                                  ::real_dir(fragment_name_).substr(parent_dir.size() + 2);
+  StorageFS *fs = array_->config()->get_filesystem();
 
-  if(move_path(fragment_name_, new_fragment_name) == TILEDB_UT_ERR) {
+  std::string parent_dir = ::parent_dir(fs, fragment_name_);
+  std::string new_fragment_name = parent_dir + "/" +
+      ::real_dir(fs, fragment_name_).substr(parent_dir.size() + 2);
+
+  if(move_path(fs, fragment_name_, new_fragment_name) == TILEDB_UT_ERR) {
     std::string errmsg = 
         std::string("Cannot rename fragment directory");
     PRINT_ERROR(errmsg);

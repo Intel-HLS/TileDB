@@ -144,6 +144,8 @@ WriteState::WriteState(
   // Initialize current bounding coordinates
   bounding_coords_ = malloc(2*coords_size);
 
+  fs_ = array_->config()->get_filesystem();
+  
   init_file_buffers();
 }
 
@@ -222,7 +224,7 @@ int WriteState::sync() {
         fragment_->fragment_name() + "/" + 
         array_schema->attribute(attribute_ids[i]) + TILEDB_FILE_SUFFIX;
     if(write_method == TILEDB_IO_WRITE) {
-      rc = ::sync(filename.c_str());
+      rc = ::sync(fs_, filename.c_str());
       // Handle error
       if(rc != TILEDB_UT_OK) {
         tiledb_ws_errmsg = tiledb_ut_errmsg;
@@ -254,7 +256,7 @@ int WriteState::sync() {
           array_schema->attribute(attribute_ids[i]) + "_var" + 
           TILEDB_FILE_SUFFIX;
       if(write_method == TILEDB_IO_WRITE) {
-        rc = ::sync(filename.c_str());
+        rc = ::sync(fs_, filename.c_str());
         // Handle error
         if(rc != TILEDB_UT_OK) {
           tiledb_ws_errmsg = tiledb_ut_errmsg;
@@ -290,7 +292,7 @@ int WriteState::sync() {
   // Sync fragment directory
   filename = fragment_->fragment_name();
   if(write_method == TILEDB_IO_WRITE) {
-    rc = ::sync(filename.c_str());
+    rc = ::sync(fs_, filename.c_str());
   } else if(write_method == TILEDB_IO_MPI) {
 #ifdef HAVE_MPI
     rc = mpi_io_sync(mpi_comm, filename.c_str());
@@ -329,7 +331,7 @@ int WriteState::sync_attribute(const std::string& attribute) {
   // Sync attribute
   filename = fragment_->fragment_name() + "/" + attribute + TILEDB_FILE_SUFFIX;
   if(write_method == TILEDB_IO_WRITE) {
-    rc = ::sync(filename.c_str());
+    rc = ::sync(fs_, filename.c_str());
   } else if(write_method == TILEDB_IO_MPI) {
 #ifdef HAVE_MPI
     rc = mpi_io_sync(mpi_comm, filename.c_str());
@@ -356,7 +358,7 @@ int WriteState::sync_attribute(const std::string& attribute) {
         fragment_->fragment_name() + "/" + 
         attribute + "_var" + TILEDB_FILE_SUFFIX;
     if(write_method == TILEDB_IO_WRITE) {
-      rc = ::sync(filename.c_str());
+      rc = ::sync(fs_, filename.c_str());
     } else if(write_method == TILEDB_IO_MPI) {
 #ifdef HAVE_MPI
       rc = mpi_io_sync(mpi_comm, filename.c_str());
@@ -381,7 +383,7 @@ int WriteState::sync_attribute(const std::string& attribute) {
   // Sync fragment directory
   filename = fragment_->fragment_name();
   if(write_method == TILEDB_IO_WRITE) {
-    rc = ::sync(filename.c_str());
+    rc = ::sync(fs_, filename.c_str());
   } else if(write_method == TILEDB_IO_MPI) {
 #ifdef HAVE_MPI
     rc = mpi_io_sync(mpi_comm, filename.c_str());
@@ -426,8 +428,8 @@ std::string WriteState::construct_filename(int attribute_id, bool is_var) {
   return filename;
 }
 
-int write_file(std::string filename, void *buffer, int64_t size) {
-  if (write_to_file(filename.c_str(), buffer, size) == TILEDB_UT_ERR) {
+int write_file(StorageFS *fs, std::string filename, void *buffer, int64_t size) {
+  if (write_to_file(fs, filename, buffer, size) == TILEDB_UT_ERR) {
     std::string errmsg = "Cannot write buffer to file " + filename;
     PRINT_ERROR(errmsg);
     return TILEDB_WS_ERR;
@@ -440,7 +442,7 @@ int WriteState::write_file_buffers() {
   for(int i=0; i<attribute_num_+1; ++i) {
     if (file_buffer_[i] != NULL) {
       if (!rc) {
-        rc = write_file(construct_filename(i, false), file_buffer_[i]->get_buffer(), file_buffer_[i]->get_buffer_size());
+        rc = write_file(fs_, construct_filename(i, false), file_buffer_[i]->get_buffer(), file_buffer_[i]->get_buffer_size());
       }
       delete file_buffer_[i];
       file_buffer_[i] = NULL;
@@ -448,7 +450,7 @@ int WriteState::write_file_buffers() {
     
     if (file_var_buffer_[i] != NULL) {
       if (!rc) {
-        rc = write_file(construct_filename(i, true).c_str(), file_var_buffer_[i]->get_buffer(), file_var_buffer_[i]->get_buffer_size());
+        rc = write_file(fs_, construct_filename(i, true), file_var_buffer_[i]->get_buffer(), file_var_buffer_[i]->get_buffer_size());
       }
       delete file_var_buffer_[i];
       file_var_buffer_[i] = NULL;
@@ -457,10 +459,10 @@ int WriteState::write_file_buffers() {
     
     // For variable length attributes, ensure an empty file exists even if there
     // are no valid values for querying.
-    if(!rc && array_schema_->var_size(i) && is_file(construct_filename(i, false))) {
+    if(!rc && array_schema_->var_size(i) && is_file(fs_, construct_filename(i, false))) {
       std::string filename = construct_filename(i, true);
-      if (!is_file(filename)) {
-        rc = create_file(filename.c_str(), O_WRONLY | O_CREAT | O_SYNC, S_IRWXU) == TILEDB_UT_ERR;
+      if (!is_file(fs_, filename)) {
+        rc = create_file(fs_, filename.c_str(), O_WRONLY | O_CREAT | O_SYNC, S_IRWXU) == TILEDB_UT_ERR;
         if (rc) {
           std::string errmsg = "Cannot create file " + filename;
           PRINT_ERROR(errmsg);
@@ -478,8 +480,9 @@ int WriteState::write_segment(int attribute_id, bool is_var, const void *segment
   // Construct the attribute file name
   std::string filename = construct_filename(attribute_id, is_var);
 
+  // Experimental buffered writes to cloud.
   // If file does not exist, use buffers and persist the buffer to the file during finalization. Otherwise, write to file directly.
-  if (!is_file(filename)) {
+  if (!is_file(fs_, filename) && is_hdfs_path(filename)) {
     Buffer *file_buffer;
     if (is_var) {
       assert((attribute_id < attribute_num_) && "Coords attribute cannot be variable");
@@ -511,7 +514,7 @@ int WriteState::write_segment(int attribute_id, bool is_var, const void *segment
   int rc;
   int write_method = array_->config()->write_method();
   if(write_method == TILEDB_IO_WRITE) {
-    rc = write_to_file(filename.c_str(), segment, length);
+    rc = write_to_file(fs_, filename.c_str(), segment, length);
   } else if(write_method == TILEDB_IO_MPI) {
 #ifdef HAVE_MPI
       rc = mpi_io_write_to_file(array_->config()->mpi_comm(), filename.c_str(), segment, length);
@@ -537,8 +540,8 @@ int WriteState::write_segment(int attribute_id, bool is_var, const void *segment
 int WriteState::write(const void** buffers, const size_t* buffer_sizes) {
   // Create fragment directory if it does not exist
   std::string fragment_name = fragment_->fragment_name();
-  if(!is_dir(fragment_name)) {
-    if(create_dir(fragment_name) != TILEDB_UT_OK) {
+  if(!is_dir(fs_, fragment_name)) {
+    if(create_dir(fs_, fragment_name) != TILEDB_UT_OK) {
       tiledb_ws_errmsg = tiledb_ut_errmsg;
       return TILEDB_WS_ERR;
     }

@@ -72,7 +72,7 @@ std::string tiledb_as_errmsg = "";
 /*   CONSTRUCTORS & DESTRUCTORS   */
 /* ****************************** */
 
-ArraySchema::ArraySchema() {
+ArraySchema::ArraySchema(StorageFS *fs) {
   cell_num_per_tile_ = -1;
   coords_for_hilbert_ = NULL;
   domain_ = NULL;
@@ -81,6 +81,7 @@ ArraySchema::ArraySchema() {
   tile_domain_ = NULL;
   tile_coords_aux_ = NULL;
   version_tag_ = TILEDB_ARRAY_SCHEMA_VERSION_TAG;
+  fs_ = fs;
 }
 
 ArraySchema::~ArraySchema() {
@@ -1286,13 +1287,13 @@ void ArraySchema::set_array_workspace(const char* array_workspace) {
   if(array_workspace)
   {
     // Get real array workspace
-    std::string array_workspace_real = real_dir(array_workspace);
+    std::string array_workspace_real = real_dir(fs_, array_workspace);
 
     // Set array workspace
     array_workspace_ = array_workspace_real;
   }
   else
-    array_workspace_ = current_dir();
+    array_workspace_ = current_dir(fs_);
 }
 
 void ArraySchema::set_array_name(const char* array_name) {

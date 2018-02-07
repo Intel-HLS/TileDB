@@ -234,38 +234,38 @@ int cmp_row_order(
   return 0;
 }
 
-int create_dir(const std::string& dir) {
+bool is_hdfs_path(const std::string& pathURL) {
+  if (!pathURL.empty() && (starts_with(pathURL, "hdfs://") || starts_with(pathURL, "s3://") || starts_with(pathURL, "gs://"))) {
+#ifdef USE_HDFS
+    return true;
+#else
+    assert(false && "HDFS functionality not enabled in TileDB, build with -DUSE_HDFS=1");
+#endif
+  } else {
+    return false;
+  }
+}
+
+int create_dir(StorageFS *fs, const std::string& dir) {
   TRACE_FN_ARG("Dir=" << dir);
-  if (hdfs::is_hdfs()) {
-    return hdfs::create_dir(dir);
-  } else {
-    return fs::create_dir(dir);
-  }
+  return fs->create_dir(dir);
 }
 
-int create_file(const std::string& filename, int flags, mode_t mode) {
+int create_file(StorageFS *fs, const std::string& filename, int flags, mode_t mode) {
   TRACE_FN_ARG("Filename=" << filename);
-  if (hdfs::is_hdfs()) {
-    return hdfs::create_file(filename, flags);
-  } else {
-    return fs::create_file(filename, flags, mode);
-  }
+  return fs->create_file(filename, flags, mode);
 }
 
-int delete_file(std::string& filename) {
+int delete_file(StorageFS *fs, std::string& filename) {
   TRACE_FN_ARG("Filename=" << filename);
-  if (hdfs::is_hdfs()) {
-    return hdfs::delete_file(filename);
-  } else {
-    return fs::delete_file(filename);
-  }
+  return fs->delete_file(filename);
 }
 
-int create_fragment_file(const std::string& dir) {
+int create_fragment_file(StorageFS *fs, const std::string& dir) {
   TRACE_FN_ARG("Dir=" << dir);
   // Create the special fragment file
   std::string filename = std::string(dir) + "/" + TILEDB_FRAGMENT_FILENAME;
-  if (create_file(filename, O_WRONLY | O_CREAT | O_SYNC,  S_IRWXU) == TILEDB_UT_ERR) {
+  if (fs->create_file(filename, O_WRONLY | O_CREAT | O_SYNC,  S_IRWXU) == TILEDB_UT_ERR) {
     std::string errmsg = 
         std::string("Failed to create fragment file; ") +
         strerror(errno);
@@ -278,22 +278,14 @@ int create_fragment_file(const std::string& dir) {
   return TILEDB_UT_OK;
 }
 
-int delete_dir(const std::string& dirname) {
+int delete_dir(StorageFS *fs, const std::string& dirname) {
   TRACE_FN_ARG("Dir=" << dirname);
-  if (hdfs::is_hdfs()) {
-    return hdfs::delete_dir(dirname);
-  } else {
-    return fs::delete_dir(dirname);
-  }
+  return fs->delete_dir(dirname);
 }
 
-int move_path(const std::string& old_path, const std::string& new_path) {
+int move_path(StorageFS *fs, const std::string& old_path, const std::string& new_path) {
   TRACE_FN_ARG("OldPath=" << old_path << " NewPath=" << new_path);
-  if(hdfs::is_hdfs()) {
-    return hdfs::move_path(old_path, new_path);
-  } else {
-    return fs::move_path(old_path, new_path);
-  }
+  return fs->move_path(old_path, new_path);
 }
 
 template<class T>
@@ -337,38 +329,26 @@ void expand_mbr(T* mbr, const T* coords, int dim_num) {
   }	
 } 
 
-size_t file_size(const std::string& filename) {
-  if (hdfs::is_hdfs()) {
-    return hdfs::file_size(filename);
-  } else {
-    return fs::file_size(filename);
-  }
+size_t file_size(StorageFS *fs, const std::string& filename) {
+  return fs->file_size(filename);
 }
 
-std::string current_dir() {
+std::string current_dir(StorageFS *fs) {
   TRACE_FN;
-  if (hdfs::is_hdfs()) {
-    return hdfs::current_dir();
-  } else {
-    return fs::current_dir();
-  }
+  return fs->current_dir();
 }
 
-std::vector<std::string> get_dirs(const std::string& dir) {
+std::vector<std::string> get_dirs(StorageFS *fs, const std::string& dir) {
   TRACE_FN_ARG("Dir=" << dir);
-  if (hdfs::is_hdfs()) {
-    return hdfs::get_dirs(dir);
-  } else {
-    return fs::get_dirs(dir);
-  }
+  return fs->get_dirs(dir);
 }
 
-std::vector<std::string> get_fragment_dirs(const std::string& dir) {
+std::vector<std::string> get_fragment_dirs(StorageFS *fs, const std::string& dir) {
   TRACE_FN_ARG("Dir=" << dir);
-  std::vector<std::string> dirs = get_dirs(dir);
+  std::vector<std::string> dirs = get_dirs(fs, dir);
   std::vector<std::string> fragment_dirs;
   for (auto const& dir: dirs) { 
-    if (is_fragment(dir)) {
+    if (is_fragment(fs, dir)) {
       fragment_dirs.push_back(dir);
     }
   }
@@ -562,10 +542,10 @@ bool intersect(const std::vector<T>& v1, const std::vector<T>& v2) {
   return intersect.size() != 0; 
 }
 
-bool is_array(const std::string& dir) {
+bool is_array(StorageFS *fs, const std::string& dir) {
   // Check existence
-  if(is_dir(dir) && 
-     is_file(dir + "/" + TILEDB_ARRAY_SCHEMA_FILENAME)) 
+  if(is_dir(fs, dir) && 
+     is_file(fs, dir + "/" + TILEDB_ARRAY_SCHEMA_FILENAME)) 
     return true;
   else
     return false;
@@ -583,47 +563,27 @@ bool is_contained(
   return true;
 }
 
-bool is_dir(const std::string& dir) {
-  if (hdfs::is_hdfs()) {
-    return hdfs::is_dir(dir);
-  } else {
-    return fs::is_dir(dir);
-  }
+bool is_dir(StorageFS *fs, const std::string& dir) {
+  return fs->is_dir(dir);
 }
 
-bool is_file(const std::string& file) {
-  if (hdfs::is_hdfs()) {
-    return hdfs::is_file(file);
-  } else {
-    return fs::is_file(file);
-  }
+bool is_file(StorageFS *fs, const std::string& file) {
+  return fs->is_file(file);
 }
 
-bool is_fragment(const std::string& dir) {
+bool is_fragment(StorageFS *fs, const std::string& dir) {
   // Check existence
-  if(is_dir(dir) &&
-     is_file(dir + "/" + TILEDB_FRAGMENT_FILENAME)) 
-    return true;
-  else
-    return false;
+  return fs->is_file(dir + '/' + TILEDB_FRAGMENT_FILENAME);
 }
 
-bool is_group(const std::string& dir) {
+bool is_group(StorageFS *fs, const std::string& dir) {
   // Check existence
-  if(is_dir(dir) && 
-     is_file(dir + "/" + TILEDB_GROUP_FILENAME)) 
-    return true;
-  else
-    return false;
+  return fs->is_file(dir + '/' + TILEDB_GROUP_FILENAME);
 }
 
-bool is_metadata(const std::string& dir) {
+bool is_metadata(StorageFS *fs, const std::string& dir) {
   // Check existence
-  if(is_dir(dir) && 
-     is_file(dir + "/" + TILEDB_METADATA_SCHEMA_FILENAME)) 
-    return true;
-  else
-    return false;
+  return fs->is_file(dir + '/' + TILEDB_METADATA_SCHEMA_FILENAME);
 }
 
 bool is_positive_integer(const char* s) {
@@ -656,13 +616,9 @@ bool is_unary_subarray(const T* subarray, int dim_num) {
   return true;
 }
 
-bool is_workspace(const std::string& dir) {
+bool is_workspace(StorageFS *fs, const std::string& dir) {
   // Check existence
-  if(is_dir(dir) && 
-     is_file(dir + "/" + TILEDB_WORKSPACE_FILENAME)) 
-    return true;
-  else
-    return false;
+  return fs->is_file(dir + '/' + TILEDB_WORKSPACE_FILENAME);
 }
 
 #ifdef HAVE_MPI
@@ -781,19 +737,20 @@ int mpi_io_write_to_file(
 }
 
 int mpi_io_sync(
+    StorageFS *fs,
     const MPI_Comm* mpi_comm,
     const char* filename) {
   // Open file
   MPI_File fh;
   int rc;
-  if(is_dir(filename))       // DIRECTORY
+  if(is_dir(fs, filename))       // DIRECTORY
     rc = MPI_File_open(
              *mpi_comm, 
               (char*) filename, 
               MPI_MODE_RDONLY, 
               MPI_INFO_NULL, 
               &fh);
-  else if(is_file(filename))  // FILE
+  else if(is_file(fs, filename))  // FILE
     rc = MPI_File_open(
              *mpi_comm, 
               (char*) filename, 
@@ -909,9 +866,9 @@ int mutex_unlock(pthread_mutex_t* mtx) {
   }
 }
 
-std::string parent_dir(const std::string& dir) {
+std::string parent_dir(StorageFS *fs, const std::string& dir) {
   // Get real dir
-  std::string real_dir = ::real_dir(dir);
+  std::string real_dir = fs->real_dir(dir);
 
   // Start from the end of the string
   int pos = real_dir.size() - 1;
@@ -927,22 +884,18 @@ std::string parent_dir(const std::string& dir) {
   return real_dir.substr(0, pos); 
 }
 
-int read_from_file(
+int read_from_file(StorageFS *fs,
     const std::string& filename,
     off_t offset,
     void* buffer,
     size_t length) {
-  if (hdfs::is_hdfs()) {
-    return hdfs::read_from_file(filename, offset, buffer, length);
-  } else {
-    return fs::read_from_file(filename, offset, buffer, length);
-  }
+  return fs->read_from_file(filename, offset, buffer, length);
 }
 
 #define windowBits 15
 #define GZIP_ENCODING 16
 
-int read_from_file_after_decompression(const std::string& filename, void** buffer, size_t &buffer_size, const int compression) {
+int read_from_file_after_decompression(StorageFS *fs, const std::string& filename, void** buffer, size_t &buffer_size, const int compression) {
   switch (compression) {
     case TILEDB_GZIP:
     case TILEDB_NO_COMPRESSION:
@@ -954,10 +907,10 @@ int read_from_file_after_decompression(const std::string& filename, void** buffe
       return TILEDB_UT_ERR;
   }
   
-  size_t size = file_size(filename);
+  size_t size = fs->file_size(filename);
   unsigned char *in = (unsigned char *)malloc(size);
 
-  if (read_from_file(filename, 0, in, size) == TILEDB_UT_ERR) {
+  if (fs->read_from_file(filename, 0, in, size) == TILEDB_UT_ERR) {
     free(in);
     std::string errmsg = std::string("Could not read from file");
     PRINT_ERROR(errmsg);
@@ -1032,15 +985,8 @@ int read_from_file_after_decompression(const std::string& filename, void** buffe
   return TILEDB_UT_OK;
 }
 
-std::string real_dir(const std::string& dir) {
-  if (hdfs::is_hdfs_path(dir)) {
-    //Absolute hdfs path, return as-is
-    return dir;
-  } else if (hdfs::is_hdfs()) {
-    return hdfs::real_dir(dir);
-  } else {
-    return fs::real_dir(dir);
-  }
+std::string real_dir(StorageFS *fs, const std::string& dir) {
+  return fs->real_dir(dir);
 }
 
 int64_t RLE_compress(
@@ -1684,31 +1630,24 @@ bool starts_with(const std::string& value, const std::string& prefix) {
   return std::equal(prefix.begin(), prefix.end(), value.begin());
 }
 
-int sync(const char* filename) {
-  if (hdfs::is_hdfs()) {
-    return hdfs::sync(filename);
-  } else {
-    return fs::sync(filename);
-  }
+int sync(StorageFS *fs, const char* filename) {
+  return fs->sync(filename);
 }
 
 int write_to_file(
-    const char* filename,
+    StorageFS *fs,
+    const std::string& filename,
     const void* buffer,
     size_t buffer_size) {
-  if (hdfs::is_hdfs()) {
-    return hdfs::write_to_file(filename, buffer, buffer_size);
-  } else {
-    return fs::write_to_file(filename, buffer, buffer_size);
-  }
+  return fs->write_to_file(filename, buffer, buffer_size);
 }
 
-int write_to_file_after_compression(const char* filename, const void* buffer, size_t buffer_size, const int compression) {
+int write_to_file_after_compression(StorageFS *fs, const std::string& filename, const void* buffer, size_t buffer_size, const int compression) {
   switch (compression) {
     case TILEDB_GZIP:
       break;
     case TILEDB_NO_COMPRESSION:
-      return write_to_file(filename, buffer, buffer_size);
+      return write_to_file(fs, filename, buffer, buffer_size);
     default:
       std::string errmsg = std::string("Compression type not supported");
       PRINT_ERROR(errmsg);
@@ -1752,7 +1691,7 @@ int write_to_file_after_compression(const char* filename, const void* buffer, si
     }
     
     have = TILEDB_GZIP_CHUNK_SIZE - strm.avail_out;
-    if (write_to_file(filename, (unsigned char *)out, have) == TILEDB_UT_ERR) {
+    if (write_to_file(fs, filename, (unsigned char *)out, have) == TILEDB_UT_ERR) {
       deflateEnd(&strm);
       std::string errmsg = std::string("Could not write compressed bytes to file");
       PRINT_ERROR(errmsg);
@@ -1764,18 +1703,18 @@ int write_to_file_after_compression(const char* filename, const void* buffer, si
   assert(strm.avail_in == 0);     /* all input is used */
   assert(rc == Z_STREAM_END);     /* stream is complete */
 
-  sync(filename);
+  fs->sync(filename);
 
   /* clean up and return */
   deflateEnd(&strm);
   return TILEDB_UT_OK;
 }
 
-int delete_directories(const std::vector<std::string>& directories)
+int delete_directories(StorageFS *fs, const std::vector<std::string>& directories)
 {
   // Delete old fragments
   for(auto i=0u; i<directories.size(); ++i) {
-    if(delete_dir(directories[i]) != TILEDB_UT_OK) {
+    if(fs->delete_dir(directories[i]) != TILEDB_UT_OK) {
       return TILEDB_UT_ERR;
     }
   }

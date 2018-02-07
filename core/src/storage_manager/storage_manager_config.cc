@@ -34,9 +34,9 @@
 
 #include "storage_manager_config.h"
 #include "tiledb_constants.h"
+#include "utils.h"
 
-
-
+#include <assert.h>
 
 /* ****************************** */
 /*   CONSTRUCTORS & DESTRUCTORS   */
@@ -53,10 +53,10 @@ StorageManagerConfig::StorageManagerConfig() {
 }
 
 StorageManagerConfig::~StorageManagerConfig() {
+  if (fs_ != NULL) {
+    delete fs_;
+  }
 }
-
-
-
 
 /* ****************************** */
 /*             MUTATORS           */
@@ -70,10 +70,20 @@ void StorageManagerConfig::init(
     int read_method,
     int write_method) {
   // Initialize home
-  if(home == NULL)
-    home_ = "";
-  else
-    home_ = home;
+   if (is_hdfs_path(home)) {
+     home_ = home;
+     fs_ = new HDFS(home);
+     read_method_ = TILEDB_IO_READ;
+     write_method_ = TILEDB_IO_WRITE;
+     return;
+   }
+   
+   fs_ = new PosixFS();
+   if(home == NULL) {
+     home_ = "";
+   } else {
+     home_ = home;
+   } 
 
 #ifdef HAVE_MPI
   // Initialize MPI communicator
@@ -93,8 +103,6 @@ void StorageManagerConfig::init(
      write_method_ != TILEDB_IO_MPI)
     write_method_ = TILEDB_IO_WRITE;  // Use default 
 }
-
-
 
 
 /* ****************************** */
@@ -117,4 +125,10 @@ int StorageManagerConfig::read_method() const {
 
 int StorageManagerConfig::write_method() const {
   return write_method_;
+}
+
+StorageFS* StorageManagerConfig::get_filesystem() const {
+  if (fs_ == NULL)
+    return new PosixFS();
+  return fs_;
 }

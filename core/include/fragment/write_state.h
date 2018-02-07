@@ -216,6 +216,9 @@ class WriteState {
   /** zlib compression level. */
   int zlib_compression_level_;
 
+  /** The Storage Filesystem */
+  StorageFS *fs_;
+
 
 
   /* ********************************* */

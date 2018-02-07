@@ -135,7 +135,11 @@ class StorageManager {
    */
   int init(StorageManagerConfig* config);
 
-
+  /** 
+   * Retrieve the configuration associated with the storage manager.
+   * @return pointer to StorageManagerConfig.
+   */
+  StorageManagerConfig* get_config();
 
 
   /* ********************************* */
@@ -553,6 +557,8 @@ class StorageManager {
 
   /** The TileDB configuration parameters. */
   StorageManagerConfig* config_;
+  /** The Filesystem associated with this configuration */
+  StorageFS* fs_;
   /** The directory of the master catalog. */
   std::string master_catalog_dir_;
   /** OpneMP mutex for creating/deleting an OpenArray object. */
