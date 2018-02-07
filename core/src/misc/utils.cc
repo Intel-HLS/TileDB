@@ -868,7 +868,12 @@ int mutex_unlock(pthread_mutex_t* mtx) {
 
 std::string parent_dir(StorageFS *fs, const std::string& dir) {
   // Get real dir
-  std::string real_dir = fs->real_dir(dir);
+  std::string real_dir;
+  if (fs == NULL) { // Allow fs to be NULL for support to parent_dir in tiledb_storage.h
+    real_dir = dir;
+  } else {
+    real_dir = fs->real_dir(dir);
+  }
 
   // Start from the end of the string
   int pos = real_dir.size() - 1;

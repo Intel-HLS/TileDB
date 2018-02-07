@@ -1763,6 +1763,42 @@ inline bool sanity_check_fs(const TileDB_CTX* tiledb_ctx) {
   return false;
 }
 
+bool is_workspace(TileDB_CTX* tiledb_ctx, const std::string dir) {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return is_workspace(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return false;
+}
+
+bool is_group(TileDB_CTX* tiledb_ctx, const std::string dir)  {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return is_group(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return false;
+}
+
+bool is_array(TileDB_CTX* tiledb_ctx, const std::string dir)  {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return is_array(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return false;
+}
+
+bool is_fragment(TileDB_CTX* tiledb_ctx, const std::string dir) {
+   if (sanity_check_fs(tiledb_ctx)) {
+    return is_fragment(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return false;
+}
+
+bool is_metadata(TileDB_CTX* tiledb_ctx, const std::string dir)  {
+  if (sanity_check_fs(tiledb_ctx)) {
+    return is_metadata(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return false;
+}
+
+
 bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string dir) {
   if (sanity_check_fs(tiledb_ctx)) {
     return is_dir(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
@@ -1777,11 +1813,8 @@ bool is_file(const TileDB_CTX* tiledb_ctx, std::string file) {
   return false;
 }
 
-std::string parent_dir(const TileDB_CTX* tiledb_ctx, std::string path) {
-  if (sanity_check_fs(tiledb_ctx)) {
-    return parent_dir(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), path);
-  }
-  return NULL;
+std::string parent_dir(std::string path) {
+  return parent_dir(NULL, path);
 }
 
 size_t file_size(const TileDB_CTX* tiledb_ctx, std::string file) {

@@ -36,11 +36,21 @@
 #include "tiledb.h"
 #include <string>
 
+bool is_workspace(TileDB_CTX* tiledb_ctx, const std::string dir);
+
+bool is_group(TileDB_CTX* tiledb_ctx, const std::string dir);
+
+bool is_array(TileDB_CTX* tiledb_ctx, const std::string dir);
+
+bool is_fragment(TileDB_CTX* tiledb_ctx, const std::string dir);
+
+bool is_metadata(TileDB_CTX* tiledb_ctx, const std::string dir);
+
 bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string dir);
 
 bool is_file(const TileDB_CTX* tiledb_ctx, const std::string file);
 
-std::string parent_dir(const TileDB_CTX* tiledb_ctx, const std::string path);
+std::string parent_dir(const std::string path);
 
 size_t file_size(const TileDB_CTX* tiledb_ctx, const std::string file);
 
