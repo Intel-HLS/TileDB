@@ -44,7 +44,7 @@ class HDFS : public StorageFS {
   hdfsFS hdfs_handle = NULL;
   char home_dir[TILEDB_NAME_MAX_LEN+1];
 
-  HDFS(const char *home);
+  HDFS(const std::string& home);
   ~HDFS();
 
   std::string current_dir();

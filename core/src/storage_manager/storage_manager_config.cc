@@ -72,7 +72,7 @@ void StorageManagerConfig::init(
   // Initialize home
    if (is_hdfs_path(home)) {
      home_ = home;
-     fs_ = new HDFS(home);
+     fs_ = new HDFS(home_);
      read_method_ = TILEDB_IO_READ;
      write_method_ = TILEDB_IO_WRITE;
      return;

@@ -41,6 +41,7 @@
 #include "trace.h"
 
 #include <iostream>
+#include <memory>
 
 #ifdef TILEDB_VERBOSE
 #  define PRINT_ERROR(x) std::cerr << TILEDB_FS_ERRMSG << "hdfs: " << x << std::endl
@@ -48,7 +49,7 @@
 #  define PRINT_ERROR(x) do { } while(0) 
 #endif
 
-HDFS::HDFS(const char *path) {
+HDFS::HDFS(const std::string& home) {
   struct hdfsBuilder *builder = hdfsNewBuilder();
   if (!builder) {
     assert(false && "Error getting new hdfs builder instance");
@@ -56,35 +57,44 @@ HDFS::HDFS(const char *path) {
 
   hdfsBuilderSetForceNewInstance(builder);
 
-  url path_url(path);
-  // protocol_nn needs to be valid in this scope. Moving it inside the if-else
-  // below will cause a subtle bug where protocol_nn goes out of scope
-  // by the time hdfsConnect tries to use protocol_nn
-  std::string protocol_nn = path_url.protocol()+"://"+path_url.host();
-  assert(!path_url.protocol().compare("hdfs") || !path_url.protocol().compare("s3") || !path_url.protocol().compare("gs"));
+  url path_url(home);
+  std::string name_node;
+  int16_t nport = 0;
+  assert((!path_url.protocol().compare("hdfs") || !path_url.protocol().compare("s3") || !path_url.protocol().compare("gs"))
+         && "Home URL not supported");
+
   if (path_url.host().empty()) {
     if (!path_url.port().empty()) {
-      std::string errmsg = std::string("path=") + path + " not supported. hdfs host and port have to be both empty";
-      assert(false && errmsg.c_str());
+      PRINT_ERROR(std::string("home=") + home + " not supported. hdfs host and port have to be both empty");
+      assert(false && "Home URL not supported: hdfs host and port have to be both empty");
     }
-    hdfsBuilderSetNameNode(builder, "default");
-  } else if(!path_url.protocol().compare("s3") || !path_url.protocol().compare("gs")) {
-    hdfsBuilderSetNameNode(builder, protocol_nn.c_str());
+    name_node.assign("default");
+  } else if(path_url.protocol().compare("hdfs") != 0) { // s3/gs protocols
+    name_node.assign(path_url.protocol() + "://" + path_url.host());
   } else {
     if (path_url.port().empty()) {
-      std::string errmsg = std::string("path=") + path + "not supported.hdfs host and port have to be specified together";
-      assert(false && errmsg.c_str());
+      PRINT_ERROR(std::string("home=") + home + "not supported.hdfs host and port have to be specified together");
+      assert(false && "Home URL not supported: hdfs host and port have to be specified together");
     }
-    hdfsBuilderSetNameNode(builder, path_url.host().c_str());
-    hdfsBuilderSetNameNodePort(builder, path_url.nport());
+    name_node.assign(path_url.host());
+    nport = path_url.nport();
   }
-
+  
+  hdfsBuilderSetNameNode(builder, name_node.c_str());
+  if (!path_url.port().empty()) {
+    hdfsBuilderSetNameNodePort(builder, nport);
+  }
+  
   hdfs_handle = hdfsBuilderConnect(builder);
   if (!hdfs_handle) {
     assert(false && "Error with hdfs builder connection");
   }
 
-  hdfsSetWorkingDirectory(hdfs_handle, path);
+  if (path_url.path().empty()) {
+    hdfsSetWorkingDirectory(hdfs_handle, "/");
+  } else {
+    hdfsSetWorkingDirectory(hdfs_handle, home.c_str());
+  }
   hdfsGetWorkingDirectory(hdfs_handle, home_dir, TILEDB_NAME_MAX_LEN);
 }
 
@@ -141,9 +151,10 @@ std::string HDFS::real_dir(const std::string& dir) {
   if (dir.empty()) {
     return current_dir();
   } else if (is_hdfs_path(dir)) {
+    // absolute path
     return dir;
   } else if (starts_with(dir, "/")) {
-    // seems to be an absolute path, but not supported
+    // seems to be an absolute path but without protocol/host information.
     print_errmsg(dir + ": Not a valid HDFS path");
     assert(false && "Not a valid HDFS path");
   } else {
