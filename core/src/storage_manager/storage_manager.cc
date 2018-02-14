@@ -121,7 +121,7 @@ int StorageManager::init(StorageManagerConfig* config) {
   }
   
   if(!is_dir(fs_, tiledb_home_)) { 
-    if(!->create_dir(fs_, tiledb_home_) != TILEDB_UT_OK) {
+    if(create_dir(fs_, tiledb_home_) != TILEDB_UT_OK) {
       tiledb_sm_errmsg = tiledb_ut_errmsg;
       return TILEDB_SM_ERR;
     }

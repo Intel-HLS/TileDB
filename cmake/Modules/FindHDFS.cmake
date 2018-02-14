@@ -77,7 +77,7 @@ endif()
 
 find_library(HDFS_SHARED_LIBRARY libhdfs.so PATHS ${HADOOP_HOME}/lib/native)
 if(NOT HDFS_SHARED_LIBRARY)
-  message(FATAL_ERROR "hdfs shared library could not be found")
+  message(STATUS "hdfs shared library could not be found, make sure to link in ${HDFS_STATIC_LIBRARY} explicitly")
   return()
 endif()
 
