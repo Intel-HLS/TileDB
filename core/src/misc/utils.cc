@@ -235,7 +235,7 @@ int cmp_row_order(
 }
 
 bool is_hdfs_path(const std::string& pathURL) {
-  if (!pathURL.empty() && (starts_with(pathURL, "hdfs://") || starts_with(pathURL, "s3://") || starts_with(pathURL, "gs://"))) {
+  if (!pathURL.empty() && (starts_with(pathURL, "hdfs:") || starts_with(pathURL, "s3:") || starts_with(pathURL, "gs:"))) {
 #ifdef USE_HDFS
     return true;
 #else
