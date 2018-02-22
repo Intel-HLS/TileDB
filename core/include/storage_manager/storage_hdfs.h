@@ -75,10 +75,16 @@ class HDFS : public StorageFS {
 
 #else
 
-class HDFS : public StorageFS {
-  HDFS(const char *home) {};
-};
+#include <assert.h>
 
+class HDFS : public StorageFS {
+ public:
+  HDFS(const std::string& home) {
+    assert(false && "HDFS functionality not enabled in TileDB, build with -DUSE_HDFS=1");
+  }
+  
+};
+  
 #endif
 
 
