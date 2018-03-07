@@ -40,8 +40,12 @@
 
 #include "trace.h"
 
+#include <cerrno>
+#include <cstring>
+#include <clocale>
 #include <iostream>
 #include <memory>
+#include <cstdlib>
 
 #ifdef TILEDB_VERBOSE
 #  define PRINT_ERROR(x) std::cerr << TILEDB_FS_ERRMSG << "hdfs: " << x << std::endl
@@ -60,6 +64,7 @@ HDFS::HDFS(const std::string& home) {
   url path_url(home);
   std::string name_node;
   int16_t nport = 0;
+
   assert((!path_url.protocol().compare("hdfs") || !path_url.protocol().compare("s3") || !path_url.protocol().compare("gs"))
          && "Home URL not supported");
 
@@ -69,7 +74,7 @@ HDFS::HDFS(const std::string& home) {
       assert(false && "Home URL not supported: hdfs host and port have to be both empty");
     }
     name_node.assign("default");
-  } else if(path_url.protocol().compare("hdfs") != 0) { // s3/gs protocols
+  } else if (path_url.protocol().compare("hdfs") != 0) { // s3/gs protocols
     name_node.assign(path_url.protocol() + "://" + path_url.host());
   } else {
     if (path_url.port().empty()) {
@@ -208,11 +213,11 @@ std::vector<std::string> HDFS::get_dirs(const std::string& dir) {
 int HDFS::create_file(const std::string& filename, int flags, mode_t mode) {
   hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_WRONLY, 0, 0, 0);
   if (!file) {
-    return print_errmsg(std::string("Cannot create file ") + filename + "; Open error");
+    return print_errmsg(std::string("Cannot create file ") + filename + "; Open error " + std::strerror(errno));
   }
     
   if (hdfsCloseFile(hdfs_handle, file)) {
-    return print_errmsg(std::string("Cannot create file ") + filename + "; Close error");
+    return print_errmsg(std::string("Cannot create file ") + filename + "; Close error " + std::strerror(errno));
   }
   
   return TILEDB_FS_OK;
@@ -275,7 +280,7 @@ static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer
   do {
     tSize bytes_read = hdfsRead(hdfs_handle, file, (void *)pbuf,  (length - nbytes) > max_bytes ? max_bytes : length - nbytes);
     if (bytes_read < 0) {
-      return print_errmsg(std::string("Error reading file"));
+      return print_errmsg(std::string("Error reading file. ") + std::strerror(errno));
     }
     nbytes += bytes_read;
     pbuf += bytes_read;
@@ -285,7 +290,7 @@ static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer
 }
 
 int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
-    TRACE_FN_ARG("filename:"<<std::string(filename) << " offset=" << offset << " length=" << length);
+    TRACE_FN_ARG("filename="<<std::string(filename) << " offset=" << offset << " length=" << length);
 
   // Workaround for error messages of the type -
   // readDirect: FSDataInputStream#read error:
@@ -298,26 +303,29 @@ int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer
   new_fd = open("/dev/null", O_WRONLY);
   dup2(new_fd, 2);
   close(new_fd);
+
+  size_t size = file_size(filename);
+
+#define MAX_SIZE 16*1024*1024
   
-  hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_RDONLY, length, 0, 0);
+  hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_RDONLY, size>MAX_SIZE?MAX_SIZE:size, 0, 0);
 
   fflush(stderr);
   dup2(old_fd, 2);
   close(old_fd);
 
   if (!file) {
-    std::string errmsg = std::string("Cannot open file ") + filename + " for read";
+    std::string errmsg = std::string("Cannot open file ") + filename + " for read " + std::strerror(errno);
     return print_errmsg(errmsg);
   }
 
   int rc = TILEDB_FS_OK;;
-  size_t size = file_size(filename);
   if(read_from_file_kernel(hdfs_handle, file, buffer, length>size?size:length, offset)) {
     rc = print_errmsg(std::string("Cannot read file ") + filename);
   }
 
   if (hdfsCloseFile(hdfs_handle, file)) {
-    rc = print_errmsg(std::string("Cannot close file ") + filename + " after read");
+    rc = print_errmsg(std::string("Cannot close file ") + filename + " after read " + std::strerror(errno));
   }
 
   return rc;
@@ -336,14 +344,14 @@ static int write_to_file_kernel(hdfsFS hdfs_handle, hdfsFile file, const void* b
   } while (nbytes < buffer_size);
     
   if (hdfsFlush(hdfs_handle, file)) {
-    return print_errmsg(std::string("Error flushing file"));
+    return print_errmsg(std::string("Error flushing file ") + std::strerror(errno));
   }
 
   return TILEDB_FS_OK;
 }
 
 int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t buffer_size) {
-  TRACE_FN_ARG("filename:"<<std::string(filename));;
+  TRACE_FN_ARG("filename:"<<std::string(filename));
   size_t max_bytes = max_tsize();
   if (max_bytes == 0) {
     return TILEDB_FS_ERR;
@@ -362,7 +370,7 @@ int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t 
   else {
     file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_WRONLY, max_bytes, 0, 0);
     if (!file) {
-      return print_errmsg(std::string("Cannot open file " + filename + " for write"));
+      return print_errmsg(std::string("Cannot open file " + filename + " for write. " + std::strerror(errno)));
     }
 
     if(write_to_file_kernel(hdfs_handle,file, buffer, buffer_size, max_bytes)) {
@@ -375,7 +383,7 @@ int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t 
   }
   
   if (hdfsCloseFile(hdfs_handle, file)) {
-    return print_errmsg(std::string("Cannot close file " + filename + " after write"));
+    return print_errmsg(std::string("Cannot close file " + filename + " after write " + std::strerror(errno)));
   }
 
   return rc;

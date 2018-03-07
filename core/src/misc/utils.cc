@@ -34,6 +34,7 @@
 #include "utils.h"
 #include "hdfs_utils.h"
 #include "fs_utils.h"
+#include "buffer.h"
 #include "trace.h"
 
 #include <algorithm>
@@ -1682,6 +1683,7 @@ int write_to_file_after_compression(StorageFS *fs, const std::string& filename, 
 
   /* run deflate() on input until output buffer not full, finish
      compression if all of source has been read in */
+  Buffer *gzip_buffer = new Buffer();
   int rc;
   do {
     strm.avail_out = TILEDB_GZIP_CHUNK_SIZE;
@@ -1696,9 +1698,9 @@ int write_to_file_after_compression(StorageFS *fs, const std::string& filename, 
     }
     
     have = TILEDB_GZIP_CHUNK_SIZE - strm.avail_out;
-    if (write_to_file(fs, filename, (unsigned char *)out, have) == TILEDB_UT_ERR) {
+    if (gzip_buffer->append_buffer(out, have) == TILEDB_BF_ERR) {
       deflateEnd(&strm);
-      std::string errmsg = std::string("Could not write compressed bytes to file");
+      std::string errmsg = std::string("Could not write compressed bytes to internal buffer");
       PRINT_ERROR(errmsg);
       tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
       return TILEDB_UT_ERR;
@@ -1708,10 +1710,17 @@ int write_to_file_after_compression(StorageFS *fs, const std::string& filename, 
   assert(strm.avail_in == 0);     /* all input is used */
   assert(rc == Z_STREAM_END);     /* stream is complete */
 
+  deflateEnd(&strm);
+
+  if (write_to_file(fs, filename, gzip_buffer->get_buffer(), gzip_buffer->get_buffer_size()) == TILEDB_UT_ERR) {
+    std::string errmsg = std::string("Could not write compressed bytes to internal buffer");
+    PRINT_ERROR(errmsg);
+    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+    return TILEDB_UT_ERR;
+  }
+
   fs->sync(filename);
 
-  /* clean up and return */
-  deflateEnd(&strm);
   return TILEDB_UT_OK;
 }
 

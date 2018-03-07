@@ -1735,7 +1735,7 @@ int StorageManager::consolidation_finalize(
     // Delete special fragment file inside the fragment directory
     std::string old_fragment_filename = 
         old_fragment_names[i] + "/" + TILEDB_FRAGMENT_FILENAME;
-    if(remove(old_fragment_filename.c_str())) {
+    if(delete_file(fs_, old_fragment_filename)) {
       std::string errmsg = 
           std::string("Cannot remove fragment file during "
           "finalizing consolidation; ") + strerror(errno);

@@ -305,6 +305,11 @@ int Fragment::rename_fragment() {
   if(read_mode())
     return TILEDB_FG_OK;
 
+  // No rename of fragment required for cloud based filenames
+  if (is_hdfs_path(fragment_name_)) {
+    return TILEDB_FG_OK;
+  }
+
   StorageFS *fs = array_->config()->get_filesystem();
 
   std::string parent_dir = ::parent_dir(fs, fragment_name_);

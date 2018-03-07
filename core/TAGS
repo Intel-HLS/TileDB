@@ -103,45 +103,46 @@ class ArrayReadState::PQFragmentCellRange 675,23161
 class ArrayReadState::SmallerPQFragmentCellRange 782,26684
   const ArraySchema* array_schema_;ArrayReadState::SmallerPQFragmentCellRange::array_schema_800,27193
 
-include/array/array_schema.h,2148
+include/array/array_schema.h,2193
 #define __ARRAY_SCHEMA_H__34,1316
-#define TILEDB_AS_KEY_DIM1_NAME 53,1672
-#define TILEDB_AS_KEY_DIM2_NAME 54,1718
-#define TILEDB_AS_KEY_DIM3_NAME 55,1764
-#define TILEDB_AS_KEY_DIM4_NAME 56,1810
-#define TILEDB_AS_OK 61,1893
-#define TILEDB_AS_ERR 62,1938
-#define TILEDB_AS_CAPACITY 66,2019
-#define TILEDB_AS_ERRMSG 69,2095
-class ArraySchema 85,2406
-  void* tile_coords_aux_;ArraySchema::tile_coords_aux_682,21968
-  std::string array_workspace_;ArraySchema::array_workspace_692,22183
-  std::string array_name_;ArraySchema::array_name_697,22324
-  std::vector<std::string> attributes_;ArraySchema::attributes_699,22381
-  int attribute_num_;ArraySchema::attribute_num_701,22456
-  int64_t capacity_;ArraySchema::capacity_705,22548
-  int64_t cell_num_per_tile_;ArraySchema::cell_num_per_tile_707,22648
-  int cell_order_;ArraySchema::cell_order_714,22825
-  std::vector<size_t> cell_sizes_;ArraySchema::cell_sizes_716,22919
-  std::vector<int> cell_val_num_;ArraySchema::cell_val_num_723,23229
-  std::vector<int> compression_;ArraySchema::compression_739,23699
-  int* coords_for_hilbert_;ArraySchema::coords_for_hilbert_741,23795
-  size_t coords_size_;ArraySchema::coords_size_743,23872
-  bool dense_;ArraySchema::dense_748,24038
-  std::vector<std::string> dimensions_;ArraySchema::dimensions_750,24083
-  int dim_num_;ArraySchema::dim_num_752,24158
-  void* domain_;ArraySchema::domain_758,24359
-  int hilbert_bits_;ArraySchema::hilbert_bits_763,24477
-  HilbertCurve* hilbert_curve_;ArraySchema::hilbert_curve_765,24552
-  void* tile_domain_;ArraySchema::tile_domain_771,24769
-  void* tile_extents_;ArraySchema::tile_extents_778,25096
-  std::vector<int64_t> tile_offsets_col_;ArraySchema::tile_offsets_col_783,25223
-  std::vector<int64_t> tile_offsets_row_;ArraySchema::tile_offsets_row_788,25366
-  int tile_order_;ArraySchema::tile_order_794,25530
-  std::vector<int> types_;ArraySchema::types_810,25967
-  std::vector<size_t> type_sizes_;ArraySchema::type_sizes_812,26074
-  int compression_level;ArraySchema::compression_level814,26160
-  unsigned version_tag_;ArraySchema::version_tag_816,26216
+#define TILEDB_AS_KEY_DIM1_NAME 54,1696
+#define TILEDB_AS_KEY_DIM2_NAME 55,1742
+#define TILEDB_AS_KEY_DIM3_NAME 56,1788
+#define TILEDB_AS_KEY_DIM4_NAME 57,1834
+#define TILEDB_AS_OK 62,1917
+#define TILEDB_AS_ERR 63,1962
+#define TILEDB_AS_CAPACITY 67,2043
+#define TILEDB_AS_ERRMSG 70,2119
+class ArraySchema 86,2430
+  void* tile_coords_aux_;ArraySchema::tile_coords_aux_683,22005
+  std::string array_workspace_;ArraySchema::array_workspace_693,22220
+  std::string array_name_;ArraySchema::array_name_698,22361
+  std::vector<std::string> attributes_;ArraySchema::attributes_700,22418
+  int attribute_num_;ArraySchema::attribute_num_702,22493
+  int64_t capacity_;ArraySchema::capacity_706,22585
+  int64_t cell_num_per_tile_;ArraySchema::cell_num_per_tile_708,22685
+  int cell_order_;ArraySchema::cell_order_715,22862
+  std::vector<size_t> cell_sizes_;ArraySchema::cell_sizes_717,22956
+  std::vector<int> cell_val_num_;ArraySchema::cell_val_num_724,23266
+  std::vector<int> compression_;ArraySchema::compression_740,23736
+  int* coords_for_hilbert_;ArraySchema::coords_for_hilbert_742,23832
+  size_t coords_size_;ArraySchema::coords_size_744,23909
+  bool dense_;ArraySchema::dense_749,24075
+  std::vector<std::string> dimensions_;ArraySchema::dimensions_751,24120
+  int dim_num_;ArraySchema::dim_num_753,24195
+  void* domain_;ArraySchema::domain_759,24396
+  int hilbert_bits_;ArraySchema::hilbert_bits_764,24514
+  HilbertCurve* hilbert_curve_;ArraySchema::hilbert_curve_766,24589
+  void* tile_domain_;ArraySchema::tile_domain_772,24806
+  void* tile_extents_;ArraySchema::tile_extents_779,25133
+  std::vector<int64_t> tile_offsets_col_;ArraySchema::tile_offsets_col_784,25260
+  std::vector<int64_t> tile_offsets_row_;ArraySchema::tile_offsets_row_789,25403
+  int tile_order_;ArraySchema::tile_order_795,25567
+  std::vector<int> types_;ArraySchema::types_811,26004
+  std::vector<size_t> type_sizes_;ArraySchema::type_sizes_813,26111
+  int compression_level;ArraySchema::compression_level815,26197
+  unsigned version_tag_;ArraySchema::version_tag_817,26253
+  StorageFS *fs_;ArraySchema::fs_819,26310
 
 include/array/array_schema_c.h,523
 #define __ARRAY_SCHEMA_C_H__34,1336
@@ -384,51 +385,54 @@ include/c_api/tiledb_constants.h,2739
 #define TILEDB_ARRAY 93,3160
 #define TILEDB_METADATA 94,3215
 #define TILEDB_NAME_MAX_LEN 98,3338
-#define TILEDB_CONSOLIDATION_BUFFER_SIZE 101,3447
-#define TILEDB_EMPTY_INT32 105,3554
-#define TILEDB_EMPTY_INT64 106,3609
-#define TILEDB_EMPTY_FLOAT32 107,3664
-#define TILEDB_EMPTY_FLOAT64 108,3719
-#define TILEDB_EMPTY_CHAR 109,3774
-#define TILEDB_VAR_NUM 114,3905
-#define TILEDB_VAR_SIZE 115,3960
-#define TILEDB_INT32 120,4050
-#define TILEDB_INT64 121,4105
-#define TILEDB_FLOAT32 122,4160
-#define TILEDB_FLOAT64 123,4215
-#define TILEDB_CHAR 124,4270
-#define TILEDB_ROW_MAJOR 129,4369
-#define TILEDB_COL_MAJOR 130,4424
-#define TILEDB_HILBERT 131,4479
-#define TILEDB_NO_COMPRESSION 136,4576
-#define TILEDB_GZIP 137,4631
-#define TILEDB_ZSTD 138,4686
-#define TILEDB_LZ4 139,4741
-#define TILEDB_BLOSC 140,4796
-#define TILEDB_BLOSC_LZ4 141,4851
-#define TILEDB_BLOSC_LZ4HC 142,4906
-#define TILEDB_BLOSC_SNAPPY 143,4961
-#define TILEDB_BLOSC_ZLIB 144,5016
-#define TILEDB_BLOSC_ZSTD 145,5071
-#define TILEDB_RLE 146,5126
-#define TILEDB_COORDS 151,5229
-#define TILEDB_KEY 152,5284
-#define TILEDB_FILE_SUFFIX 157,5396
-#define TILEDB_GZIP_SUFFIX 158,5451
-#define TILEDB_GZIP_CHUNK_SIZE 162,5556
-#define TILEDB_ARRAY_SCHEMA_FILENAME 166,5662
-#define TILEDB_METADATA_SCHEMA_FILENAME 167,5728
-#define TILEDB_BOOK_KEEPING_FILENAME 168,5794
-#define TILEDB_FRAGMENT_FILENAME 169,5860
-#define TILEDB_GROUP_FILENAME 170,5926
-#define TILEDB_WORKSPACE_FILENAME 171,5992
-#define TILEDB_SORTED_BUFFER_SIZE 176,6115
-#define TILEDB_SORTED_BUFFER_VAR_SIZE 177,6180
-#  define TILEDB_COMPRESSION_LEVEL_GZIP 183,6327
-#  define TILEDB_COMPRESSION_LEVEL_ZSTD 186,6439
-#  define TILEDB_COMPRESSION_LEVEL_BLOSC 189,6552
-    #define TILEDB_MAC_ADDRESS_INTERFACE 197,6756
-    #define TILEDB_MAC_ADDRESS_INTERFACE 201,6877
+#define TILEDB_CONSOLIDATION_BUFFER_SIZE 101,3448
+#define TILEDB_EMPTY_INT32 105,3555
+#define TILEDB_EMPTY_INT64 106,3610
+#define TILEDB_EMPTY_FLOAT32 107,3665
+#define TILEDB_EMPTY_FLOAT64 108,3720
+#define TILEDB_EMPTY_CHAR 109,3775
+#define TILEDB_VAR_NUM 114,3906
+#define TILEDB_VAR_SIZE 115,3961
+#define TILEDB_INT32 120,4051
+#define TILEDB_INT64 121,4106
+#define TILEDB_FLOAT32 122,4161
+#define TILEDB_FLOAT64 123,4216
+#define TILEDB_CHAR 124,4271
+#define TILEDB_ROW_MAJOR 129,4370
+#define TILEDB_COL_MAJOR 130,4425
+#define TILEDB_HILBERT 131,4480
+#define TILEDB_NO_COMPRESSION 136,4577
+#define TILEDB_GZIP 137,4632
+#define TILEDB_ZSTD 138,4687
+#define TILEDB_LZ4 139,4742
+#define TILEDB_BLOSC 140,4797
+#define TILEDB_BLOSC_LZ4 141,4852
+#define TILEDB_BLOSC_LZ4HC 142,4907
+#define TILEDB_BLOSC_SNAPPY 143,4962
+#define TILEDB_BLOSC_ZLIB 144,5017
+#define TILEDB_BLOSC_ZSTD 145,5072
+#define TILEDB_RLE 146,5127
+#define TILEDB_COORDS 151,5230
+#define TILEDB_KEY 152,5285
+#define TILEDB_FILE_SUFFIX 157,5397
+#define TILEDB_GZIP_SUFFIX 158,5452
+#define TILEDB_GZIP_CHUNK_SIZE 162,5557
+#define TILEDB_ARRAY_SCHEMA_FILENAME 166,5663
+#define TILEDB_METADATA_SCHEMA_FILENAME 167,5729
+#define TILEDB_BOOK_KEEPING_FILENAME 168,5795
+#define TILEDB_FRAGMENT_FILENAME 169,5861
+#define TILEDB_GROUP_FILENAME 170,5927
+#define TILEDB_WORKSPACE_FILENAME 171,5993
+#define TILEDB_SORTED_BUFFER_SIZE 176,6116
+#define TILEDB_SORTED_BUFFER_VAR_SIZE 177,6181
+#  define TILEDB_COMPRESSION_LEVEL_GZIP 183,6328
+#  define TILEDB_COMPRESSION_LEVEL_ZSTD 186,6440
+#  define TILEDB_COMPRESSION_LEVEL_BLOSC 189,6553
+    #define TILEDB_MAC_ADDRESS_INTERFACE 197,6757
+    #define TILEDB_MAC_ADDRESS_INTERFACE 201,6878
+
+include/c_api/tiledb_storage.h,38
+#define  __TILEDB_STORAGE_H__34,1349
 
 include/expressions/expression.h,569
 #define __EXPRESSION_H__34,1343
@@ -448,29 +452,38 @@ include/expressions/expression_c.h,131
 typedef struct ExpressionC 39,1434
   std::string expression_;ExpressionC::expression_40,1463
 
-include/fragment/book_keeping.h,1308
+include/fragment/book_keeping.h,1145
 #define __BOOK_KEEPING_H__34,1316
-#define TILEDB_BK_OK 50,1589
-#define TILEDB_BK_ERR 51,1621
-#define TILEDB_BK_ERRMSG 55,1692
-class BookKeeping 71,2025
-  const ArraySchema* array_schema_;BookKeeping::array_schema_237,6674
-  std::vector<void*> bounding_coords_;BookKeeping::bounding_coords_239,6764
-  bool dense_;BookKeeping::dense_241,6870
-  void* domain_;BookKeeping::domain_248,7205
-  std::string fragment_name_;BookKeeping::fragment_name_250,7285
-  int64_t last_tile_cell_num_;BookKeeping::last_tile_cell_num_252,7395
-  std::vector<void*> mbrs_;BookKeeping::mbrs_254,7503
-  int mode_;BookKeeping::mode_256,7588
-  std::vector<off_t> next_tile_offsets_;BookKeeping::next_tile_offsets_258,7659
-  std::vector<off_t> next_tile_var_offsets_;BookKeeping::next_tile_var_offsets_260,7767
-  void* non_empty_domain_;BookKeeping::non_empty_domain_265,7981
-  std::vector<std::vector<off_t> > tile_offsets_;BookKeeping::tile_offsets_270,8131
-  std::vector<std::vector<off_t> > tile_var_offsets_;BookKeeping::tile_var_offsets_275,8311
-  std::vector<std::vector<size_t> > tile_var_sizes_;BookKeeping::tile_var_sizes_280,8496
-  void *buffer BookKeeping::buffer286,8657
-  int64_t buffer_size BookKeeping::buffer_size287,8683
-  int64_t buffer_offset BookKeeping::buffer_offset288,8710
+#define TILEDB_BK_OK 52,1633
+#define TILEDB_BK_ERR 53,1665
+#define TILEDB_BK_ERRMSG 57,1736
+class BookKeeping 73,2069
+  const ArraySchema* array_schema_;BookKeeping::array_schema_241,6852
+  std::vector<void*> bounding_coords_;BookKeeping::bounding_coords_243,6942
+  bool dense_;BookKeeping::dense_245,7048
+  void* domain_;BookKeeping::domain_252,7383
+  std::string fragment_name_;BookKeeping::fragment_name_254,7463
+  int64_t last_tile_cell_num_;BookKeeping::last_tile_cell_num_256,7573
+  std::vector<void*> mbrs_;BookKeeping::mbrs_258,7681
+  int mode_;BookKeeping::mode_260,7766
+  std::vector<off_t> next_tile_offsets_;BookKeeping::next_tile_offsets_262,7837
+  std::vector<off_t> next_tile_var_offsets_;BookKeeping::next_tile_var_offsets_264,7945
+  void* non_empty_domain_;BookKeeping::non_empty_domain_269,8159
+  std::vector<std::vector<off_t> > tile_offsets_;BookKeeping::tile_offsets_274,8309
+  std::vector<std::vector<off_t> > tile_var_offsets_;BookKeeping::tile_var_offsets_279,8489
+  std::vector<std::vector<size_t> > tile_var_sizes_;BookKeeping::tile_var_sizes_284,8674
+
+include/fragment/buffer.h,411
+#define __BUFFER_H__32,1284
+#define TILEDB_BF_OK 43,1506
+#define TILEDB_BF_ERR 44,1536
+#define TILEDB_BF_ERRMSG 48,1605
+class Buffer 57,1870
+  void *buffer Buffer::buffer123,3805
+  int64_t buffer_size Buffer::buffer_size124,3828
+  int64_t buffer_offset Buffer::buffer_offset125,3855
+  int64_t allocated_buffer_size Buffer::allocated_buffer_size126,3884
+  bool read_only Buffer::read_only127,3921
 
 include/fragment/fragment.h,522
 #define __FRAGMENT_H__34,1305
@@ -486,7 +499,7 @@ class Fragment 78,2101
   ReadState* read_state_;Fragment::read_state_257,8253
   WriteState* write_state_;Fragment::write_state_259,8314
 
-include/fragment/read_state.h,3631
+include/fragment/read_state.h,3783
 #define __READ_STATE_H__34,1310
 #define TILEDB_RS_OK 51,1575
 #define TILEDB_RS_ERR 52,1606
@@ -508,58 +521,66 @@ class ReadState 75,2050
   int attribute_num_;ReadState::attribute_num_392,12539
   BookKeeping* book_keeping_;ReadState::book_keeping_394,12630
   size_t coords_size_;ReadState::coords_size_396,12704
-  bool done_;ReadState::done_398,12795
-  std::vector<int64_t> fetched_tile_;ReadState::fetched_tile_400,12883
-  const Fragment* fragment_;ReadState::fragment_402,12970
-  std::vector<bool> is_empty_attribute_;ReadState::is_empty_attribute_404,13063
-  void* last_tile_coords_;ReadState::last_tile_coords_409,13225
-  std::vector<void*> map_addr_;ReadState::map_addr_411,13332
-  std::vector<size_t> map_addr_lengths_;ReadState::map_addr_lengths_413,13428
-  void* map_addr_compressed_;ReadState::map_addr_compressed_415,13524
-  size_t map_addr_compressed_length_;ReadState::map_addr_compressed_length_417,13624
-  std::vector<void*> map_addr_var_;ReadState::map_addr_var_422,13766
-  std::vector<size_t> map_addr_var_lengths_;ReadState::map_addr_var_lengths_424,13870
-  int mbr_tile_overlap_;ReadState::mbr_tile_overlap_434,14259
-  std::vector<bool> overflow_;ReadState::overflow_436,14340
-  int search_tile_overlap_;ReadState::search_tile_overlap_445,14662
-  void* search_tile_overlap_subarray_;ReadState::search_tile_overlap_subarray_447,14767
-  int64_t search_tile_pos_;ReadState::search_tile_pos_449,14865
-  bool subarray_area_covered_;ReadState::subarray_area_covered_454,15018
-  void* tile_compressed_;ReadState::tile_compressed_456,15107
-  size_t tile_compressed_allocated_size_;ReadState::tile_compressed_allocated_size_458,15210
-  std::vector<off_t> tiles_file_offsets_;ReadState::tiles_file_offsets_460,15298
-  std::vector<off_t> tiles_var_file_offsets_;ReadState::tiles_var_file_offsets_462,15401
-  std::vector<void*> tiles_;ReadState::tiles_467,15571
-  std::vector<size_t> tiles_offsets_;ReadState::tiles_offsets_469,15656
-  int64_t tile_search_range_[ReadState::tile_search_range_474,15813
-  std::vector<size_t> tiles_sizes_;ReadState::tiles_sizes_476,15892
-  std::vector<void*> tiles_var_;ReadState::tiles_var_478,15986
-  std::vector<size_t> tiles_var_allocated_size_;ReadState::tiles_var_allocated_size_480,16081
-  std::vector<size_t> tiles_var_offsets_;ReadState::tiles_var_offsets_482,16190
-  std::vector<size_t> tiles_var_sizes_;ReadState::tiles_var_sizes_484,16282
-  void* tmp_coords_;ReadState::tmp_coords_486,16354
-  size_t tmp_offset_;ReadState::tmp_offset_488,16402
+  std::vector<Buffer *> file_buffer_;ReadState::file_buffer_399,12790
+  std::vector<Buffer *> file_var_buffer_;ReadState::file_var_buffer_400,12828
+  bool done_;ReadState::done_403,12941
+  std::vector<int64_t> fetched_tile_;ReadState::fetched_tile_405,13029
+  const Fragment* fragment_;ReadState::fragment_407,13116
+  std::vector<bool> is_empty_attribute_;ReadState::is_empty_attribute_409,13209
+  void* last_tile_coords_;ReadState::last_tile_coords_414,13371
+  std::vector<void*> map_addr_;ReadState::map_addr_416,13478
+  std::vector<size_t> map_addr_lengths_;ReadState::map_addr_lengths_418,13574
+  void* map_addr_compressed_;ReadState::map_addr_compressed_420,13670
+  size_t map_addr_compressed_length_;ReadState::map_addr_compressed_length_422,13770
+  std::vector<void*> map_addr_var_;ReadState::map_addr_var_427,13912
+  std::vector<size_t> map_addr_var_lengths_;ReadState::map_addr_var_lengths_429,14016
+  int mbr_tile_overlap_;ReadState::mbr_tile_overlap_439,14405
+  std::vector<bool> overflow_;ReadState::overflow_441,14486
+  int search_tile_overlap_;ReadState::search_tile_overlap_450,14808
+  void* search_tile_overlap_subarray_;ReadState::search_tile_overlap_subarray_452,14913
+  int64_t search_tile_pos_;ReadState::search_tile_pos_454,15011
+  bool subarray_area_covered_;ReadState::subarray_area_covered_459,15164
+  void* tile_compressed_;ReadState::tile_compressed_461,15253
+  size_t tile_compressed_allocated_size_;ReadState::tile_compressed_allocated_size_463,15356
+  std::vector<off_t> tiles_file_offsets_;ReadState::tiles_file_offsets_465,15444
+  std::vector<off_t> tiles_var_file_offsets_;ReadState::tiles_var_file_offsets_467,15547
+  std::vector<void*> tiles_;ReadState::tiles_472,15717
+  std::vector<size_t> tiles_offsets_;ReadState::tiles_offsets_474,15802
+  int64_t tile_search_range_[ReadState::tile_search_range_479,15959
+  std::vector<size_t> tiles_sizes_;ReadState::tiles_sizes_481,16038
+  std::vector<void*> tiles_var_;ReadState::tiles_var_483,16132
+  std::vector<size_t> tiles_var_allocated_size_;ReadState::tiles_var_allocated_size_485,16227
+  std::vector<size_t> tiles_var_offsets_;ReadState::tiles_var_offsets_487,16336
+  std::vector<size_t> tiles_var_sizes_;ReadState::tiles_var_sizes_489,16428
+  void* tmp_coords_;ReadState::tmp_coords_491,16500
+  size_t tmp_offset_;ReadState::tmp_offset_493,16548
 
-include/fragment/write_state.h,1132
+include/fragment/write_state.h,1507
 #define __WRITE_STATE_H__34,1313
 #define TILEDB_WS_OK 50,1579
 #define TILEDB_WS_ERR 51,1609
 #define TILEDB_WS_ERRMSG 55,1678
 class WriteState 77,2060
-  BookKeeping* book_keeping_;WriteState::book_keeping_172,5376
-  void* bounding_coords_;WriteState::bounding_coords_174,5485
-  std::vector<size_t> buffer_var_offsets_;WriteState::buffer_var_offsets_180,5695
-  const Fragment* fragment_;WriteState::fragment_182,5788
-  void* mbr_;WriteState::mbr_184,5873
-  std::vector<int64_t> tile_cell_num_;WriteState::tile_cell_num_186,5964
-  std::vector<void*> tiles_;WriteState::tiles_188,6062
-  std::vector<size_t> tiles_var_offsets_;WriteState::tiles_var_offsets_190,6147
-  std::vector<void*> tiles_var_;WriteState::tiles_var_192,6267
-  std::vector<size_t> tiles_var_sizes_;WriteState::tiles_var_sizes_197,6403
-  void* tile_compressed_;WriteState::tile_compressed_199,6501
-  size_t tile_compressed_allocated_size_;WriteState::tile_compressed_allocated_size_201,6604
-  std::vector<size_t> tile_offsets_;WriteState::tile_offsets_203,6713
-  int zlib_compression_level_;WriteState::zlib_compression_level_205,6783
+  const Array* array_;WriteState::array_172,5340
+  const ArraySchema* array_schema_;WriteState::array_schema_174,5390
+  int attribute_num_;WriteState::attribute_num_176,5471
+  BookKeeping* book_keeping_;WriteState::book_keeping_179,5576
+  void* bounding_coords_;WriteState::bounding_coords_181,5685
+  std::vector<Buffer *> file_buffer_;WriteState::file_buffer_184,5774
+  std::vector<Buffer *> file_var_buffer_;WriteState::file_var_buffer_185,5812
+  std::vector<size_t> buffer_var_offsets_;WriteState::buffer_var_offsets_192,6039
+  const Fragment* fragment_;WriteState::fragment_194,6132
+  void* mbr_;WriteState::mbr_196,6217
+  std::vector<int64_t> tile_cell_num_;WriteState::tile_cell_num_198,6308
+  std::vector<void*> tiles_;WriteState::tiles_200,6406
+  std::vector<size_t> tiles_var_offsets_;WriteState::tiles_var_offsets_202,6491
+  std::vector<void*> tiles_var_;WriteState::tiles_var_204,6611
+  std::vector<size_t> tiles_var_sizes_;WriteState::tiles_var_sizes_209,6747
+  void* tile_compressed_;WriteState::tile_compressed_211,6845
+  size_t tile_compressed_allocated_size_;WriteState::tile_compressed_allocated_size_213,6948
+  std::vector<size_t> tile_offsets_;WriteState::tile_offsets_215,7057
+  int zlib_compression_level_;WriteState::zlib_compression_level_217,7127
+  StorageFS *fs_;WriteState::fs_220,7191
 
 include/metadata/metadata.h,231
 #define __METADATA_H__34,1305
@@ -618,6 +639,12 @@ class SmallerRow 195,5384
   const T* buffer_;SmallerRow::buffer_229,6243
   int dim_num_;SmallerRow::dim_num_231,6294
 
+include/misc/fs_utils.h,31
+#define __FS_UTILS_H__34,1361
+
+include/misc/hdfs_utils.h,33
+#define __HDFS_UTILS_H__34,1345
+
 include/misc/hilbert_curve.h,225
 #define __HILBERT_CURVE_H__34,1323
 #define HC_MAX_DIM 54,1893
@@ -641,38 +668,39 @@ class ProgressBar 50,1749
   int max_length_;ProgressBar::max_length_101,3130
   double ratio_;ProgressBar::ratio_103,3197
 
-include/misc/utils.h,166
-#define __UTILS_H__34,1310
-#define TILEDB_UT_OK 55,1628
-#define TILEDB_UT_ERR 56,1659
-#define TILEDB_UT_ERRMSG 60,1729
-#define TILEDB_UT_MAX_WRITE_COUNT 63,1850
-
-include/misc/fs_utils.h,31
-#define __FS_UTILS_H__34,1334
-
 include/misc/trace.h,151
-#define __TDB_TRACE_H__34,1310
-#  define TRACE_FN 37,1355
-#  define TRACE_FN_ARG(38,1484
-#  define TRACE_FN40,1639
-#  define TRACE_FN_ARG(41,1658
+#define __TDB_TRACE_H__34,1336
+#  define TRACE_FN 41,1450
+#  define TRACE_FN_ARG(42,1618
+#  define TRACE_FN44,1812
+#  define TRACE_FN_ARG(45,1831
 
 include/misc/url.h,308
-#define URL_HH_ 34,1285
-struct url 37,1324
-  url(38,1337
-  std::string protocol_;url::protocol_52,1582
-  std::string host_;url::host_53,1607
-  std::string port_;url::port_54,1628
-  int16_t nport_ url::nport_55,1649
-  std::string path_;url::path_56,1671
-  std::string query_;url::query_57,1692
+#define URL_HH_ 34,1311
+struct url 37,1350
+  url(38,1363
+  std::string protocol_;url::protocol_52,1608
+  std::string host_;url::host_53,1633
+  std::string port_;url::port_54,1654
+  int16_t nport_ url::nport_55,1675
+  std::string path_;url::path_56,1697
+  std::string query_;url::query_57,1718
 
-include/misc/hdfs_utils.h,33
-#define __HDFS_UTILS_H__34,1318
+include/misc/utils.h,166
+#define __UTILS_H__34,1310
+#define TILEDB_UT_OK 57,1653
+#define TILEDB_UT_ERR 58,1684
+#define TILEDB_UT_ERRMSG 62,1754
+#define TILEDB_UT_MAX_WRITE_COUNT 65,1875
 
-include/storage_manager/storage_manager.h,1762
+include/storage_manager/storage_fs.h,154
+#define  __STORAGE_FS_H__33,1295
+#define TILEDB_FS_OK 40,1387
+#define TILEDB_FS_ERR 41,1418
+#define TILEDB_FS_ERRMSG 45,1488
+class StorageFS 55,1791
+
+include/storage_manager/storage_manager.h,1810
 #define __STORAGE_MANAGER_H__34,1328
 #define TILEDB_SM_OK 57,1829
 #define TILEDB_SM_ERR 58,1901
@@ -685,29 +713,43 @@ class StorageManager 93,2849
   enum MasterCatalogOp StorageManager::MasterCatalogOp100,3084
   enum MasterCatalogOp {TILEDB_SM_MC_INS,StorageManager::MasterCatalogOp::TILEDB_SM_MC_INS100,3084
   enum MasterCatalogOp {TILEDB_SM_MC_INS, TILEDB_SM_MC_DEL}StorageManager::MasterCatalogOp::TILEDB_SM_MC_DEL100,3084
-  StorageManagerConfig* config_;StorageManager::config_555,20140
-  std::string master_catalog_dir_;StorageManager::master_catalog_dir_557,20219
-  omp_lock_t open_array_omp_mtx_;StorageManager::open_array_omp_mtx_560,20338
-  pthread_mutex_t open_array_pthread_mtx_;StorageManager::open_array_pthread_mtx_563,20445
-  std::map<StorageManager::std::map565,20531
-  std::map<std::string, OpenArray*> open_arrays_;StorageManager::open_arrays_565,20531
-  std::string tiledb_home_;StorageManager::tiledb_home_567,20617
-class StorageManager::OpenArray 924,32577
-  ArraySchema* array_schema_;StorageManager::OpenArray::array_schema_929,32664
-  std::vector<BookKeeping*> book_keeping_;StorageManager::OpenArray::book_keeping_931,32767
-  int cnt_;StorageManager::OpenArray::cnt_936,32920
-  int consolidation_filelock_;StorageManager::OpenArray::consolidation_filelock_938,32984
-  std::vector<std::string> fragment_names_;StorageManager::OpenArray::fragment_names_940,33070
-  omp_lock_t omp_mtx_;StorageManager::OpenArray::omp_mtx_946,33272
-  pthread_mutex_t pthread_mtx_;StorageManager::OpenArray::pthread_mtx_952,33441
+  StorageManagerConfig* config_;StorageManager::config_559,20305
+  StorageFS* fs_;StorageManager::fs_561,20397
+  std::string master_catalog_dir_;StorageManager::master_catalog_dir_563,20461
+  omp_lock_t open_array_omp_mtx_;StorageManager::open_array_omp_mtx_566,20580
+  pthread_mutex_t open_array_pthread_mtx_;StorageManager::open_array_pthread_mtx_569,20687
+  std::map<StorageManager::std::map571,20773
+  std::map<std::string, OpenArray*> open_arrays_;StorageManager::open_arrays_571,20773
+  std::string tiledb_home_;StorageManager::tiledb_home_573,20859
+class StorageManager::OpenArray 930,32819
+  ArraySchema* array_schema_;StorageManager::OpenArray::array_schema_935,32906
+  std::vector<BookKeeping*> book_keeping_;StorageManager::OpenArray::book_keeping_937,33009
+  int cnt_;StorageManager::OpenArray::cnt_942,33162
+  int consolidation_filelock_;StorageManager::OpenArray::consolidation_filelock_944,33226
+  std::vector<std::string> fragment_names_;StorageManager::OpenArray::fragment_names_946,33312
+  omp_lock_t omp_mtx_;StorageManager::OpenArray::omp_mtx_952,33514
+  pthread_mutex_t pthread_mtx_;StorageManager::OpenArray::pthread_mtx_958,33683
 
-include/storage_manager/storage_manager_config.h,317
+include/storage_manager/storage_manager_config.h,370
 #define __CONFIG_H__34,1331
-class StorageManagerConfig 48,1517
-  std::string home_;StorageManagerConfig::home_145,4171
-  MPI_Comm* mpi_comm_;StorageManagerConfig::mpi_comm_148,4239
-  int read_method_;StorageManagerConfig::read_method_160,4551
-  int write_method_;StorageManagerConfig::write_method_169,4797
+class StorageManagerConfig 49,1594
+  std::string home_;StorageManagerConfig::home_149,4331
+  MPI_Comm* mpi_comm_;StorageManagerConfig::mpi_comm_152,4399
+  int read_method_;StorageManagerConfig::read_method_164,4711
+  int write_method_;StorageManagerConfig::write_method_173,4957
+  StorageFS *fs_ StorageManagerConfig::fs_176,5043
+
+include/storage_manager/storage_posixfs.h,62
+#define  __STORAGE_POSIXFS_H__33,1268
+class PosixFS 37,1325
+
+include/storage_manager/storage_hdfs.h,191
+#define  __STORAGE_HDFS_H__33,1250
+class HDFS 42,1370
+  hdfsFS hdfs_handle HDFS::hdfs_handle44,1411
+  char home_dir[HDFS::home_dir45,1440
+class HDFS 80,2391
+  HDFS(HDFS::HDFS82,2432
 
 src/array/array.cc,1674
 #  define PRINT_ERROR(49,1626
@@ -735,26 +777,26 @@ const void* Array::subarray(361,9274
 bool Array::write_mode(365,9335
 bool Array::filter_mode(369,9405
 int Array::consolidate(378,9590
-int Array::consolidate(420,10769
-int Array::finalize(499,12929
-int Array::init(575,14910
-int Array::reset_attributes(745,20317
-int Array::reset_subarray(791,21788
-int Array::reset_subarray_soft(893,24998
-int Array::sync(939,26205
-int Array::sync_attribute(960,26659
-int Array::write(981,27175
-int Array::write_default(1022,28282
-void Array::aio_handle_next_request(1068,29567
-void *Array::aio_handler(Array::aio_handler1146,32634
-int Array::aio_push_request(1155,32841
-int Array::aio_thread_create(1190,33723
-int Array::aio_thread_destroy(1210,34201
-std::string Array::new_fragment_name(1255,35457
-int Array::open_fragments(1295,36376
-void Array::set_zlib_compression_level(1317,37004
-void Array::free_array_schema(1323,37156
-const std::string& Array::get_array_path_used(1330,37263
+int Array::consolidate(420,10796
+int Array::finalize(499,12956
+int Array::init(575,14937
+int Array::reset_attributes(745,20371
+int Array::reset_subarray(791,21842
+int Array::reset_subarray_soft(893,25052
+int Array::sync(939,26259
+int Array::sync_attribute(960,26713
+int Array::write(981,27229
+int Array::write_default(1022,28336
+void Array::aio_handle_next_request(1068,29621
+void *Array::aio_handler(Array::aio_handler1146,32688
+int Array::aio_push_request(1155,32895
+int Array::aio_thread_create(1190,33777
+int Array::aio_thread_destroy(1210,34255
+std::string Array::new_fragment_name(1255,35511
+int Array::open_fragments(1295,36430
+void Array::set_zlib_compression_level(1317,37058
+void Array::free_array_schema(1323,37210
+const std::string& Array::get_array_path_used(1330,37317
 
 src/array/array_iterator.cc,409
 #  define PRINT_ERROR(43,1467
@@ -838,107 +880,107 @@ src/array/array_schema.cc,4965
 #define TILEDB_ARRAY_SCHEMA_MIN_VERSION_TAG 59,1917
 std::string tiledb_as_errmsg 66,2087
 ArraySchema::ArraySchema(75,2238
-ArraySchema::~ArraySchema(86,2494
-const std::string& ArraySchema::array_workspace(113,2976
-const std::string& ArraySchema::array_name(117,3064
-void ArraySchema::array_schema_export(121,3142
-void ArraySchema::array_schema_export(194,5655
-const std::string& ArraySchema::attribute(237,7289
-int ArraySchema::attribute_id(247,7602
-int ArraySchema::attribute_num(264,8029
-const std::vector<std::string>& ArraySchema::attributes(268,8098
-int64_t ArraySchema::capacity(272,8189
-int64_t ArraySchema::cell_num_per_tile(276,8252
-int ArraySchema::cell_order(283,8370
-size_t ArraySchema::cell_size(287,8433
-int ArraySchema::cell_val_num(295,8641
-int ArraySchema::compression(299,8738
-size_t ArraySchema::coords_size(310,9063
-int ArraySchema::coords_type(314,9131
-bool ArraySchema::dense(318,9206
-int ArraySchema::dim_num(322,9260
-const void* ArraySchema::domain(326,9317
-int ArraySchema::get_attribute_ids(330,9380
-bool ArraySchema::is_contained_in_tile_slab_col(357,10080
-bool ArraySchema::is_contained_in_tile_slab_row(370,10687
-void ArraySchema::print(383,11294
-int ArraySchema::serialize(594,19790
-int ArraySchema::subarray_overlap(721,24304
-const void* ArraySchema::tile_domain(780,25854
-const void* ArraySchema::tile_extents(784,25927
-int64_t ArraySchema::tile_num(788,26002
-int64_t ArraySchema::tile_num(805,26474
-int64_t ArraySchema::tile_num(817,26790
-int64_t ArraySchema::tile_num(835,27344
-int ArraySchema::tile_order(851,27783
-int64_t ArraySchema::tile_slab_col_cell_num(855,27846
-int64_t ArraySchema::tile_slab_row_cell_num(869,28486
-int ArraySchema::type(884,29127
-size_t ArraySchema::type_size(895,29408
-int ArraySchema::var_attribute_num(901,29521
-bool ArraySchema::var_size(910,29712
-int ArraySchema::deserialize(947,30744
-int ArraySchema::init(1116,36575
-int ArraySchema::init(1178,38431
-void ArraySchema::set_array_workspace(1285,42427
-void ArraySchema::set_array_name(1298,42745
-int ArraySchema::set_attributes(1312,43164
-void ArraySchema::set_capacity(1362,44604
-void ArraySchema::set_cell_val_num(1372,44791
-int ArraySchema::set_cell_order(1382,45063
-int ArraySchema::set_compression(1398,45492
-void ArraySchema::set_dense(1429,46594
-int ArraySchema::set_dimensions(1433,46656
-int ArraySchema::set_domain(1480,47991
-int ArraySchema::set_tile_extents(1558,50475
-int ArraySchema::set_tile_order(1585,51195
-int ArraySchema::set_types(1600,51587
-int ArraySchema::cell_order_cmp(1660,53255
-void ArraySchema::expand_domain(1706,54483
-void ArraySchema::expand_domain(1714,54763
-int64_t ArraySchema::get_cell_pos(1733,55347
-void ArraySchema::get_next_cell_coords(1757,56074
-void ArraySchema::get_next_tile_coords(1774,56563
-void ArraySchema::get_previous_cell_coords(1790,56988
-void ArraySchema::get_subarray_tile_domain(1806,57425
-int64_t ArraySchema::get_tile_pos(1834,58292
-int64_t ArraySchema::get_tile_pos(1853,58869
-void ArraySchema::get_tile_subarray(1874,59488
-int64_t ArraySchema::hilbert_id(1889,59951
-int ArraySchema::tile_cell_order_cmp(1906,60368
-int64_t ArraySchema::tile_id(1920,60671
-int ArraySchema::tile_order_cmp(1941,61210
-int ArraySchema::tile_order_cmp(1997,62846
-int ArraySchema::tile_order_cmp(2053,64521
-int ArraySchema::tile_order_cmp(2121,66465
-size_t ArraySchema::compute_bin_size(2218,69324
-void ArraySchema::compute_cell_num_per_tile(2257,70538
-void ArraySchema::compute_cell_num_per_tile(2273,70956
-size_t ArraySchema::compute_cell_size(2281,71174
-void ArraySchema::compute_hilbert_bits(2318,72278
-void ArraySchema::compute_tile_domain(2333,72681
-void ArraySchema::compute_tile_domain(2349,73148
-void ArraySchema::compute_tile_offsets(2373,73813
-void ArraySchema::compute_tile_offsets(2389,74348
-size_t ArraySchema::compute_type_size(2417,75315
-int64_t ArraySchema::get_cell_pos_col(2438,75868
-int64_t ArraySchema::get_cell_pos_row(2466,76685
-void ArraySchema::get_next_cell_coords_col(2495,77562
-void ArraySchema::get_next_cell_coords_row(2514,77985
-void ArraySchema::get_previous_cell_coords_col(2533,78399
-void ArraySchema::get_previous_cell_coords_row(2546,78674
-void ArraySchema::get_next_tile_coords_col(2559,78949
-void ArraySchema::get_next_tile_coords_row(2572,79220
-int64_t ArraySchema::get_tile_pos_col(2585,79491
-int64_t ArraySchema::get_tile_pos_col(2596,79733
-int64_t ArraySchema::get_tile_pos_row(2622,80411
-int64_t ArraySchema::get_tile_pos_row(2633,80653
-void ArraySchema::init_hilbert_curve(2659,81376
-bool ArraySchema::is_contained_in_tile_slab_col(2683,82164
-bool ArraySchema::is_contained_in_tile_slab_row(2702,82762
-int64_t ArraySchema::tile_slab_col_cell_num(2721,83357
-int64_t ArraySchema::tile_slab_row_cell_num(2741,83956
-bool ArraySchema::version_tag_exists(2758,84458
+ArraySchema::~ArraySchema(87,2519
+const std::string& ArraySchema::array_workspace(114,3001
+const std::string& ArraySchema::array_name(118,3089
+void ArraySchema::array_schema_export(122,3167
+void ArraySchema::array_schema_export(195,5680
+const std::string& ArraySchema::attribute(238,7314
+int ArraySchema::attribute_id(248,7627
+int ArraySchema::attribute_num(265,8054
+const std::vector<std::string>& ArraySchema::attributes(269,8123
+int64_t ArraySchema::capacity(273,8214
+int64_t ArraySchema::cell_num_per_tile(277,8277
+int ArraySchema::cell_order(284,8395
+size_t ArraySchema::cell_size(288,8458
+int ArraySchema::cell_val_num(296,8666
+int ArraySchema::compression(300,8763
+size_t ArraySchema::coords_size(311,9088
+int ArraySchema::coords_type(315,9156
+bool ArraySchema::dense(319,9231
+int ArraySchema::dim_num(323,9285
+const void* ArraySchema::domain(327,9342
+int ArraySchema::get_attribute_ids(331,9405
+bool ArraySchema::is_contained_in_tile_slab_col(358,10105
+bool ArraySchema::is_contained_in_tile_slab_row(371,10712
+void ArraySchema::print(384,11319
+int ArraySchema::serialize(595,19815
+int ArraySchema::subarray_overlap(722,24329
+const void* ArraySchema::tile_domain(781,25879
+const void* ArraySchema::tile_extents(785,25952
+int64_t ArraySchema::tile_num(789,26027
+int64_t ArraySchema::tile_num(806,26499
+int64_t ArraySchema::tile_num(818,26815
+int64_t ArraySchema::tile_num(836,27369
+int ArraySchema::tile_order(852,27808
+int64_t ArraySchema::tile_slab_col_cell_num(856,27871
+int64_t ArraySchema::tile_slab_row_cell_num(870,28511
+int ArraySchema::type(885,29152
+size_t ArraySchema::type_size(896,29433
+int ArraySchema::var_attribute_num(902,29546
+bool ArraySchema::var_size(911,29737
+int ArraySchema::deserialize(948,30769
+int ArraySchema::init(1117,36600
+int ArraySchema::init(1179,38456
+void ArraySchema::set_array_workspace(1286,42452
+void ArraySchema::set_array_name(1299,42778
+int ArraySchema::set_attributes(1313,43197
+void ArraySchema::set_capacity(1363,44637
+void ArraySchema::set_cell_val_num(1373,44824
+int ArraySchema::set_cell_order(1383,45096
+int ArraySchema::set_compression(1399,45525
+void ArraySchema::set_dense(1430,46627
+int ArraySchema::set_dimensions(1434,46689
+int ArraySchema::set_domain(1481,48024
+int ArraySchema::set_tile_extents(1559,50508
+int ArraySchema::set_tile_order(1586,51228
+int ArraySchema::set_types(1601,51620
+int ArraySchema::cell_order_cmp(1661,53288
+void ArraySchema::expand_domain(1707,54516
+void ArraySchema::expand_domain(1715,54796
+int64_t ArraySchema::get_cell_pos(1734,55380
+void ArraySchema::get_next_cell_coords(1758,56107
+void ArraySchema::get_next_tile_coords(1775,56596
+void ArraySchema::get_previous_cell_coords(1791,57021
+void ArraySchema::get_subarray_tile_domain(1807,57458
+int64_t ArraySchema::get_tile_pos(1835,58325
+int64_t ArraySchema::get_tile_pos(1854,58902
+void ArraySchema::get_tile_subarray(1875,59521
+int64_t ArraySchema::hilbert_id(1890,59984
+int ArraySchema::tile_cell_order_cmp(1907,60401
+int64_t ArraySchema::tile_id(1921,60704
+int ArraySchema::tile_order_cmp(1942,61243
+int ArraySchema::tile_order_cmp(1998,62879
+int ArraySchema::tile_order_cmp(2054,64554
+int ArraySchema::tile_order_cmp(2122,66498
+size_t ArraySchema::compute_bin_size(2219,69357
+void ArraySchema::compute_cell_num_per_tile(2258,70571
+void ArraySchema::compute_cell_num_per_tile(2274,70989
+size_t ArraySchema::compute_cell_size(2282,71207
+void ArraySchema::compute_hilbert_bits(2319,72311
+void ArraySchema::compute_tile_domain(2334,72714
+void ArraySchema::compute_tile_domain(2350,73181
+void ArraySchema::compute_tile_offsets(2374,73846
+void ArraySchema::compute_tile_offsets(2390,74381
+size_t ArraySchema::compute_type_size(2418,75348
+int64_t ArraySchema::get_cell_pos_col(2439,75901
+int64_t ArraySchema::get_cell_pos_row(2467,76718
+void ArraySchema::get_next_cell_coords_col(2496,77595
+void ArraySchema::get_next_cell_coords_row(2515,78018
+void ArraySchema::get_previous_cell_coords_col(2534,78432
+void ArraySchema::get_previous_cell_coords_row(2547,78707
+void ArraySchema::get_next_tile_coords_col(2560,78982
+void ArraySchema::get_next_tile_coords_row(2573,79253
+int64_t ArraySchema::get_tile_pos_col(2586,79524
+int64_t ArraySchema::get_tile_pos_col(2597,79766
+int64_t ArraySchema::get_tile_pos_row(2623,80444
+int64_t ArraySchema::get_tile_pos_row(2634,80686
+void ArraySchema::init_hilbert_curve(2660,81409
+bool ArraySchema::is_contained_in_tile_slab_col(2684,82197
+bool ArraySchema::is_contained_in_tile_slab_row(2703,82795
+int64_t ArraySchema::tile_slab_col_cell_num(2722,83390
+int64_t ArraySchema::tile_slab_row_cell_num(2742,83989
+bool ArraySchema::version_tag_exists(2759,84491
 
 src/array/array_sorted_read_state.cc,6187
 #  define PRINT_ERROR(47,1571
@@ -1115,91 +1157,103 @@ void ArraySortedWriteState::update_current_tile_and_offset(1776,55722
 int ArraySortedWriteState::wait_aio(1795,56218
 int ArraySortedWriteState::wait_copy(1818,56781
 
-src/c_api/tiledb.cc,3502
-#  define PRINT_ERROR(52,1696
-#  define PRINT_ERROR(54,1769
-char tiledb_errmsg[tiledb_errmsg64,1934
-int g_TileDB_enable_SYNC_write 67,2036
-int g_TileDB_compression_level 70,2122
-typedef struct TileDB_CTX 77,2272
-  StorageManager* storage_manager_;TileDB_CTX::storage_manager_78,2300
-} TileDB_CTX;79,2336
-int tiledb_ctx_init(81,2351
-int tiledb_ctx_finalize(126,3581
-bool sanity_check(159,4201
-bool sanity_check(170,4508
-bool sanity_check(181,4779
-bool sanity_check(192,5073
-bool sanity_check(203,5356
-int tiledb_workspace_create(221,5777
-int tiledb_group_create(256,6607
-typedef struct TileDB_Array 290,7387
-  Array* array_;TileDB_Array::array_291,7417
-  const TileDB_CTX* tiledb_ctx_;TileDB_Array::tiledb_ctx_292,7434
-} TileDB_Array;293,7467
-typedef struct TileDB_Expression 296,7520
-  Expression* expression_;TileDB_Expression::expression_297,7555
-} TileDB_Expression;298,7582
-int tiledb_array_set_schema(301,7611
-int tiledb_array_create(426,11627
-int tiledb_array_init(463,12955
-int tiledb_array_reset_subarray(510,14135
-int tiledb_array_reset_attributes(529,14532
-int tiledb_array_get_schema(548,14972
-int tiledb_array_load_schema(583,16349
-int tiledb_array_free_schema(637,18350
-int tiledb_array_write(695,19966
-int tiledb_array_read(713,20370
-int tiledb_array_filter(732,20792
-int tiledb_array_overflow(753,21202
-int tiledb_array_consolidate(766,21464
-int tiledb_array_finalize(788,22061
-int tiledb_array_sync(812,22568
-int tiledb_array_sync_attribute(834,23034
-typedef struct TileDB_ArrayIterator 859,23619
-  ArrayIterator* array_it_;TileDB_ArrayIterator::array_it_860,23657
-  const TileDB_CTX* tiledb_ctx_;TileDB_ArrayIterator::tiledb_ctx_861,23685
-} TileDB_ArrayIterator;862,23718
-int tiledb_array_iterator_init(864,23743
-int tiledb_array_iterator_get_value(909,24884
-int tiledb_array_iterator_next(933,25390
-int tiledb_array_iterator_end(949,25746
-int tiledb_array_iterator_finalize(959,25997
-typedef struct TileDB_Metadata 991,26636
-  Metadata* metadata_;TileDB_Metadata::metadata_992,26669
-  const TileDB_CTX* tiledb_ctx_;TileDB_Metadata::tiledb_ctx_993,26692
-} TileDB_Metadata;994,26725
-int tiledb_metadata_set_schema(996,26745
-int tiledb_metadata_create(1073,29336
-int tiledb_metadata_init(1101,30298
-int tiledb_metadata_reset_attributes(1134,31120
-int tiledb_metadata_get_schema(1154,31605
-int tiledb_metadata_load_schema(1179,32569
-int tiledb_metadata_free_schema(1222,34038
-int tiledb_metadata_write(1256,35008
-int tiledb_metadata_read(1280,35528
-int tiledb_metadata_overflow(1302,35987
-int tiledb_metadata_consolidate(1312,36235
-int tiledb_metadata_finalize(1334,36832
-typedef struct TileDB_MetadataIterator 1356,37320
-  MetadataIterator* metadata_it_;TileDB_MetadataIterator::metadata_it_1357,37361
-  const TileDB_CTX* tiledb_ctx_;TileDB_MetadataIterator::tiledb_ctx_1358,37395
-} TileDB_MetadataIterator;1359,37428
-int tiledb_metadata_iterator_init(1361,37456
-int tiledb_metadata_iterator_get_value(1397,38420
-int tiledb_metadata_iterator_next(1419,38932
-int tiledb_metadata_iterator_end(1435,39316
-int tiledb_metadata_iterator_finalize(1445,39595
-int tiledb_clear(1476,40275
-int tiledb_delete(1503,40914
-int tiledb_move(1530,41560
-int tiledb_ls_workspaces(1566,42558
-int tiledb_ls_workspaces_c(1588,43019
-int tiledb_ls(1606,43421
-int tiledb_ls_c(1640,44240
-int tiledb_array_aio_read(1676,45103
-int tiledb_array_aio_write(1706,46116
-void tiledb_array_set_zlib_compression_level(1741,47249
+src/c_api/tiledb.cc,3891
+#  define PRINT_ERROR(53,1715
+#  define PRINT_ERROR(55,1788
+char tiledb_errmsg[tiledb_errmsg65,1953
+int g_TileDB_enable_SYNC_write 68,2055
+int g_TileDB_compression_level 71,2141
+typedef struct TileDB_CTX 78,2291
+  StorageManager* storage_manager_;TileDB_CTX::storage_manager_79,2319
+} TileDB_CTX;80,2355
+int tiledb_ctx_init(82,2370
+int tiledb_ctx_finalize(127,3600
+inline bool sanity_check(160,4220
+inline bool sanity_check(171,4534
+inline bool sanity_check(182,4812
+inline bool sanity_check(193,5113
+inline bool sanity_check(204,5403
+int tiledb_workspace_create(222,5831
+int tiledb_group_create(257,6661
+typedef struct TileDB_Array 291,7441
+  Array* array_;TileDB_Array::array_292,7471
+  const TileDB_CTX* tiledb_ctx_;TileDB_Array::tiledb_ctx_293,7488
+} TileDB_Array;294,7521
+typedef struct TileDB_Expression 297,7574
+  Expression* expression_;TileDB_Expression::expression_298,7609
+} TileDB_Expression;299,7636
+int tiledb_array_set_schema(302,7665
+int tiledb_array_create(427,11681
+int tiledb_array_init(464,13009
+int tiledb_array_reset_subarray(511,14189
+int tiledb_array_reset_attributes(530,14586
+int tiledb_array_get_schema(549,15026
+int tiledb_array_load_schema(584,16403
+int tiledb_array_free_schema(638,18404
+int tiledb_array_write(696,20020
+int tiledb_array_read(714,20424
+int tiledb_array_filter(733,20846
+int tiledb_array_overflow(754,21256
+int tiledb_array_consolidate(767,21518
+int tiledb_array_finalize(789,22115
+int tiledb_array_sync(813,22622
+int tiledb_array_sync_attribute(835,23088
+typedef struct TileDB_ArrayIterator 860,23673
+  ArrayIterator* array_it_;TileDB_ArrayIterator::array_it_861,23711
+  const TileDB_CTX* tiledb_ctx_;TileDB_ArrayIterator::tiledb_ctx_862,23739
+} TileDB_ArrayIterator;863,23772
+int tiledb_array_iterator_init(865,23797
+int tiledb_array_iterator_get_value(910,24938
+int tiledb_array_iterator_next(934,25444
+int tiledb_array_iterator_end(950,25800
+int tiledb_array_iterator_finalize(960,26051
+typedef struct TileDB_Metadata 992,26690
+  Metadata* metadata_;TileDB_Metadata::metadata_993,26723
+  const TileDB_CTX* tiledb_ctx_;TileDB_Metadata::tiledb_ctx_994,26746
+} TileDB_Metadata;995,26779
+int tiledb_metadata_set_schema(997,26799
+int tiledb_metadata_create(1074,29390
+int tiledb_metadata_init(1102,30352
+int tiledb_metadata_reset_attributes(1135,31174
+int tiledb_metadata_get_schema(1155,31659
+int tiledb_metadata_load_schema(1180,32623
+int tiledb_metadata_free_schema(1223,34092
+int tiledb_metadata_write(1257,35062
+int tiledb_metadata_read(1281,35582
+int tiledb_metadata_overflow(1303,36041
+int tiledb_metadata_consolidate(1313,36289
+int tiledb_metadata_finalize(1335,36886
+typedef struct TileDB_MetadataIterator 1357,37374
+  MetadataIterator* metadata_it_;TileDB_MetadataIterator::metadata_it_1358,37415
+  const TileDB_CTX* tiledb_ctx_;TileDB_MetadataIterator::tiledb_ctx_1359,37449
+} TileDB_MetadataIterator;1360,37482
+int tiledb_metadata_iterator_init(1362,37510
+int tiledb_metadata_iterator_get_value(1398,38474
+int tiledb_metadata_iterator_next(1420,38986
+int tiledb_metadata_iterator_end(1436,39370
+int tiledb_metadata_iterator_finalize(1446,39649
+int tiledb_clear(1477,40329
+int tiledb_delete(1504,40968
+int tiledb_move(1531,41614
+int tiledb_ls_workspaces(1567,42612
+int tiledb_ls_workspaces_c(1589,43073
+int tiledb_ls(1607,43475
+int tiledb_ls_c(1641,44294
+int tiledb_array_aio_read(1677,45157
+int tiledb_array_aio_write(1707,46170
+void tiledb_array_set_zlib_compression_level(1742,47303
+inline bool sanity_check_fs(1752,47542
+bool is_workspace(1766,47957
+bool is_group(1773,48176
+bool is_array(1780,48388
+bool is_fragment(1787,48600
+bool is_metadata(1794,48818
+bool is_dir(1802,49037
+bool is_file(1809,49250
+std::string parent_dir(1816,49461
+size_t file_size(1820,49540
+int read_from_file(1827,49754
+int write_to_file(1834,50065
 
 src/expressions/expression.cc,309
 Expression::Expression(36,1355
@@ -1211,52 +1265,64 @@ int Expression::add_attribute(81,2730
 int Expression::add_udf(108,3501
 int Expression::evaluate(112,3594
 
-src/fragment/book_keeping.cc,2064
-#  define PRINT_ERROR(47,1579
-#  define PRINT_ERROR(49,1655
-std::string tiledb_bk_errmsg 59,1820
-BookKeeping::BookKeeping(68,1971
-BookKeeping::~BookKeeping(81,2265
-const std::vector<void*>& BookKeeping::bounding_coords(106,2808
-int64_t BookKeeping::cell_num(110,2903
-bool BookKeeping::dense(122,3196
-const void* BookKeeping::domain(126,3250
-int64_t BookKeeping::last_tile_cell_num(130,3313
-const std::vector<void*>& BookKeeping::mbrs(134,3396
-const void* BookKeeping::non_empty_domain(138,3469
-bool BookKeeping::read_mode(143,3559
-int64_t BookKeeping::tile_num(147,3633
-const std::vector<std::vector<off_t> >& BookKeeping::tile_offsets(155,3777
-const std::vector<std::vector<off_t> >& BookKeeping::tile_var_offsets(159,3880
-const std::vector<std::vector<size_t> >& BookKeeping::tile_var_sizes(163,3991
-bool BookKeeping::write_mode(168,4106
-void BookKeeping::append_bounding_coords(179,4297
-void BookKeeping::append_mbr(189,4667
-void BookKeeping::append_tile_offset(199,4918
-void BookKeeping::append_tile_var_offset(207,5191
-void BookKeeping::append_tile_var_size(216,5491
-int BookKeeping::read_buffer(222,5624
-#define CHUNK 243,6165
-int BookKeeping::write_buffer(244,6184
-void BookKeeping::free_buffer(271,6928
-int BookKeeping::finalize(304,8140
-int BookKeeping::init(359,9660
-int BookKeeping::load(428,11988
-void BookKeeping::set_last_tile_cell_num(486,13592
-int BookKeeping::flush_bounding_coords(499,13909
-int BookKeeping::flush_last_tile_cell_num(532,14922
-int BookKeeping::flush_mbrs(558,15652
-int BookKeeping::flush_non_empty_domain(589,16513
-int BookKeeping::flush_tile_offsets(626,17666
-int BookKeeping::flush_tile_var_offsets(668,19018
-int BookKeeping::flush_tile_var_sizes(711,20415
-int BookKeeping::load_bounding_coords(750,21596
-int BookKeeping::load_last_tile_cell_num(788,22761
-int BookKeeping::load_mbrs(806,23254
-int BookKeeping::load_non_empty_domain(843,24195
-int BookKeeping::load_tile_offsets(888,25520
-int BookKeeping::load_tile_var_offsets(933,26929
-int BookKeeping::load_tile_var_sizes(979,28405
+src/fragment/book_keeping.cc,1921
+#  define PRINT_ERROR(46,1555
+#  define PRINT_ERROR(48,1631
+std::string tiledb_bk_errmsg 58,1796
+BookKeeping::BookKeeping(67,1947
+BookKeeping::~BookKeeping(80,2241
+const std::vector<void*>& BookKeeping::bounding_coords(102,2781
+int64_t BookKeeping::cell_num(106,2876
+bool BookKeeping::dense(118,3169
+const void* BookKeeping::domain(122,3223
+int64_t BookKeeping::last_tile_cell_num(126,3286
+const std::vector<void*>& BookKeeping::mbrs(130,3369
+const void* BookKeeping::non_empty_domain(134,3442
+bool BookKeeping::read_mode(139,3532
+int64_t BookKeeping::tile_num(143,3606
+const std::vector<std::vector<off_t> >& BookKeeping::tile_offsets(151,3750
+const std::vector<std::vector<off_t> >& BookKeeping::tile_var_offsets(155,3853
+const std::vector<std::vector<size_t> >& BookKeeping::tile_var_sizes(159,3964
+bool BookKeeping::write_mode(164,4079
+void BookKeeping::append_bounding_coords(175,4270
+void BookKeeping::append_mbr(185,4640
+void BookKeeping::append_tile_offset(195,4891
+void BookKeeping::append_tile_var_offset(203,5164
+void BookKeeping::append_tile_var_size(212,5464
+int BookKeeping::finalize(244,6696
+int BookKeeping::init(299,8247
+int BookKeeping::load(368,10575
+void BookKeeping::set_last_tile_cell_num(425,12191
+int BookKeeping::flush_bounding_coords(438,12508
+int BookKeeping::flush_last_tile_cell_num(471,13523
+int BookKeeping::flush_mbrs(497,14254
+int BookKeeping::flush_non_empty_domain(528,15117
+int BookKeeping::flush_tile_offsets(565,16272
+int BookKeeping::flush_tile_var_offsets(607,17626
+int BookKeeping::flush_tile_var_sizes(650,19025
+int BookKeeping::load_bounding_coords(689,20208
+int BookKeeping::load_last_tile_cell_num(727,21373
+int BookKeeping::load_mbrs(745,21866
+int BookKeeping::load_non_empty_domain(782,22807
+int BookKeeping::load_tile_offsets(827,24132
+int BookKeeping::load_tile_var_offsets(872,25541
+int BookKeeping::load_tile_var_sizes(918,27017
+
+src/fragment/buffer.cc,462
+#  define PRINT_ERROR(43,1463
+#  define PRINT_ERROR(45,1539
+std::string tiledb_bf_errmsg 52,1701
+Buffer::Buffer(54,1737
+Buffer::Buffer(57,1759
+Buffer::~Buffer(61,1833
+void *Buffer::get_buffer(Buffer::get_buffer65,1873
+int64_t Buffer::get_buffer_size(69,1928
+void Buffer::set_buffer(73,1989
+int Buffer::read_buffer(81,2188
+int Buffer::read_buffer(102,2707
+#define CHUNK 127,3286
+int Buffer::append_buffer(128,3305
+void Buffer::free_buffer(156,4071
 
 src/fragment/fragment.cc,827
 #  define PRINT_ERROR(49,1575
@@ -1274,128 +1340,136 @@ ReadState* Fragment::read_state(122,2907
 size_t Fragment::tile_size(126,2974
 bool Fragment::write_mode(141,3472
 int Fragment::finalize(152,3660
-int Fragment::init(187,4571
-int Fragment::init(236,5825
-void Fragment::reset_read_state(251,6186
-int Fragment::sync(255,6249
-int Fragment::sync_attribute(268,6488
-int Fragment::write(281,6794
-int Fragment::rename_fragment(302,7236
-void Fragment::set_zlib_compression_level(324,7871
+int Fragment::init(188,4637
+int Fragment::init(237,5891
+void Fragment::reset_read_state(252,6252
+int Fragment::sync(256,6315
+int Fragment::sync_attribute(269,6554
+int Fragment::write(282,6860
+int Fragment::rename_fragment(303,7302
+void Fragment::set_zlib_compression_level(327,7976
 
-src/fragment/read_state.cc,3065
-#  define PRINT_ERROR(62,1783
-#  define PRINT_ERROR(64,1859
-std::string tiledb_rs_errmsg 74,2024
-ReadState::ReadState(83,2175
-ReadState::~ReadState(154,4363
-bool ReadState::dense(210,5933
-bool ReadState::done(214,5997
-void ReadState::get_bounding_coords(218,6047
-bool ReadState::mbr_overlaps_tile(228,6299
-bool ReadState::overflow(232,6374
-bool ReadState::subarray_area_covered(236,6462
-void ReadState::reset(247,6661
-void ReadState::reset_overflow(265,7019
-int ReadState::copy_cells(277,7243
-int ReadState::copy_cells_var(345,9428
-int ReadState::get_coords_after(467,13488
-int ReadState::get_enclosing_coords(502,14353
-int ReadState::get_fragment_cell_pos_range_sparse(572,16221
-int ReadState::get_fragment_cell_ranges_dense(601,17164
-int ReadState::get_fragment_cell_ranges_sparse(700,20636
-int ReadState::get_fragment_cell_ranges_sparse(736,21652
-void ReadState::get_next_overlapping_tile_dense(840,25197
-void ReadState::get_next_overlapping_tile_sparse(926,28078
-void ReadState::get_next_overlapping_tile_sparse(964,29011
-int ReadState::CMP_COORDS_TO_SEARCH_TILE(1078,32392
-int ReadState::compute_bytes_to_copy(1132,33881
-void ReadState::compute_tile_search_range(1231,36733
-void ReadState::compute_tile_search_range(1255,37398
-void ReadState::compute_tile_search_range_col_or_row(1273,37900
-void ReadState::compute_tile_search_range_hil(1375,41205
-int ReadState::decompress_tile(1440,43344
-int ReadState::decompress_tile_gzip(1528,45866
-int ReadState::decompress_tile_zstd(1550,46355
-int ReadState::decompress_tile_lz4(1575,46953
-int ReadState::decompress_tile_blosc(1598,47522
-int ReadState::decompress_tile_rle(1627,48163
-int64_t ReadState::get_cell_pos_after(1694,50075
-int64_t ReadState::get_cell_pos_at_or_after(1731,50993
-int64_t ReadState::get_cell_pos_at_or_before(1769,51895
-int ReadState::GET_COORDS_PTR_FROM_SEARCH_TILE(1806,52787
-int ReadState::GET_CELL_PTR_FROM_OFFSET_TILE(1864,54302
-bool ReadState::is_empty_attribute(1925,55934
-int ReadState::map_tile_from_file_cmp(1933,56166
-int ReadState::map_tile_from_file_var_cmp(2016,58871
-int ReadState::map_tile_from_file_cmp_none(2100,61417
-int ReadState::map_tile_from_file_var_cmp_none(2183,64223
-int ReadState::mpi_io_read_tile_from_file_cmp(2274,67072
-int ReadState::mpi_io_read_tile_from_file_var_cmp(2316,68308
-int ReadState::prepare_tile_for_reading(2357,69374
-int ReadState::prepare_tile_for_reading_var(2370,69813
-int ReadState::prepare_tile_for_reading_cmp(2383,70264
-int ReadState::prepare_tile_for_reading_cmp_none(2477,73258
-int ReadState::prepare_tile_for_reading_var_cmp(2529,74747
-int ReadState::prepare_tile_for_reading_var_cmp_none(2711,80571
-int ReadState::READ_FROM_TILE(2837,84370
-int ReadState::READ_FROM_TILE_VAR(2897,85878
-int ReadState::read_tile_from_file_cmp(2956,87338
-int ReadState::read_tile_from_file_var_cmp(2994,88468
-int ReadState::set_tile_file_offset(3027,89375
-int ReadState::set_tile_var_file_offset(3037,89561
-void ReadState::shift_var_offsets(3047,89755
-void ReadState::shift_var_offsets(3061,90138
+src/fragment/read_state.cc,3192
+#  define PRINT_ERROR(58,1779
+#  define PRINT_ERROR(60,1855
+std::string tiledb_rs_errmsg 70,2020
+ReadState::ReadState(79,2171
+ReadState::~ReadState(154,4506
+bool ReadState::dense(212,6101
+bool ReadState::done(216,6165
+void ReadState::get_bounding_coords(220,6215
+bool ReadState::mbr_overlaps_tile(230,6467
+bool ReadState::overflow(234,6542
+bool ReadState::subarray_area_covered(238,6630
+void ReadState::reset(249,6829
+void ReadState::reset_overflow(269,7212
+int ReadState::copy_cells(281,7436
+int ReadState::copy_cells_var(349,9621
+int ReadState::get_coords_after(471,13681
+int ReadState::get_enclosing_coords(506,14546
+int ReadState::get_fragment_cell_pos_range_sparse(576,16414
+int ReadState::get_fragment_cell_ranges_dense(605,17357
+int ReadState::get_fragment_cell_ranges_sparse(704,20829
+int ReadState::get_fragment_cell_ranges_sparse(740,21845
+void ReadState::get_next_overlapping_tile_dense(844,25390
+void ReadState::get_next_overlapping_tile_sparse(930,28271
+void ReadState::get_next_overlapping_tile_sparse(968,29204
+void ReadState::reset_file_buffers(1082,32585
+Buffer *read_file(read_file1095,32887
+int ReadState::read_segment(1106,33280
+int ReadState::CMP_COORDS_TO_SEARCH_TILE(1180,35825
+int ReadState::compute_bytes_to_copy(1200,36382
+void ReadState::compute_tile_search_range(1299,39234
+void ReadState::compute_tile_search_range(1323,39899
+void ReadState::compute_tile_search_range_col_or_row(1341,40401
+void ReadState::compute_tile_search_range_hil(1443,43706
+int ReadState::decompress_tile(1508,45845
+int ReadState::decompress_tile_gzip(1596,48367
+int ReadState::decompress_tile_zstd(1618,48856
+int ReadState::decompress_tile_lz4(1643,49454
+int ReadState::decompress_tile_blosc(1666,50023
+int ReadState::decompress_tile_rle(1695,50664
+int64_t ReadState::get_cell_pos_after(1762,52576
+int64_t ReadState::get_cell_pos_at_or_after(1799,53494
+int64_t ReadState::get_cell_pos_at_or_before(1837,54396
+int ReadState::GET_COORDS_PTR_FROM_SEARCH_TILE(1874,55288
+int ReadState::GET_CELL_PTR_FROM_OFFSET_TILE(1898,55872
+bool ReadState::is_empty_attribute(1923,56530
+int ReadState::map_tile_from_file_cmp(1931,56762
+int ReadState::map_tile_from_file_var_cmp(2014,59467
+int ReadState::map_tile_from_file_cmp_none(2098,62013
+int ReadState::map_tile_from_file_var_cmp_none(2181,64819
+int ReadState::mpi_io_read_tile_from_file_cmp(2272,67668
+int ReadState::mpi_io_read_tile_from_file_var_cmp(2314,68904
+int ReadState::prepare_tile_for_reading(2355,69970
+int ReadState::prepare_tile_for_reading_var(2368,70409
+int ReadState::prepare_tile_for_reading_cmp(2381,70860
+int ReadState::prepare_tile_for_reading_cmp_none(2475,73890
+int ReadState::prepare_tile_for_reading_var_cmp(2527,75379
+int ReadState::prepare_tile_for_reading_var_cmp_none(2709,81275
+int ReadState::READ_FROM_TILE(2804,84171
+int ReadState::READ_FROM_TILE_VAR(2822,84669
+int ReadState::read_tile_from_file_cmp(2840,85138
+int ReadState::read_tile_from_file_var_cmp(2865,85976
+int ReadState::set_tile_file_offset(2884,86561
+int ReadState::set_tile_var_file_offset(2894,86747
+void ReadState::shift_var_offsets(2904,86941
+void ReadState::shift_var_offsets(2918,87324
 
-src/fragment/write_state.cc,2220
+src/fragment/write_state.cc,2435
 #  define PRINT_ERROR(61,1776
 #  define PRINT_ERROR(63,1852
   #define SORT(68,1987
   #define SORT(71,2096
 std::string tiledb_ws_errmsg 81,2288
 WriteState::WriteState(90,2439
-WriteState::~WriteState(147,4191
-int WriteState::finalize(180,4909
-int WriteState::sync(200,5426
-int WriteState::sync_attribute(311,8582
-int WriteState::write(403,11086
-int WriteState::compress_tile(462,13484
-int WriteState::compress_tile_gzip(566,16811
-int WriteState::compress_tile_zstd(604,17990
-int WriteState::compress_tile_lz4(647,19229
-int WriteState::compress_tile_blosc(684,20269
-int WriteState::compress_tile_rle(749,22031
-int WriteState::compress_and_write_tile(831,24684
-int WriteState::compress_and_write_tile_var(892,26457
-void WriteState::expand_mbr(960,28519
-void WriteState::shift_var_offsets(978,29027
-void WriteState::sort_cell_pos(1000,29676
-void WriteState::sort_cell_pos(1020,30393
-void WriteState::update_book_keeping(1090,32653
-void WriteState::update_book_keeping(1109,33318
-int WriteState::write_last_tile(1153,34640
-int WriteState::write_dense(1180,35535
-int WriteState::write_dense_attr(1214,36653
-int WriteState::write_dense_attr_cmp_none(1233,37219
-int WriteState::write_dense_attr_cmp(1278,38456
-int WriteState::write_dense_attr_var(1344,40394
-int WriteState::write_dense_attr_var_cmp_none(1381,41316
-int WriteState::write_dense_attr_var_cmp(1475,43844
-int WriteState::write_sparse(1663,50303
-int WriteState::write_sparse_attr(1697,51424
-int WriteState::write_sparse_attr_cmp_none(1716,51992
-int WriteState::write_sparse_attr_cmp(1769,53449
-int WriteState::write_sparse_attr_var(1841,55668
-int WriteState::write_sparse_attr_var_cmp_none(1872,56525
-int WriteState::write_sparse_attr_var_cmp(1969,59140
-int WriteState::write_sparse_unsorted(2159,65670
-int WriteState::write_sparse_unsorted_attr(2225,67717
-int WriteState::write_sparse_unsorted_attr_cmp_none(2249,68432
-int WriteState::write_sparse_unsorted_attr_cmp(2316,70433
-int WriteState::write_sparse_unsorted_attr_var(2383,72420
-int WriteState::write_sparse_unsorted_attr_var_cmp_none(2413,73322
-int WriteState::write_sparse_unsorted_attr_var_cmp(2507,76413
-void WriteState::set_zlib_compression_level(2602,79490
+WriteState::~WriteState(152,4277
+int WriteState::finalize(185,4994
+int WriteState::sync(209,5588
+int WriteState::sync_attribute(320,8759
+void WriteState::init_file_buffers(411,11277
+std::string WriteState::construct_filename(421,11512
+int write_file(431,11906
+int WriteState::write_file_buffers(440,12205
+int WriteState::write_segment(479,13518
+int WriteState::write(540,15689
+int WriteState::compress_tile(575,16925
+int WriteState::compress_tile_gzip(679,20252
+int WriteState::compress_tile_zstd(717,21431
+int WriteState::compress_tile_lz4(760,22670
+int WriteState::compress_tile_blosc(797,23710
+int WriteState::compress_tile_rle(862,25472
+int WriteState::compress_and_write_tile(944,28125
+int WriteState::compress_and_write_tile_var(977,28959
+void WriteState::expand_mbr(1016,30054
+void WriteState::shift_var_offsets(1034,30562
+void WriteState::sort_cell_pos(1056,31211
+void WriteState::sort_cell_pos(1076,31928
+void WriteState::update_book_keeping(1146,34188
+void WriteState::update_book_keeping(1165,34853
+int WriteState::write_last_tile(1209,36175
+int WriteState::write_dense(1236,37070
+int WriteState::write_dense_attr(1270,38188
+int WriteState::write_dense_attr_cmp_none(1289,38754
+int WriteState::write_dense_attr_cmp(1297,38964
+int WriteState::write_dense_attr_var(1363,40902
+int WriteState::write_dense_attr_var_cmp_none(1400,41824
+int WriteState::write_dense_attr_var_cmp(1436,42557
+int WriteState::write_sparse(1624,49016
+int WriteState::write_sparse_attr(1658,50137
+int WriteState::write_sparse_attr_cmp_none(1677,50705
+int WriteState::write_sparse_attr_cmp(1701,51284
+int WriteState::write_sparse_attr_var(1773,53503
+int WriteState::write_sparse_attr_var_cmp_none(1804,54360
+int WriteState::write_sparse_attr_var_cmp(1847,55327
+int WriteState::write_sparse_unsorted(2037,61857
+int WriteState::write_sparse_unsorted_attr(2103,63904
+int WriteState::write_sparse_unsorted_attr_cmp_none(2127,64619
+int WriteState::write_sparse_unsorted_attr_cmp(2194,66620
+int WriteState::write_sparse_unsorted_attr_var(2261,68607
+int WriteState::write_sparse_unsorted_attr_var_cmp_none(2291,69509
+int WriteState::write_sparse_unsorted_attr_var_cmp(2385,72600
+void WriteState::set_zlib_compression_level(2480,75677
 
 src/metadata/metadata.cc,565
 #  define PRINT_ERROR(46,1513
@@ -1442,258 +1516,246 @@ ProgressBar::~ProgressBar(53,1667
 void ProgressBar::load(63,1815
 void ProgressBar::print(85,2235
 
-src/misc/utils.cc,2345
-#define XSTR(68,1959
-#define STR(69,1982
-#  define PRINT_ERROR(78,2137
-#  define PRINT_ERROR(80,2213
-std::string tiledb_ut_errmsg 90,2378
-bool array_read_mode(99,2529
-bool array_write_mode(105,2700
-bool array_filter_mode(112,2925
-bool both_slashes(116,3001
-bool cell_in_subarray(122,3096
-int64_t cell_num_in_subarray(134,3409
-int cmp_col_order(144,3623
-int cmp_col_order(162,3951
-int cmp_row_order(191,4460
-int cmp_row_order(209,4785
-int create_dir(237,5272
-int create_file(246,5453
-int delete_file(255,5706
-int create_fragment_file(264,5909
-int delete_dir(281,6447
-int move_path(290,6644
-bool empty_value(300,6939
-int expand_buffer(313,7327
-void expand_mbr(328,7716
-size_t file_size(340,8018
-std::string current_dir(348,8183
-std::vector<std::string> get_dirs(357,8328
-std::vector<std::string> get_fragment_dirs(366,8524
-std::string get_mac_addr(379,8893
-std::string get_mac_addr(420,9885
-ssize_t gzip(443,10450
-int gunzip(489,11464
-bool has_duplicates(538,12504
-bool inside_subarray(545,12642
-bool intersect(554,12867
-bool is_array(565,13229
-bool is_contained(575,13431
-bool is_dir(586,13657
-bool is_file(594,13796
-bool is_fragment(602,13941
-bool is_group(611,14123
-bool is_metadata(620,14300
-bool is_positive_integer(629,14490
-bool is_unary_subarray(650,14852
-bool is_workspace(659,15026
-int mpi_io_read_from_file(669,15227
-int mpi_io_write_to_file(719,16536
-int mpi_io_sync(783,18370
-int mutex_destroy(843,19894
-int mutex_init(849,19983
-int mutex_lock(855,20066
-int mutex_unlock(861,20148
-int mutex_destroy(868,20241
-int mutex_init(879,20517
-int mutex_lock(890,20796
-int mutex_unlock(901,21063
-std::string parent_dir(912,21336
-int read_from_file(930,21729
-#define windowBits 942,22014
-#define GZIP_ENCODING 943,22036
-int read_from_file_after_decompression(945,22062
-std::string real_dir(1035,24605
-int64_t RLE_compress(1043,24757
-size_t RLE_compress_bound(1133,27478
-size_t RLE_compress_bound_coords(1139,27705
-int64_t RLE_compress_coords_col(1150,28163
-int64_t RLE_compress_coords_row(1278,32311
-int RLE_decompress(1407,36463
-int RLE_decompress_coords_col(1467,38144
-int RLE_decompress_coords_row(1571,41279
-bool starts_with(1678,44468
-int sync(1684,44663
-int write_to_file(1692,44803
-int write_to_file_after_compression(1703,45065
-int delete_directories(1771,47275
-
-src/misc/fs_utils.cc,553
-#  define PRINT_ERROR(46,1502
-#  define PRINT_ERROR(48,1607
-namespace fs 51,1657
-std::string current_dir(fs::current_dir53,1673
-bool is_dir(66,1834
-bool is_file(71,1954
-void adjacent_slashes_dedup(76,2081
-void purge_dots_from_path(81,2232
-std::string real_dir(135,3470
-int create_dir(167,4282
-int delete_dir(194,5053
-std::vector<std::string> get_dirs(252,6651
-int create_file(277,7241
-int delete_file(289,7641
-int move_path(301,7968
-size_t file_size(313,8328
-int read_from_file(331,8722
-int write_to_file(363,9663
-int sync(416,11302
-
 src/misc/url.cc,231
-url::url(43,1412
-std::string url::protocol(48,1481
-std::string url::host(52,1534
-std::string url::port(56,1579
-int16_t url::nport(60,1624
-std::string url::path(64,1667
-std::string url::query(68,1712
-void url::parse(73,1778
+url::url(43,1438
+std::string url::protocol(48,1507
+std::string url::host(52,1560
+std::string url::port(56,1605
+int16_t url::nport(60,1650
+std::string url::path(64,1693
+std::string url::query(68,1738
+void url::parse(73,1804
 
-src/misc/hdfs_utils.cc,1748
-#  define PRINT_ERROR(51,1509
-#  define PRINT_ERROR(53,1596
-namespace hdfs 56,1646
-static thread_local hdfsFS hdfs_handle hdfs::hdfs_handle57,1663
-static thread_local char home_dir[hdfs::home_dir58,1710
-#define ERR_MSG_LEN 60,1769
-static char errmsg[hdfs::errmsg61,1794
-static int print_errmsg(hdfs::print_errmsg63,1830
-void set_hdfs_handle(72,2019
-int connect(76,2084
-void disconnect(121,3822
-bool is_hdfs_path(129,3983
-bool is_hdfs(133,4100
-char *get_home_dir(get_home_dir137,4150
-std::string current_dir(141,4195
-static bool is_path(152,4523
-bool is_dir(167,4899
-bool is_file(171,4976
-std::string real_dir(175,5056
-int create_dir(188,5411
-int delete_dir(202,5803
-std::vector<std::string> get_dirs(213,6066
-int create_file(232,6590
-int delete_file(247,7120
-int move_path(258,7405
-size_t file_size(272,7922
-static tSize max_tsize(293,8442
-int read_from_file_kernel(304,8680
-int read_from_file(330,9441
-int write_to_file_kernel(353,10266
-int append_by_replacing(371,10846
-int write_to_file(431,12916
-int sync(467,14037
-int move_to_fs(502,15280
-int move_from_fs(519,15773
-namespace hdfs 538,16276
-int connect(hdfs::connect539,16293
-void disconnect(543,16347
-bool is_hdfs_path(546,16370
-bool is_hdfs(553,16585
-char *get_home_dir(get_home_dir558,16663
-std::string current_dir(562,16704
-bool is_dir(566,16750
-bool is_file(570,16807
-std::string real_dir(574,16866
-int create_dir(578,16931
-int delete_dir(582,16987
-std::vector<std::string> get_dirs(586,17043
-int create_file(590,17123
-int delete_file(594,17196
-size_t file_size(598,17258
-int read_from_file(602,17321
-int write_to_file(606,17429
-int move_path(610,17526
-int sync(614,17619
-int move_to_fs(618,17667
-int move_from_fs(622,17757
+src/misc/utils.cc,2372
+#define XSTR(69,1979
+#define STR(70,2002
+#  define PRINT_ERROR(79,2157
+#  define PRINT_ERROR(81,2233
+std::string tiledb_ut_errmsg 91,2398
+bool array_read_mode(100,2549
+bool array_write_mode(106,2720
+bool array_filter_mode(113,2945
+bool both_slashes(117,3021
+bool cell_in_subarray(123,3116
+int64_t cell_num_in_subarray(135,3429
+int cmp_col_order(145,3643
+int cmp_col_order(163,3971
+int cmp_row_order(192,4480
+int cmp_row_order(210,4805
+bool is_hdfs_path(238,5292
+int create_dir(250,5635
+int create_file(255,5755
+int delete_file(260,5934
+int create_fragment_file(265,6070
+int delete_dir(282,6627
+int move_path(287,6759
+bool empty_value(293,6980
+int expand_buffer(306,7368
+void expand_mbr(321,7757
+size_t file_size(333,8059
+std::string current_dir(337,8159
+std::vector<std::string> get_dirs(342,8243
+std::vector<std::string> get_fragment_dirs(347,8380
+std::string get_mac_addr(360,8772
+std::string get_mac_addr(401,9764
+ssize_t gzip(424,10329
+int gunzip(470,11343
+bool has_duplicates(519,12383
+bool inside_subarray(526,12521
+bool intersect(535,12746
+bool is_array(546,13108
+bool is_contained(556,13333
+bool is_dir(567,13559
+bool is_file(571,13641
+bool is_fragment(575,13727
+bool is_group(580,13869
+bool is_metadata(585,14005
+bool is_positive_integer(590,14154
+bool is_unary_subarray(611,14516
+bool is_workspace(620,14690
+int mpi_io_read_from_file(626,14850
+int mpi_io_write_to_file(676,16159
+int mpi_io_sync(740,17993
+int mutex_destroy(801,19544
+int mutex_init(807,19633
+int mutex_lock(813,19716
+int mutex_unlock(819,19798
+int mutex_destroy(826,19891
+int mutex_init(837,20167
+int mutex_lock(848,20446
+int mutex_unlock(859,20713
+std::string parent_dir(870,20986
+int read_from_file(893,21534
+#define windowBits 901,21724
+#define GZIP_ENCODING 902,21746
+int read_from_file_after_decompression(904,21772
+std::string real_dir(994,24338
+int64_t RLE_compress(998,24431
+size_t RLE_compress_bound(1088,27152
+size_t RLE_compress_bound_coords(1094,27379
+int64_t RLE_compress_coords_col(1105,27837
+int64_t RLE_compress_coords_row(1233,31985
+int RLE_decompress(1362,36137
+int RLE_decompress_coords_col(1422,37818
+int RLE_decompress_coords_row(1526,40953
+bool starts_with(1633,44142
+int sync(1639,44337
+int write_to_file(1643,44417
+int write_to_file_after_compression(1651,44600
+int delete_directories(1727,47161
 
-src/storage_manager/storage_manager_config.cc,350
-StorageManagerConfig::StorageManagerConfig(45,1500
-StorageManagerConfig::~StorageManagerConfig(55,1695
-void StorageManagerConfig::init(65,1861
-const std::string& StorageManagerConfig::home(104,2707
-MPI_Comm* StorageManagerConfig::mpi_comm(109,2798
-int StorageManagerConfig::read_method(114,2879
-int StorageManagerConfig::write_method(118,2953
+src/storage_manager/storage_fs.cc,640
+std::string tiledb_fs_errmsg 40,1377
+StorageFS::~StorageFS(42,1413
+std::string StorageFS::current_dir(46,1455
+bool StorageFS::is_dir(50,1546
+bool StorageFS::is_file(54,1647
+std::string StorageFS::real_dir(58,1750
+int StorageFS::create_dir(62,1862
+int StorageFS::delete_dir(66,1966
+std::vector<std::string> StorageFS::get_dirs(70,2070
+int StorageFS::create_file(74,2197
+int StorageFS::delete_file(78,2331
+size_t StorageFS::file_size(82,2441
+int StorageFS::read_from_file(86,2552
+int StorageFS::write_to_file(90,2708
+int StorageFS::move_path(94,2860
+int StorageFS::sync(98,3001
+bool StorageFS::consolidation_support(102,3100
 
-src/storage_manager/storage_manager.cc,3615
-#  define PRINT_ERROR(52,1687
-#  define PRINT_ERROR(54,1763
-  #define SORT_LIB 59,1898
-  #define SORT_LIB 62,1961
-#define SORT_2(65,1993
-#define SORT_3(66,2053
-#define GET_MACRO(67,2127
-#define SORT(68,2173
-std::string tiledb_sm_errmsg 77,2359
-StorageManager::StorageManager(86,2510
-StorageManager::~StorageManager(89,2548
-int StorageManager::finalize(99,2702
-int StorageManager::init(110,2870
-int StorageManager::workspace_create(147,3937
-int StorageManager::ls_workspaces(190,5231
-int StorageManager::ls_workspaces_c(258,7092
-int StorageManager::group_create(304,8320
-int StorageManager::array_consolidate(337,9165
-int StorageManager::array_create(390,10624
-int StorageManager::array_create(436,11962
-void StorageManager::array_get_fragment_names(464,12721
-int StorageManager::array_load_book_keeping(475,13020
-int StorageManager::array_load_schema(515,14068
-int StorageManager::array_init(588,16310
-int StorageManager::array_finalize(676,18694
-int StorageManager::array_sync(702,19264
-int StorageManager::array_sync_attribute(717,19560
-int StorageManager::array_iterator_init(734,19924
-int StorageManager::array_iterator_finalize(770,20758
-int StorageManager::metadata_consolidate(803,21463
-int StorageManager::metadata_create(877,23640
-int StorageManager::metadata_create(918,24815
-int StorageManager::metadata_load_schema(974,26517
-int StorageManager::metadata_init(1029,28065
-int StorageManager::metadata_finalize(1084,29518
-int StorageManager::metadata_iterator_init(1114,30306
-int StorageManager::metadata_iterator_finalize(1148,31177
-int StorageManager::ls(1183,31992
-int StorageManager::ls_c(1235,33355
-int StorageManager::clear(1262,34097
-int StorageManager::delete_entire(1279,34573
-int StorageManager::move(1307,35356
-int StorageManager::filesystem_reinit(1336,36088
-int StorageManager::array_clear(1372,37271
-int StorageManager::array_close(1438,39299
-int StorageManager::array_delete(1506,41162
-int StorageManager::array_get_open_array_entry(1522,41505
-int StorageManager::array_move(1559,42472
-int StorageManager::array_open(1624,44486
-int StorageManager::array_store_schema(1686,46295
-int StorageManager::config_set(1724,47433
-int StorageManager::consolidation_filelock_create(1764,48545
-int StorageManager::consolidation_filelock_lock(1779,49034
-int StorageManager::consolidation_filelock_unlock(1835,50526
-int StorageManager::consolidation_finalize(1853,50965
-int StorageManager::create_group_file(1903,52488
-int StorageManager::create_master_catalog_entry(1917,52939
-int StorageManager::create_workspace_file(1959,54124
-int StorageManager::group_clear(1973,54597
-int StorageManager::group_delete(2049,56948
-int StorageManager::group_move(2065,57291
-int StorageManager::master_catalog_consolidate(2128,59211
-int StorageManager::master_catalog_create(2136,59427
-int StorageManager::metadata_clear(2162,60084
-int StorageManager::metadata_delete(2225,62055
-int StorageManager::metadata_move(2244,62520
-int StorageManager::open_array_mtx_destroy(2310,64668
-int StorageManager::open_array_mtx_init(2328,65097
-int StorageManager::open_array_mtx_lock(2346,65517
-int StorageManager::open_array_mtx_unlock(2364,65937
-void StorageManager::sort_fragment_names(2382,66363
-int StorageManager::workspace_clear(2422,67874
-int StorageManager::workspace_delete(2480,69799
-int StorageManager::workspace_move(2533,71259
-int StorageManager::OpenArray::mutex_destroy(2621,74120
-int StorageManager::OpenArray::mutex_init(2639,74528
-int StorageManager::OpenArray::mutex_lock(2657,74928
-int StorageManager::OpenArray::mutex_unlock(2675,75327
+src/storage_manager/storage_hdfs.cc,801
+#  define PRINT_ERROR(51,1486
+#  define PRINT_ERROR(53,1577
+HDFS::HDFS(56,1627
+HDFS::~HDFS(117,3876
+static int print_errmsg(124,3995
+std::string HDFS::current_dir(132,4183
+static bool is_path(142,4480
+bool HDFS::is_dir(158,4885
+bool HDFS::is_file(162,4981
+std::string HDFS::real_dir(166,5080
+int HDFS::create_dir(182,5540
+int HDFS::delete_dir(194,5882
+std::vector<std::string> HDFS::get_dirs(206,6198
+int HDFS::create_file(224,6700
+int HDFS::delete_file(237,7185
+size_t HDFS::file_size(249,7544
+static tSize max_tsize(269,8085
+static int read_from_file_kernel(279,8284
+int HDFS::read_from_file(303,9032
+static int write_to_file_kernel(343,10372
+int HDFS::write_to_file(362,11050
+int HDFS::move_path(401,12430
+int HDFS::sync(413,12881
+bool HDFS::consolidation_support(418,13024
+
+src/storage_manager/storage_manager.cc,3624
+#  define PRINT_ERROR(53,1688
+#  define PRINT_ERROR(55,1764
+  #define SORT_LIB 60,1899
+  #define SORT_LIB 63,1962
+#define SORT_2(66,1994
+#define SORT_3(67,2054
+#define GET_MACRO(68,2128
+#define SORT(69,2174
+std::string tiledb_sm_errmsg 78,2360
+StorageManager::StorageManager(87,2511
+StorageManager::~StorageManager(90,2549
+int StorageManager::finalize(100,2703
+int StorageManager::init(107,2817
+StorageManagerConfig* StorageManager::get_config(140,3792
+int StorageManager::workspace_create(148,3978
+int StorageManager::ls_workspaces(183,5039
+int StorageManager::ls_workspaces_c(251,6900
+int StorageManager::group_create(297,8128
+int StorageManager::array_consolidate(330,8993
+int StorageManager::array_create(376,10184
+int StorageManager::array_create(414,11258
+void StorageManager::array_get_fragment_names(442,12022
+int StorageManager::array_load_book_keeping(453,12331
+int StorageManager::array_load_schema(493,13387
+int StorageManager::array_init(557,15360
+int StorageManager::array_finalize(638,17497
+int StorageManager::array_sync(664,18067
+int StorageManager::array_sync_attribute(679,18363
+int StorageManager::array_iterator_init(696,18727
+int StorageManager::array_iterator_finalize(732,19561
+int StorageManager::metadata_consolidate(765,20266
+int StorageManager::metadata_create(839,22448
+int StorageManager::metadata_create(880,23646
+int StorageManager::metadata_load_schema(929,25071
+int StorageManager::metadata_init(984,26642
+int StorageManager::metadata_finalize(1039,28100
+int StorageManager::metadata_iterator_init(1069,28888
+int StorageManager::metadata_iterator_finalize(1103,29759
+int StorageManager::ls(1138,30574
+int StorageManager::ls_c(1181,31665
+int StorageManager::clear(1199,32140
+int StorageManager::delete_entire(1216,32636
+int StorageManager::move(1236,33176
+int StorageManager::array_clear(1265,33928
+int StorageManager::array_close(1300,34878
+int StorageManager::array_delete(1368,36746
+int StorageManager::array_get_open_array_entry(1384,37094
+int StorageManager::array_move(1421,38061
+int StorageManager::array_open(1486,40102
+int StorageManager::array_store_schema(1548,41916
+int StorageManager::config_set(1586,43069
+int StorageManager::consolidation_filelock_create(1618,43907
+int StorageManager::consolidation_filelock_lock(1637,44472
+int StorageManager::consolidation_filelock_unlock(1691,45905
+int StorageManager::consolidation_finalize(1707,46307
+int StorageManager::create_group_file(1757,47830
+int StorageManager::create_master_catalog_entry(1771,48286
+int StorageManager::create_workspace_file(1813,49476
+int StorageManager::group_clear(1827,49954
+int StorageManager::group_delete(1873,51336
+int StorageManager::group_move(1889,51684
+int StorageManager::master_catalog_consolidate(1952,53636
+int StorageManager::master_catalog_create(1960,53852
+int StorageManager::metadata_clear(1986,54512
+int StorageManager::metadata_delete(2017,55402
+int StorageManager::metadata_move(2036,55877
+int StorageManager::open_array_mtx_destroy(2102,58057
+int StorageManager::open_array_mtx_init(2120,58486
+int StorageManager::open_array_mtx_lock(2138,58906
+int StorageManager::open_array_mtx_unlock(2156,59326
+void StorageManager::sort_fragment_names(2174,59752
+int StorageManager::workspace_clear(2214,61268
+int StorageManager::workspace_delete(2241,62129
+int StorageManager::workspace_move(2294,63614
+int StorageManager::OpenArray::mutex_destroy(2382,66522
+int StorageManager::OpenArray::mutex_init(2400,66930
+int StorageManager::OpenArray::mutex_lock(2418,67330
+int StorageManager::OpenArray::mutex_unlock(2436,67729
+
+src/storage_manager/storage_manager_config.cc,408
+StorageManagerConfig::StorageManagerConfig(45,1537
+StorageManagerConfig::~StorageManagerConfig(55,1732
+void StorageManagerConfig::init(65,1936
+const std::string& StorageManagerConfig::home(112,2992
+MPI_Comm* StorageManagerConfig::mpi_comm(117,3083
+int StorageManagerConfig::read_method(122,3164
+int StorageManagerConfig::write_method(126,3238
+StorageFS* StorageManagerConfig::get_filesystem(130,3314
+
+src/storage_manager/storage_posixfs.cc,689
+#  define PRINT_ERROR(45,1491
+#  define PRINT_ERROR(47,1590
+std::string PosixFS::current_dir(50,1640
+bool PosixFS::is_dir(63,1811
+bool PosixFS::is_file(68,1941
+void adjacent_slashes_dedup(73,2077
+void purge_dots_from_path(78,2228
+std::string PosixFS::real_dir(132,3466
+int PosixFS::create_dir(164,4289
+int PosixFS::delete_dir(190,5072
+std::vector<std::string> PosixFS::get_dirs(248,6683
+int PosixFS::create_file(273,7287
+int PosixFS::delete_file(285,7694
+size_t PosixFS::file_size(297,8030
+int PosixFS::read_from_file(315,8433
+int PosixFS::write_to_file(347,9381
+int PosixFS::move_path(401,11041
+int PosixFS::sync(413,11415
+bool PosixFS::consolidation_support(457,12606
