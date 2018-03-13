@@ -76,7 +76,9 @@ class StorageFS {
 
   virtual int move_path(const std::string& old_path, const std::string& new_path);
     
-  virtual int sync(const std::string& path);
+  virtual int sync_path(const std::string& path);
+
+  virtual int close_file(const std::string& filename);
 
   virtual bool consolidation_support(); 
 };

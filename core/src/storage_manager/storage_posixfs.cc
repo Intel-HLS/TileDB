@@ -410,7 +410,7 @@ int PosixFS::move_path(const std::string& old_path, const std::string& new_path)
   return TILEDB_FS_OK;
 }
     
-int PosixFS::sync(const std::string& filename) {
+int PosixFS::sync_path(const std::string& filename) {
   // Open file
   int fd;
   if(is_dir(filename))       // DIRECTORY 

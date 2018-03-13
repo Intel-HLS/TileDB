@@ -806,7 +806,17 @@ bool starts_with(const std::string& value, const std::string& prefix);
  * @param filename The name of the file.
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
-int sync(StorageFS *fs, const char* filename);
+int sync_path(StorageFS *fs, const std::string& path);
+
+/** 
+ * Closes any open file handles associated with a file. If the file does not exist,
+ * or if there are no open file handles it is a noop).
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param filename The name of the file.
+ * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
+ */
+int close_file(StorageFS *fs, const std::string& filename);
 
 /** 
  * Writes the input buffer to a file.

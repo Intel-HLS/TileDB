@@ -38,10 +38,11 @@
 
 #include "tiledb_constants.h"
 #include <hdfs.h>
+#include <mutex>
+#include <unordered_map>
 
 class HDFS : public StorageFS {
  public:
-  hdfsFS hdfs_handle = NULL;
   char home_dir[TILEDB_NAME_MAX_LEN+1];
 
   HDFS(const std::string& home);
@@ -67,24 +68,24 @@ class HDFS : public StorageFS {
   
   int move_path(const std::string& old_path, const std::string& new_path);
     
-  int sync(const std::string& path);
+  int sync_path(const std::string& path);
+
+  int close_file(const std::string& filename);
 
   bool consolidation_support();
-  
+
+  private:
+  hdfsFS hdfs_handle_ = NULL;
+  std::mutex read_map_mtx_, write_map_mtx_;
+  std::unordered_map<std::string, hdfsFile> read_map_, write_map_;
 };
 
 #else
 
-#include <assert.h>
-
 class HDFS : public StorageFS {
- public:
-  HDFS(const std::string& home) {
-    assert(false && "HDFS functionality not enabled in TileDB, build with -DUSE_HDFS=1");
-  }
-  
+  HDFS(const char *home) {};
 };
-  
+
 #endif
 
 

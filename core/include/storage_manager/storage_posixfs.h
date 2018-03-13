@@ -56,7 +56,7 @@ class PosixFS : public StorageFS {
   
   int move_path(const std::string& old_path, const std::string& new_path);
     
-  int sync(const std::string& path);
+  int sync_path(const std::string& path);
 
   bool consolidation_support();
 };

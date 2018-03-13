@@ -907,7 +907,11 @@ int StorageManager::metadata_create(const ArraySchema* array_schema) const {
   }
 
   // Store the array schema
-  if (write_to_file(fs_, filename.c_str(), array_schema_bin, array_schema_bin_size) == TILEDB_UT_ERR) {
+  int rc = write_to_file(fs_, filename, array_schema_bin, array_schema_bin_size);
+  if (!rc) {
+    rc = close_file(fs_, filename);
+  }
+  if (rc) {
     free(array_schema_bin);
     std::string errmsg = std::string("Cannot create metadata");
     PRINT_ERROR(errmsg);
@@ -1568,7 +1572,11 @@ int StorageManager::array_store_schema(
   }
 
   // Store the array schema
-  if (write_to_file(fs_, filename.c_str(), array_schema_bin, array_schema_bin_size) == TILEDB_UT_ERR) {
+  int rc = write_to_file(fs_, filename, array_schema_bin, array_schema_bin_size);
+  if (!rc) {
+    rc = close_file(fs_, filename);
+  }
+  if (rc) {
     free(array_schema_bin);
     std::string errmsg = std::string("Cannot store schema");
     PRINT_ERROR(errmsg);

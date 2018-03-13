@@ -987,6 +987,8 @@ int read_from_file_after_decompression(StorageFS *fs, const std::string& filenam
   inflateEnd(&strm);
 
   assert(rc == Z_STREAM_END); // All bytes have been decompressed
+
+  close_file(fs, filename);
   
   return TILEDB_UT_OK;
 }
@@ -1636,8 +1638,12 @@ bool starts_with(const std::string& value, const std::string& prefix) {
   return std::equal(prefix.begin(), prefix.end(), value.begin());
 }
 
-int sync(StorageFS *fs, const char* filename) {
-  return fs->sync(filename);
+int sync_path(StorageFS *fs, const std::string& path) {
+  return fs->sync_path(path);
+}
+
+int close_file(StorageFS *fs, const std::string& filename) {
+  return fs->close_file(filename);
 }
 
 int write_to_file(
@@ -1649,11 +1655,16 @@ int write_to_file(
 }
 
 int write_to_file_after_compression(StorageFS *fs, const std::string& filename, const void* buffer, size_t buffer_size, const int compression) {
+    int rc;
   switch (compression) {
     case TILEDB_GZIP:
       break;
     case TILEDB_NO_COMPRESSION:
-      return write_to_file(fs, filename, buffer, buffer_size);
+      rc = write_to_file(fs, filename, buffer, buffer_size);
+      if (!rc ) {
+        close_file(fs, filename);
+      }
+      return rc;
     default:
       std::string errmsg = std::string("Compression type not supported");
       PRINT_ERROR(errmsg);
@@ -1684,7 +1695,6 @@ int write_to_file_after_compression(StorageFS *fs, const std::string& filename, 
   /* run deflate() on input until output buffer not full, finish
      compression if all of source has been read in */
   Buffer *gzip_buffer = new Buffer();
-  int rc;
   do {
     strm.avail_out = TILEDB_GZIP_CHUNK_SIZE;
     strm.next_out = out;
@@ -1713,13 +1723,14 @@ int write_to_file_after_compression(StorageFS *fs, const std::string& filename, 
   deflateEnd(&strm);
 
   if (write_to_file(fs, filename, gzip_buffer->get_buffer(), gzip_buffer->get_buffer_size()) == TILEDB_UT_ERR) {
-    std::string errmsg = std::string("Could not write compressed bytes to internal buffer");
-    PRINT_ERROR(errmsg);
-    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-    return TILEDB_UT_ERR;
-  }
+      std::string errmsg = std::string("Could not write compressed bytes to internal buffer");
+      PRINT_ERROR(errmsg);
+      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+      return TILEDB_UT_ERR;
+    }
 
-  fs->sync(filename);
+  sync_path(fs, filename);
+  close_file(fs, filename);
 
   return TILEDB_UT_OK;
 }

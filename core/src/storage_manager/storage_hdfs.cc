@@ -53,6 +53,10 @@
 #  define PRINT_ERROR(x) do { } while(0) 
 #endif
 
+// Forward declarations
+static int sync_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& path);
+static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& path);
+
 HDFS::HDFS(const std::string& home) {
   struct hdfsBuilder *builder = hdfsNewBuilder();
   if (!builder) {
@@ -90,24 +94,34 @@ HDFS::HDFS(const std::string& home) {
     hdfsBuilderSetNameNodePort(builder, nport);
   }
   
-  hdfs_handle = hdfsBuilderConnect(builder);
-  if (!hdfs_handle) {
+  hdfs_handle_ = hdfsBuilderConnect(builder);
+  if (!hdfs_handle_) {
     assert(false && "Error with hdfs builder connection");
   }
 
   if (path_url.path().empty()) {
-    hdfsSetWorkingDirectory(hdfs_handle, "/");
+    hdfsSetWorkingDirectory(hdfs_handle_, "/");
   } else {
-    hdfsSetWorkingDirectory(hdfs_handle, home.c_str());
+    hdfsSetWorkingDirectory(hdfs_handle_, home.c_str());
   }
-  hdfsGetWorkingDirectory(hdfs_handle, home_dir, TILEDB_NAME_MAX_LEN);
+  hdfsGetWorkingDirectory(hdfs_handle_, home_dir, TILEDB_NAME_MAX_LEN);
 }
 
 HDFS::~HDFS() {
-  if (hdfsDisconnect(hdfs_handle)) {
+    // Flush out and close any files that have not been written out.
+  for (auto it = write_map_.begin(); it != write_map_.end(); ++it) {
+    std::string filename = it->first;
+    hdfsFile hdfs_file_handle = it->second;
+    //    TRACE_FN_ARG(std::string("Filename=") << filename << "has not been closed");
+    //assert(false && "File should have been closed already");
+    close_kernel(hdfs_handle_, hdfs_file_handle, filename);
+  }
+  write_map_.clear();
+
+  if (hdfsDisconnect(hdfs_handle_)) {
     PRINT_ERROR("disconnect error");
   }
-  hdfs_handle = NULL;
+  hdfs_handle_ = NULL;
 }
 
 static int print_errmsg(const std::string& errmsg) {
@@ -118,9 +132,18 @@ static int print_errmsg(const std::string& errmsg) {
   return TILEDB_FS_ERR;
 }
 
+static hdfsFile get_hdfsFile(const std::string& filename, std::unordered_map<std::string, hdfsFile> map) {
+  auto search = map.find(filename);
+  if (search != map.end()) {
+    return search->second;
+  } else {
+    return NULL;
+  }
+}
+
 std::string HDFS::current_dir() {
   char working_dir[TILEDB_NAME_MAX_LEN];
-  if (hdfsGetWorkingDirectory(hdfs_handle, working_dir, TILEDB_NAME_MAX_LEN) == NULL) {
+  if (hdfsGetWorkingDirectory(hdfs_handle_, working_dir, TILEDB_NAME_MAX_LEN) == NULL) {
     print_errmsg("Could not get current working dir");
     return NULL;
   }
@@ -145,11 +168,11 @@ static bool is_path(const hdfsFS hdfs_handle, const char *path, const char kind)
 
   
 bool HDFS::is_dir(const std::string& dir) {
-  return is_path(hdfs_handle, dir.c_str(), 'D');
+  return is_path(hdfs_handle_, dir.c_str(), 'D');
 }
 
 bool HDFS::is_file(const std::string& file) {
-  return is_path(hdfs_handle, file.c_str(), 'F');
+  return is_path(hdfs_handle_, file.c_str(), 'F');
 }
 
 std::string HDFS::real_dir(const std::string& dir) {
@@ -173,7 +196,7 @@ int HDFS::create_dir(const std::string& dir) {
     return print_errmsg(std::string("Cannot create directory ") + dir + "; Directory already exists");
   }
 
-  if (hdfsCreateDirectory(hdfs_handle, dir.c_str()) < 0) {
+  if (hdfsCreateDirectory(hdfs_handle_, dir.c_str()) < 0) {
     return print_errmsg(std::string("Cannot create directory ") + dir);
   }
     
@@ -182,7 +205,7 @@ int HDFS::create_dir(const std::string& dir) {
 
 int HDFS::delete_dir(const std::string& dir) {
   if (is_dir(dir)) {
-    if (hdfsDelete(hdfs_handle, dir.c_str(), 1) < 0) {
+    if (hdfsDelete(hdfs_handle_, dir.c_str(), 1) < 0) {
       return print_errmsg(std::string("Cannot delete directory ") + dir);
     }
   }else {
@@ -196,7 +219,7 @@ std::vector<std::string> HDFS::get_dirs(const std::string& dir) {
   std::vector<std::string> path_list;
 
   int num_entries = 0;
-  hdfsFileInfo *file_info = hdfsListDirectory(hdfs_handle, dir.c_str(), &num_entries);
+  hdfsFileInfo *file_info = hdfsListDirectory(hdfs_handle_, dir.c_str(), &num_entries);
   if (!file_info) {
     print_errmsg(std::string("Cannot list contents of dir ") + dir);
   } else {
@@ -211,12 +234,12 @@ std::vector<std::string> HDFS::get_dirs(const std::string& dir) {
 }
     
 int HDFS::create_file(const std::string& filename, int flags, mode_t mode) {
-  hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_WRONLY, 0, 0, 0);
+  hdfsFile file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_WRONLY, 0, 0, 0);
   if (!file) {
     return print_errmsg(std::string("Cannot create file ") + filename + "; Open error " + std::strerror(errno));
   }
     
-  if (hdfsCloseFile(hdfs_handle, file)) {
+  if (hdfsCloseFile(hdfs_handle_, file)) {
     return print_errmsg(std::string("Cannot create file ") + filename + "; Close error " + std::strerror(errno));
   }
   
@@ -224,8 +247,14 @@ int HDFS::create_file(const std::string& filename, int flags, mode_t mode) {
 }
 
 int HDFS::delete_file(const std::string& filename) {
+  hdfsFile file = get_hdfsFile(filename, write_map_);
+  if (file) {
+    close_kernel(hdfs_handle_, file, filename);
+    // TODO remove file from map
+  }
+  
   if (is_file(filename)) {
-    if (hdfsDelete(hdfs_handle, filename.c_str(), 0) < 0) {
+    if (hdfsDelete(hdfs_handle_, filename.c_str(), 0) < 0) {
       return print_errmsg(std::string("Cannot delete file ") + filename);
     }
   } else {
@@ -236,7 +265,12 @@ int HDFS::delete_file(const std::string& filename) {
 }
 
 size_t HDFS::file_size(const std::string& filename) {
-  hdfsFileInfo* file_info = hdfsGetPathInfo(hdfs_handle, filename.c_str());
+  hdfsFile file = get_hdfsFile(filename, write_map_);
+  if (file) {
+    sync_kernel(hdfs_handle_, file, filename);
+  }
+
+  hdfsFileInfo* file_info = hdfsGetPathInfo(hdfs_handle_, filename.c_str());
   if (!file_info) {
     print_errmsg(std::string("Cannot get path info for file ") + filename);
     return 0;
@@ -292,6 +326,8 @@ static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer
 int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
     TRACE_FN_ARG("filename="<<std::string(filename) << " offset=" << offset << " length=" << length);
 
+        // TODO remove file from map
+
   // Workaround for error messages of the type -
   // readDirect: FSDataInputStream#read error:
   // java.lang.UnsupportedOperationException: Byte-buffer read unsupported by input stream
@@ -308,7 +344,7 @@ int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer
 
 #define MAX_SIZE 16*1024*1024
   
-  hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_RDONLY, size>MAX_SIZE?MAX_SIZE:size, 0, 0);
+  hdfsFile file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_RDONLY, size>MAX_SIZE?MAX_SIZE:size, 0, 0);
 
   fflush(stderr);
   dup2(old_fd, 2);
@@ -320,11 +356,11 @@ int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer
   }
 
   int rc = TILEDB_FS_OK;;
-  if(read_from_file_kernel(hdfs_handle, file, buffer, length>size?size:length, offset)) {
+  if(read_from_file_kernel(hdfs_handle_, file, buffer, length>size?size:length, offset)) {
     rc = print_errmsg(std::string("Cannot read file ") + filename);
   }
 
-  if (hdfsCloseFile(hdfs_handle, file)) {
+  if (hdfsCloseFile(hdfs_handle_, file)) {
     rc = print_errmsg(std::string("Cannot close file ") + filename + " after read " + std::strerror(errno));
   }
 
@@ -358,52 +394,84 @@ int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t 
   }
 
   int rc = TILEDB_FS_OK;
-  hdfsFile file = NULL;
-  if (is_file(filename)) {
-    assert(false && "TBD: No support for appending to existing file");
-    /*    // emrfs doesn't support append, so append by replacing file
-    if(append_by_replacing(file, filename, buffer, buffer_size)) {
-      std::string errmsg = std::string("Cannot append by replace for file") + filename;
-      rc = print_errmsg(errmsg);
-      } */
-  }
-  else {
-    file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_WRONLY, max_bytes, 0, 0);
+  hdfsFile file = get_hdfsFile(filename, write_map_);
+  if (!file) {
+    if (is_file(filename)) {
+      assert(false && "No support for appending to existing file.");
+    }
+    write_map_mtx_.lock();
+    file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_WRONLY, max_bytes, 0, 0);
+    if (file) {
+      write_map_.emplace(filename, file);
+    }
+    write_map_mtx_.unlock();
     if (!file) {
-      return print_errmsg(std::string("Cannot open file " + filename + " for write. " + std::strerror(errno)));
-    }
-
-    if(write_to_file_kernel(hdfs_handle,file, buffer, buffer_size, max_bytes)) {
-      rc = print_errmsg( std::string("Error writing to file " + filename));
+      return  print_errmsg(std::string("Cannot open file " + filename + " for write"));
     }
   }
 
-  if (rc == TILEDB_FS_OK && hdfsHSync(hdfs_handle, file)) {
-    rc= print_errmsg(std::string("Cannot synch file " + filename + " after write"));
-  }
-  
-  if (hdfsCloseFile(hdfs_handle, file)) {
-    return print_errmsg(std::string("Cannot close file " + filename + " after write " + std::strerror(errno)));
-  }
+  if (write_to_file_kernel(hdfs_handle_, file, buffer, buffer_size, max_bytes)) {
+    rc = print_errmsg(std::string("Cannot write to file " + filename));
+  } /*else if (hdfsHSync(hdfs_handle_, file)) {
+    rc = print_errmsg(std::string("Cannot synch file " + filename + " after write"));
+    }*/
 
   return rc;
 }
 
 int HDFS::move_path(const std::string& old_path, const std::string& new_path) {  
-  if (!hdfsExists(hdfs_handle, new_path.c_str())) {
+  if (!hdfsExists(hdfs_handle_, new_path.c_str())) {
     return print_errmsg(std::string("Cannot move path ") + old_path + " to " + new_path + " as it exists");
   }
     
-  if (hdfsRename(hdfs_handle, old_path.c_str(), new_path.c_str()) < 0) {
+  if (hdfsRename(hdfs_handle_, old_path.c_str(), new_path.c_str()) < 0) {
     return print_errmsg(std::string("Cannot rename path ") + old_path + " to " + new_path);
   }
 
   return TILEDB_FS_OK;
 }
     
-int HDFS::sync(const std::string& path) {
-  // Files are synched up as soon as they are written. So this is a no-op.
+static int sync_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& path) {
+  if (hdfsHSync(hdfs_handle, hdfs_file_handle)) {
+    return print_errmsg(std::string("Cannot sync file ") + path);
+  }
+
   return TILEDB_FS_OK;
+}
+
+int HDFS::sync_path(const std::string& path) {
+  int rc = TILEDB_FS_OK;
+  
+  auto search = write_map_.find(path);
+  if(search != write_map_.end()) {
+    rc = sync_kernel(hdfs_handle_, search->second, path);
+  }
+
+  return rc;
+}
+
+static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& path) {
+  if (hdfsCloseFile(hdfs_handle, hdfs_file_handle)) {
+    return print_errmsg(std::string("Cannot close file " + path + " after write"));
+  }
+
+  return TILEDB_FS_OK;
+}
+
+int HDFS::close_file(const std::string& filename) {
+  int rc = TILEDB_FS_OK;
+
+  sync_path(filename);
+
+  hdfsFile file = get_hdfsFile(filename, write_map_);
+  if (file) {
+    write_map_mtx_.lock();
+    rc = close_kernel(hdfs_handle_, file, filename);
+    write_map_.erase(filename);
+    write_map_mtx_.unlock();
+  }
+
+  return rc;
 }
 
 bool HDFS::consolidation_support() {

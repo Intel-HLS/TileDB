@@ -95,8 +95,12 @@ int StorageFS::move_path(const std::string& old_path, const std::string& new_pat
   assert(false && "Implement in derived class");
 }
     
-int StorageFS::sync(const std::string& path) {
+int StorageFS::sync_path(const std::string& path) {
   assert(false && "Implement in derived class");
+}
+
+int StorageFS::close_file(const std::string& filename) {
+  return TILEDB_FS_OK;
 }
 
 bool StorageFS::consolidation_support() {
