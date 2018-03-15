@@ -280,7 +280,8 @@ int ReadState::copy_cells(
     void* buffer,  
     size_t buffer_size,
     size_t& buffer_offset,
-    const CellPosRange& cell_pos_range) {
+    const CellPosRange& cell_pos_range,
+    size_t& remaining_skip_count) {
   // Trivial case
   if(is_empty_attribute(attribute_id))
     return TILEDB_RS_OK;
@@ -295,7 +296,7 @@ int ReadState::copy_cells(
   // Calculate free space in buffer
   size_t buffer_free_space = buffer_size - buffer_offset; 
   buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  if(buffer_free_space == 0) { // Overflow
+  if(buffer_free_space == 0 && remaining_skip_count == 0u) { // Overflow
     overflow_[attribute_id] = true;
     return TILEDB_RS_OK;
   }
@@ -317,6 +318,21 @@ int ReadState::copy_cells(
   else if(tiles_offsets_[attribute_id] > end_offset) // This range is written
     return TILEDB_RS_OK;
 
+  // Calculate number of bytes to skip
+  auto bytes_to_skip = remaining_skip_count * cell_size;
+
+  //#cells remaining in this cell range <= remaining_skip_count
+  if(tiles_offsets_[attribute_id] + bytes_to_skip > end_offset) { // This range is written
+    assert(remaining_skip_count > 0u);
+    auto num_cells_skipped = (end_offset - tiles_offsets_[attribute_id] + 1u)/cell_size;
+    assert(num_cells_skipped <= remaining_skip_count);
+    remaining_skip_count -= num_cells_skipped;
+    return TILEDB_RS_OK;
+  }
+
+  //skip some cells
+  tiles_offsets_[attribute_id] += bytes_to_skip;
+
   // Calculate the total size to copy
   bytes_left_to_copy = end_offset - tiles_offsets_[attribute_id] + 1;
   bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space);  
@@ -333,6 +349,9 @@ int ReadState::copy_cells(
     tiles_offsets_[attribute_id] += bytes_to_copy; 
     buffer_free_space = buffer_size - buffer_offset;
   }
+
+  //if some cells had remained to be skipped, they would have been caught by the if statement 30 lines above
+  remaining_skip_count = 0u;
 
   // Handle buffer overflow
   if(tiles_offsets_[attribute_id] != end_offset + 1) 

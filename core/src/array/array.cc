@@ -271,7 +271,7 @@ bool Array::overflow(int attribute_id) const {
     return array_read_state_->overflow(attribute_id);
 }
 
-int Array::read(void** buffers, size_t* buffer_sizes) {
+int Array::read(void** buffers, size_t* buffer_sizes, size_t* skip_counts) {
   // Sanity checks
   if(!read_mode()) {
     std::string errmsg = "Cannot read from array; Invalid mode";
@@ -297,7 +297,11 @@ int Array::read(void** buffers, size_t* buffer_sizes) {
 
   // Handle sorted modes
   if(mode_ == TILEDB_ARRAY_READ_SORTED_COL ||
-     mode_ == TILEDB_ARRAY_READ_SORTED_ROW) { 
+     mode_ == TILEDB_ARRAY_READ_SORTED_ROW) {
+      if(skip_counts) {
+        tiledb_ar_errmsg = "skip counts only handled for TILDB_ARRAY_READ mode, unsupported for TILDB_ARRAY_READ_SORTED* modes";
+        return TILEDB_AR_ERR;
+      }
       if(array_sorted_read_state_->read(buffers, buffer_sizes) == 
          TILEDB_ASRS_OK) {
         return TILEDB_AR_OK;
@@ -306,7 +310,7 @@ int Array::read(void** buffers, size_t* buffer_sizes) {
         return TILEDB_AR_ERR;
       }
   } else { // mode_ == TILDB_ARRAY_READ 
-    return read_default(buffers, buffer_sizes);
+    return read_default(buffers, buffer_sizes, skip_counts);
   }
 }
 
@@ -344,8 +348,8 @@ int Array::filter(void** buffers, size_t* buffer_sizes) {
 }
 #endif
 
-int Array::read_default(void** buffers, size_t* buffer_sizes) {
-  if(array_read_state_->read(buffers, buffer_sizes) != TILEDB_ARS_OK) {
+int Array::read_default(void** buffers, size_t* buffer_sizes, size_t* skip_counts) {
+  if(array_read_state_->read(buffers, buffer_sizes, skip_counts) != TILEDB_ARS_OK) {
     tiledb_ar_errmsg = tiledb_ars_errmsg;
     return TILEDB_AR_ERR;
   }

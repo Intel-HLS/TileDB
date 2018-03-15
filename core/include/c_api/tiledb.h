@@ -546,6 +546,24 @@ TILEDB_EXPORT int tiledb_array_read(
     void** buffers,
     size_t* buffer_sizes);
 
+/**
+ * Identical to tiledb_array_read, but skips N cells for each attribute
+ * before reading data into the buffer. An example where this is useful is
+ * as follows - user queries fields/attributes [ F0, F1, F2 ], but is only
+ * interested in cells where F0 > C. So, a good query would read blocks of F0
+ * data, determine which cells are needed and would only fetch data from F1
+ * and F2 for the required cells. This can be achieved by skipping over the
+ * discarded cells
+ * @params - identical to tiledb_array_read()
+ * @param skip_counts The number of cells to skip over for each buffer/attribute.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_array_skip_and_read(
+    const TileDB_Array* tiledb_array,
+    void** buffers,
+    size_t* buffer_sizes,
+    size_t* skip_counts);
+
 #ifdef ENABLE_MUPARSERX_EXPRESSIONS
 /**
  * Performs a filter operation on an array.

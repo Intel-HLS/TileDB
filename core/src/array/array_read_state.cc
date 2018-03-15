@@ -138,7 +138,8 @@ bool ArrayReadState::overflow(int attribute_id) const {
 
 int ArrayReadState::read(
     void** buffers, 
-    size_t* buffer_sizes) {
+    size_t* buffer_sizes,
+    size_t* skip_counts) {
   // Sanity check
   assert(fragment_num_);
 
@@ -150,10 +151,15 @@ int ArrayReadState::read(
   for(int i=0; i<fragment_num_; ++i)
     fragment_read_states_[i]->reset_overflow();
 
-  if(array_schema_->dense())  // DENSE
+  if(array_schema_->dense()) { // DENSE
+    if(skip_counts) {
+      tiledb_ar_errmsg = "skip counts only handled for sparse arrays";
+      return TILEDB_ARS_ERR;
+    }
     return read_dense(buffers, buffer_sizes);
+  }
   else                       // SPARSE
-    return read_sparse(buffers, buffer_sizes);
+    return read_sparse(buffers, buffer_sizes, skip_counts);
 }
 
 
@@ -406,9 +412,24 @@ int ArrayReadState::compute_unsorted_fragment_cell_ranges_sparse(
 
 int ArrayReadState::copy_cells(
     int attribute_id,
+    void* buffer,
+    size_t buffer_size,
+    size_t& buffer_offset)
+{
+  size_t remaining_skip_count = 0u;
+  return copy_cells(attribute_id,
+      buffer,
+      buffer_size,
+      buffer_offset,
+      remaining_skip_count);
+}
+
+int ArrayReadState::copy_cells(
+    int attribute_id,
     void* buffer,  
     size_t buffer_size,
-    size_t& buffer_offset) {
+    size_t& buffer_offset,
+    size_t& remaining_skip_count) {
   // For easy reference
   int type = array_schema_->type(attribute_id);
 
@@ -419,31 +440,36 @@ int ArrayReadState::copy_cells(
              attribute_id, 
              buffer, 
              buffer_size, 
-             buffer_offset);
+             buffer_offset,
+             remaining_skip_count);
   else if(type == TILEDB_INT64)
     rc = copy_cells<int64_t>(
              attribute_id, 
              buffer, 
              buffer_size, 
-             buffer_offset);
+             buffer_offset,
+             remaining_skip_count);
   else if(type == TILEDB_FLOAT32)
     rc = copy_cells<float>(
              attribute_id, 
              buffer, 
              buffer_size, 
-             buffer_offset);
+             buffer_offset,
+             remaining_skip_count);
   else if(type == TILEDB_FLOAT64)
     rc = copy_cells<double>(
              attribute_id, 
              buffer, 
              buffer_size, 
-             buffer_offset);
+             buffer_offset,
+             remaining_skip_count);
   else if(type == TILEDB_CHAR)
     rc = copy_cells<char>(
              attribute_id, 
              buffer, 
              buffer_size, 
-             buffer_offset);
+             buffer_offset,
+             remaining_skip_count);
   else 
     rc = TILEDB_ARS_ERR;
 
@@ -460,7 +486,8 @@ int ArrayReadState::copy_cells(
     int attribute_id,
     void* buffer,  
     size_t buffer_size,
-    size_t& buffer_offset) {
+    size_t& buffer_offset,
+    size_t& remaining_skip_count) {
   // For easy reference
   int64_t pos = fragment_cell_pos_ranges_vec_pos_[attribute_id];
   FragmentCellPosRanges& fragment_cell_pos_ranges = 
@@ -485,7 +512,8 @@ int ArrayReadState::copy_cells(
            buffer,
            buffer_size,
            buffer_offset,
-           cell_pos_range);
+           cell_pos_range,
+           remaining_skip_count);
       if(overflow_[attribute_id])
         break;
       else
@@ -499,7 +527,8 @@ int ArrayReadState::copy_cells(
            buffer,
            buffer_size,
            buffer_offset,
-           cell_pos_range) != TILEDB_RS_OK) {
+           cell_pos_range,
+           remaining_skip_count) != TILEDB_RS_OK) {
        tiledb_ars_errmsg = tiledb_rs_errmsg;
        return TILEDB_ARS_ERR;
      }
@@ -669,13 +698,14 @@ int ArrayReadState::copy_cells_var(
   return TILEDB_ARS_OK;
 }
 
-template<>
-void ArrayReadState::copy_cells_with_empty<int>(
+template<class T>
+void ArrayReadState::copy_cells_with_empty(
     int attribute_id,
     void* buffer,  
     size_t buffer_size,
     size_t& buffer_offset,
-    const CellPosRange& cell_pos_range) {
+    const CellPosRange& cell_pos_range,
+    size_t& remaining_skip_count) {
 
   // For easy reference
   size_t cell_size = array_schema_->cell_size(attribute_id);
@@ -685,7 +715,7 @@ void ArrayReadState::copy_cells_with_empty<int>(
   // Calculate free space in buffer
   size_t buffer_free_space = buffer_size - buffer_offset;
   buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  if(buffer_free_space == 0) { // Overflow
+  if(buffer_free_space == 0 && remaining_skip_count == 0u) { // Overflow
     overflow_[attribute_id] = true;
     return;
   }
@@ -695,21 +725,37 @@ void ArrayReadState::copy_cells_with_empty<int>(
 
   // Calculate number of empty cells to write
   int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
+
   int64_t cell_num_left_to_copy = 
       cell_num_in_range - empty_cells_written_[attribute_id]; 
+  
+  //If #cells to skip >= cell_num_left_to_copy, no need to copy anything
+  if(static_cast<size_t>(cell_num_left_to_copy) <= remaining_skip_count) {
+    remaining_skip_count -= cell_num_left_to_copy;
+    empty_cells_written_[attribute_id] = 0; //done with this range
+    return;
+  }
+
+  //#cells to copy - deduct remaining_skip_count
+  assert(remaining_skip_count < static_cast<size_t>(cell_num_left_to_copy));
+  cell_num_left_to_copy -= remaining_skip_count;
+
   size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
   size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
   int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
 
   // Copy empty cells to buffer
-  int empty = TILEDB_EMPTY_INT32;
+  auto empty = get_tiledb_empty_value<T>();
   for(int64_t i=0; i<cell_num_to_copy; ++i) {
     for(int j=0; j<cell_val_num; ++j) {
-      memcpy(buffer_c + buffer_offset, &empty, sizeof(int));
-      buffer_offset += sizeof(int);
+      memcpy(buffer_c + buffer_offset, &empty, sizeof(T));
+      buffer_offset += sizeof(T);
     }
-  } 
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
+  }
+  // include #cells skipped in the empty_cells_written_ value
+  empty_cells_written_[attribute_id] += (cell_num_to_copy + remaining_skip_count);
+  // reset remaining_skip_count
+  remaining_skip_count = 0u;
 
   // Handle buffer overflow
   if(empty_cells_written_[attribute_id] != cell_num_in_range) {
@@ -719,204 +765,8 @@ void ArrayReadState::copy_cells_with_empty<int>(
   }
 }
 
-template<>
-void ArrayReadState::copy_cells_with_empty<int64_t>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = array_schema_->cell_size(attribute_id);
-  char* buffer_c = static_cast<char*>(buffer);
-  int cell_val_num = array_schema_->cell_val_num(attribute_id);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  if(buffer_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true;
-    return;
-  }
-
-  // Sanity check
-  assert(!array_schema_->var_size(attribute_id));
-
-  // Calculate number of empty cells to write
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-
-  // Copy empty cells to buffer
-  int64_t empty = TILEDB_EMPTY_INT64;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    for(int j=0; j<cell_val_num; ++j) {
-      memcpy(buffer_c + buffer_offset, &empty, sizeof(int64_t));
-      buffer_offset += sizeof(int64_t);
-    }
-  } 
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) { 
-    overflow_[attribute_id] = true;
-  } else { // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-  }
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty<float>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = array_schema_->cell_size(attribute_id);
-  char* buffer_c = static_cast<char*>(buffer);
-  int cell_val_num = array_schema_->cell_val_num(attribute_id);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  if(buffer_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true;
-    return;
-  }
-
-  // Sanity check
-  assert(!array_schema_->var_size(attribute_id));
-
-  // Calculate number of empty cells to write
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-
-  // Copy empty cells to buffer
-  float empty = TILEDB_EMPTY_FLOAT32;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    for(int j=0; j<cell_val_num; ++j) {
-      memcpy(buffer_c + buffer_offset, &empty, sizeof(float));
-      buffer_offset += sizeof(float);
-    }
-  } 
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) { 
-    overflow_[attribute_id] = true;
-  } else { // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-  }
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty<double>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = array_schema_->cell_size(attribute_id);
-  char* buffer_c = static_cast<char*>(buffer);
-  int cell_val_num = array_schema_->cell_val_num(attribute_id);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  if(buffer_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true;
-    return;
-  }
-
-  // Sanity check
-  assert(!array_schema_->var_size(attribute_id));
-
-  // Calculate number of empty cells to write
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-
-  // Copy empty cells to buffer
-  double empty = TILEDB_EMPTY_FLOAT64;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    for(int j=0; j<cell_val_num; ++j) {
-      memcpy(buffer_c + buffer_offset, &empty, sizeof(double));
-      buffer_offset += sizeof(double);
-    }
-  } 
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) { 
-    overflow_[attribute_id] = true;
-  } else { // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-  }
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty<char>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = array_schema_->cell_size(attribute_id);
-  char* buffer_c = static_cast<char*>(buffer);
-  int cell_val_num = array_schema_->cell_val_num(attribute_id);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  if(buffer_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true;
-    return;
-  }
-
-  // Sanity check
-  assert(!array_schema_->var_size(attribute_id));
-
-  // Calculate number of empty cells to write
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-
-  // Copy empty cells to buffer
-  char empty = TILEDB_EMPTY_CHAR;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    for(int j=0; j<cell_val_num; ++j) {
-      memcpy(buffer_c + buffer_offset, &empty, sizeof(char));
-      buffer_offset += sizeof(char);
-    }
-  } 
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) {
-    overflow_[attribute_id] = true;
-  } else { // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-  }
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty_var<int>(
+template<class T>
+void ArrayReadState::copy_cells_with_empty_var(
     int attribute_id,
     void* buffer,  
     size_t buffer_size,
@@ -927,7 +777,7 @@ void ArrayReadState::copy_cells_with_empty_var<int>(
     const CellPosRange& cell_pos_range) {
   // For easy reference
   size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
-  size_t cell_size_var = sizeof(int);
+  size_t cell_size_var = sizeof(T);
   char* buffer_c = static_cast<char*>(buffer);
   char* buffer_var_c = static_cast<char*>(buffer_var);
 
@@ -960,277 +810,9 @@ void ArrayReadState::copy_cells_with_empty_var<int>(
   cell_num_to_copy = std::min(cell_num_to_copy, cell_num_to_copy_var);
 
   // Copy empty cells to buffers
-  int empty = TILEDB_EMPTY_INT32;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    memcpy(
-        buffer_c + buffer_offset, 
-        &buffer_var_offset, 
-        cell_size);
-    buffer_offset += cell_size;
-    memcpy(
-        buffer_var_c + buffer_var_offset, 
-        &empty,
-        cell_size_var);
-    buffer_var_offset += cell_size_var;
-  }
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) {
-    overflow_[attribute_id] = true;
-  } else { // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-  }
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty_var<int64_t>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    void* buffer_var,  
-    size_t buffer_var_size,
-    size_t& buffer_var_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
-  size_t cell_size_var = sizeof(int64_t);
-  char* buffer_c = static_cast<char*>(buffer);
-  char* buffer_var_c = static_cast<char*>(buffer_var);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
-  buffer_var_free_space = (buffer_var_free_space/cell_size_var)*cell_size_var;
-
-  // Handle overflow
-  if(buffer_free_space == 0 || buffer_var_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true; 
-    return;
-  }
-
-  // Sanity check
-  assert(array_schema_->var_size(attribute_id));
-
-  // Calculate cell number to copy
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_left_to_copy_var = cell_num_left_to_copy * cell_size_var;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  size_t bytes_to_copy_var = 
-      std::min(bytes_left_to_copy_var, buffer_var_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-  int64_t cell_num_to_copy_var = bytes_to_copy_var / cell_size_var; 
-  cell_num_to_copy = std::min(cell_num_to_copy, cell_num_to_copy_var);
-
-  // Copy empty cells to buffers
-  int64_t empty = TILEDB_EMPTY_INT64;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    memcpy(
-        buffer_c + buffer_offset, 
-        &buffer_var_offset, 
-        cell_size);
-    buffer_offset += cell_size;
-    memcpy(
-        buffer_var_c + buffer_var_offset, 
-        &empty,
-        cell_size_var);
-    buffer_var_offset += cell_size_var;
-  }
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) { 
-    overflow_[attribute_id] = true;
-  } else { // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-  }
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty_var<float>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    void* buffer_var,  
-    size_t buffer_var_size,
-    size_t& buffer_var_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
-  size_t cell_size_var = sizeof(float);
-  char* buffer_c = static_cast<char*>(buffer);
-  char* buffer_var_c = static_cast<char*>(buffer_var);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
-  buffer_var_free_space = (buffer_var_free_space/cell_size_var)*cell_size_var;
-
-  // Handle overflow
-  if(buffer_free_space == 0 || buffer_var_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true; 
-    return;
-  }
-
-  // Sanity check
-  assert(array_schema_->var_size(attribute_id));
-
-  // Calculate cell number to copy
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_left_to_copy_var = cell_num_left_to_copy * cell_size_var;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  size_t bytes_to_copy_var = 
-      std::min(bytes_left_to_copy_var, buffer_var_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-  int64_t cell_num_to_copy_var = bytes_to_copy_var / cell_size_var; 
-  cell_num_to_copy = std::min(cell_num_to_copy, cell_num_to_copy_var);
-
-  // Copy empty cells to buffers
-  float empty = TILEDB_EMPTY_FLOAT32;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    memcpy(
-        buffer_c + buffer_offset, 
-        &buffer_var_offset, 
-        cell_size);
-    buffer_offset += cell_size;
-    memcpy(
-        buffer_var_c + buffer_var_offset, 
-        &empty,
-        cell_size_var);
-    buffer_var_offset += cell_size_var;
-  }
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) 
-    overflow_[attribute_id] = true;
-  else // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty_var<double>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    void* buffer_var,  
-    size_t buffer_var_size,
-    size_t& buffer_var_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
-  size_t cell_size_var = sizeof(double);
-  char* buffer_c = static_cast<char*>(buffer);
-  char* buffer_var_c = static_cast<char*>(buffer_var);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
-  buffer_var_free_space = (buffer_var_free_space/cell_size_var)*cell_size_var;
-
-  // Handle overflow
-  if(buffer_free_space == 0 || buffer_var_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true; 
-    return;
-  }
-
-  // Sanity check
-  assert(array_schema_->var_size(attribute_id));
-
-  // Calculate cell number to copy
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_left_to_copy_var = cell_num_left_to_copy * cell_size_var;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  size_t bytes_to_copy_var = 
-      std::min(bytes_left_to_copy_var, buffer_var_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-  int64_t cell_num_to_copy_var = bytes_to_copy_var / cell_size_var; 
-  cell_num_to_copy = std::min(cell_num_to_copy, cell_num_to_copy_var);
-
-  // Copy empty cells to buffers
-  double empty = TILEDB_EMPTY_FLOAT64;
-  for(int64_t i=0; i<cell_num_to_copy; ++i) {
-    memcpy(
-        buffer_c + buffer_offset, 
-        &buffer_var_offset, 
-        cell_size);
-    buffer_offset += cell_size;
-    memcpy(
-        buffer_var_c + buffer_var_offset, 
-        &empty,
-        cell_size_var);
-    buffer_var_offset += cell_size_var;
-  }
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
-
-  // Handle buffer overflow
-  if(empty_cells_written_[attribute_id] != cell_num_in_range) 
-    overflow_[attribute_id] = true;
-  else // Done copying this range
-    empty_cells_written_[attribute_id] = 0;
-}
-
-template<>
-void ArrayReadState::copy_cells_with_empty_var<char>(
-    int attribute_id,
-    void* buffer,  
-    size_t buffer_size,
-    size_t& buffer_offset,
-    void* buffer_var,  
-    size_t buffer_var_size,
-    size_t& buffer_var_offset,
-    const CellPosRange& cell_pos_range) {
-  // For easy reference
-  size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
-  size_t cell_size_var = sizeof(char);
-  char* buffer_c = static_cast<char*>(buffer);
-  char* buffer_var_c = static_cast<char*>(buffer_var);
-
-  // Calculate free space in buffer
-  size_t buffer_free_space = buffer_size - buffer_offset;
-  buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
-  buffer_var_free_space = (buffer_var_free_space/cell_size_var)*cell_size_var;
-
-  // Handle overflow
-  if(buffer_free_space == 0 || buffer_var_free_space == 0) { // Overflow
-    overflow_[attribute_id] = true; 
-    return;
-  }
-
-  // Sanity check
-  assert(array_schema_->var_size(attribute_id));
-
-  // Calculate cell number to copy
-  int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
-  int64_t cell_num_left_to_copy = 
-      cell_num_in_range - empty_cells_written_[attribute_id]; 
-  size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
-  size_t bytes_left_to_copy_var = cell_num_left_to_copy * cell_size_var;
-  size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
-  size_t bytes_to_copy_var = 
-      std::min(bytes_left_to_copy_var, buffer_var_free_space); 
-  int64_t cell_num_to_copy = bytes_to_copy / cell_size; 
-  int64_t cell_num_to_copy_var = bytes_to_copy_var / cell_size_var; 
-  cell_num_to_copy = std::min(cell_num_to_copy, cell_num_to_copy_var);
-
-  // Copy empty cells to buffers
-  char empty = TILEDB_EMPTY_CHAR;
+  //FIXME: can't empty var cells be represented by setting the same value of
+  //buffer_var_offset for consecutive cells? No empty var char needed?
+  auto empty = get_tiledb_empty_value<T>();
   for(int64_t i=0; i<cell_num_to_copy; ++i) {
     memcpy(
         buffer_c + buffer_offset, 
@@ -1881,7 +1463,8 @@ int ArrayReadState::read_dense_attr_var(
 
 int ArrayReadState::read_sparse(
     void** buffers,  
-    size_t* buffer_sizes) {
+    size_t* buffer_sizes,
+    size_t* skip_counts) {
   // For easy reference
   std::vector<int> attribute_ids = array_->attribute_ids();
   int attribute_id_num = attribute_ids.size(); 
@@ -1900,12 +1483,15 @@ int ArrayReadState::read_sparse(
       buffer_i +=2;
   }
 
+  size_t zero_skip_count = 0u;
+
   // Read coordinates attribute first
   if(coords_buffer_i != -1) {
     if(read_sparse_attr(
            attribute_num_, 
            buffers[coords_buffer_i], 
-           buffer_sizes[coords_buffer_i]) != TILEDB_ARS_OK)
+           buffer_sizes[coords_buffer_i],
+           skip_counts ? skip_counts[coords_buffer_i] : zero_skip_count) != TILEDB_ARS_OK)
       return TILEDB_ARS_ERR;
   }  
 
@@ -1922,7 +1508,8 @@ int ArrayReadState::read_sparse(
       if(read_sparse_attr(
              attribute_ids[i], 
              buffers[buffer_i], 
-             buffer_sizes[buffer_i]) != TILEDB_ARS_OK)
+             buffer_sizes[buffer_i],
+             skip_counts ? skip_counts[buffer_i] : zero_skip_count) != TILEDB_ARS_OK)
         return TILEDB_ARS_ERR;
 
       ++buffer_i;
@@ -1931,8 +1518,10 @@ int ArrayReadState::read_sparse(
              attribute_ids[i], 
              buffers[buffer_i],       // offsets 
              buffer_sizes[buffer_i],
+             skip_counts ? skip_counts[buffer_i] : zero_skip_count,
              buffers[buffer_i+1],     // actual values
-             buffer_sizes[buffer_i+1]) != TILEDB_ARS_OK)
+             buffer_sizes[buffer_i+1],
+             skip_counts ? skip_counts[buffer_i+1]: zero_skip_count) != TILEDB_ARS_OK)
         return TILEDB_ARS_ERR;
 
       buffer_i += 2;
@@ -1946,7 +1535,8 @@ int ArrayReadState::read_sparse(
 int ArrayReadState::read_sparse_attr(
     int attribute_id,
     void* buffer,  
-    size_t& buffer_size) {
+    size_t& buffer_size,
+    size_t& skip_count) {
   // For easy reference
   int coords_type = array_schema_->coords_type();
 
@@ -1955,22 +1545,26 @@ int ArrayReadState::read_sparse_attr(
     return read_sparse_attr<int>(
                attribute_id, 
                buffer, 
-               buffer_size);
+               buffer_size,
+               skip_count);
   } else if(coords_type == TILEDB_INT64) {
     return read_sparse_attr<int64_t>(
                attribute_id, 
                buffer, 
-               buffer_size);
+               buffer_size,
+               skip_count);
   } else if(coords_type == TILEDB_FLOAT32) {
     return read_sparse_attr<float>(
                attribute_id, 
                buffer, 
-               buffer_size);
+               buffer_size,
+               skip_count);
   } else if(coords_type == TILEDB_FLOAT64) {
     return read_sparse_attr<double>(
                attribute_id, 
                buffer, 
-               buffer_size);
+               buffer_size,
+               skip_count);
   } else {
     std::string errmsg = "Cannot read from array; Invalid coordinates type"; 
     PRINT_ERROR(errmsg);
@@ -1983,7 +1577,8 @@ template<class T>
 int ArrayReadState::read_sparse_attr(
     int attribute_id,
     void* buffer,  
-    size_t& buffer_size) {
+    size_t& buffer_size,
+    size_t& skip_count) {
   // Auxiliary variables
   size_t buffer_offset = 0;
 
@@ -1995,7 +1590,8 @@ int ArrayReadState::read_sparse_attr(
              attribute_id,
              buffer, 
              buffer_size, 
-             buffer_offset) != TILEDB_ARS_OK)
+             buffer_offset,
+             skip_count) != TILEDB_ARS_OK)
         return TILEDB_ARS_ERR;
 
     // Check for overflow
@@ -2025,7 +1621,8 @@ int ArrayReadState::read_sparse_attr(
            attribute_id, 
            buffer, 
            buffer_size, 
-           buffer_offset) != TILEDB_ARS_OK)
+           buffer_offset,
+           skip_count) != TILEDB_ARS_OK)
       return TILEDB_ARS_ERR;
 
     // Check for buffer overflow
@@ -2040,8 +1637,10 @@ int ArrayReadState::read_sparse_attr_var(
     int attribute_id,
     void* buffer,  
     size_t& buffer_size,
+    size_t& skip_count,
     void* buffer_var,  
-    size_t& buffer_var_size) {
+    size_t& buffer_var_size,
+    size_t& skip_count_var) {
   // For easy reference
   int coords_type = array_schema_->coords_type();
 
@@ -2051,29 +1650,37 @@ int ArrayReadState::read_sparse_attr_var(
                attribute_id, 
                buffer, 
                buffer_size,
+               skip_count,
                buffer_var, 
-               buffer_var_size);
+               buffer_var_size,
+               skip_count_var);
   } else if(coords_type == TILEDB_INT64) {
     return read_sparse_attr_var<int64_t>(
                attribute_id, 
                buffer, 
                buffer_size,
+               skip_count,
                buffer_var, 
-               buffer_var_size);
+               buffer_var_size,
+               skip_count_var);
   } else if(coords_type == TILEDB_FLOAT32) {
     return read_sparse_attr_var<float>(
                attribute_id, 
                buffer, 
                buffer_size,
+               skip_count,
                buffer_var, 
-               buffer_var_size);
+               buffer_var_size,
+               skip_count_var);
   } else if(coords_type == TILEDB_FLOAT64) {
     return read_sparse_attr_var<double>(
                attribute_id, 
                buffer, 
                buffer_size,
+               skip_count,
                buffer_var, 
-               buffer_var_size);
+               buffer_var_size,
+               skip_count_var);
   } else {
     std::string errmsg = "Cannot read from array; Invalid coordinates type";
     PRINT_ERROR(errmsg);
@@ -2087,8 +1694,10 @@ int ArrayReadState::read_sparse_attr_var(
     int attribute_id,
     void* buffer,  
     size_t& buffer_size,
+    size_t& skip_count,
     void* buffer_var,  
-    size_t& buffer_var_size) {
+    size_t& buffer_var_size,
+    size_t& skip_count_var) {
     // Auxiliary variables
   size_t buffer_offset = 0;
   size_t buffer_var_offset = 0;

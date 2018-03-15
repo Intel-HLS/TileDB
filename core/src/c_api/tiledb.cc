@@ -682,12 +682,20 @@ int tiledb_array_read(
     const TileDB_Array* tiledb_array,
     void** buffers,
     size_t* buffer_sizes) {
+  return tiledb_array_skip_and_read(tiledb_array, buffers, buffer_sizes, 0); //no skip counts
+}
+
+int tiledb_array_skip_and_read(
+    const TileDB_Array* tiledb_array,
+    void** buffers,
+    size_t* buffer_sizes,
+    size_t* skip_counts) {
   // Sanity check
   if(!sanity_check(tiledb_array))
     return TILEDB_ERR;
 
   // Read
-  if(tiledb_array->array_->read(buffers, buffer_sizes) != TILEDB_AR_OK) {
+  if(tiledb_array->array_->read(buffers, buffer_sizes, skip_counts) != TILEDB_AR_OK) {
     strcpy(tiledb_errmsg, tiledb_ar_errmsg.c_str());
     return TILEDB_ERR;
   }

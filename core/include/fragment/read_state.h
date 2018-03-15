@@ -196,6 +196,7 @@ class ReadState {
    * @param buffer_size The size (in bytes) of *buffer*.
    * @param buffer_offset The offset in *buffer* where the copy will start from.
    * @param cell_pos_range The cell position range to be copied.
+   * @param remaining_skip_count The number of cells to skip before copying
    * @return TILEDB_RS_OK on success and TILEDB_RS_ERR on error.
    */
   int copy_cells(
@@ -204,7 +205,8 @@ class ReadState {
       void* buffer,
       size_t buffer_size,
       size_t& buffer_offset,
-      const CellPosRange& cell_pos_range);
+      const CellPosRange& cell_pos_range,
+      size_t& remaining_skip_count);
 
   /**
    * Copies the cells of the input **variable-sized** attribute into the input
