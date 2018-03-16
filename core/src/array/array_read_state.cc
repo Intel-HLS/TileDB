@@ -1665,6 +1665,8 @@ int ArrayReadState::read_sparse_attr(
       return TILEDB_ARS_OK;
     }
 
+    // TODO: skip_count is ignored here - functionally correct, but there is
+    // further opportunity to optimize
     // Prepare the cell ranges for the next read round
     if(fragment_cell_pos_ranges_vec_pos_[attribute_id] >= 
        int64_t(fragment_cell_pos_ranges_vec_.size())) {
@@ -1790,6 +1792,8 @@ int ArrayReadState::read_sparse_attr_var(
       return TILEDB_ARS_OK;
     }
 
+    // TODO: skip_count is ignored here - functionally correct, but there is
+    // further opportunity to optimize
     // Prepare the cell ranges for the next read round
     if(fragment_cell_pos_ranges_vec_pos_[attribute_id] >= 
        int64_t(fragment_cell_pos_ranges_vec_.size())) {

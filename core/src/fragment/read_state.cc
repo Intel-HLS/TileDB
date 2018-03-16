@@ -289,9 +289,14 @@ int ReadState::copy_cells(
   // For easy reference
   size_t cell_size = array_schema_->cell_size(attribute_id);
 
-  // Prepare attribute tile
-  if(prepare_tile_for_reading(attribute_id, tile_i) != TILEDB_RS_OK)
-    return TILEDB_RS_ERR;
+  //If this tile hasn't been fetched and all the cells in this tile should be skipped,
+  //then there is no need to fetch the tile from disk (and decompress)
+  size_t num_cells_in_curr_tile = (cell_pos_range.second - cell_pos_range.first + 1u);
+  if(fetched_tile_[attribute_id] != tile_i
+      && remaining_skip_count >= num_cells_in_curr_tile) {
+    remaining_skip_count -= num_cells_in_curr_tile;
+    return TILEDB_RS_OK;
+  }
 
   // Calculate free space in buffer
   size_t buffer_free_space = buffer_size - buffer_offset; 
@@ -300,6 +305,10 @@ int ReadState::copy_cells(
     overflow_[attribute_id] = true;
     return TILEDB_RS_OK;
   }
+
+  // Prepare attribute tile
+  if(prepare_tile_for_reading(attribute_id, tile_i) != TILEDB_RS_OK)
+    return TILEDB_RS_ERR;
 
   // Sanity check
   assert(!array_schema_->var_size(attribute_id));
@@ -373,6 +382,20 @@ int ReadState::copy_cells_var(
     size_t& buffer_var_offset,
     size_t& remaining_skip_count_var,
     const CellPosRange& cell_pos_range) {
+
+  // TileDB traverses the offsets and data in lock step - can't have different skip values
+  assert(remaining_skip_count == remaining_skip_count_var);
+
+  //If this tile hasn't been fetched and all the cells in this tile should be skipped,
+  //then there is no need to fetch the tile from disk (and decompress)
+  size_t num_cells_in_curr_tile = (cell_pos_range.second - cell_pos_range.first + 1u);
+  if(fetched_tile_[attribute_id] != tile_i
+      && remaining_skip_count >= num_cells_in_curr_tile) {
+    remaining_skip_count -= num_cells_in_curr_tile;
+    remaining_skip_count_var -= num_cells_in_curr_tile;
+    return TILEDB_RS_OK;
+  }
+
   // For easy reference
   size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
 
@@ -380,10 +403,6 @@ int ReadState::copy_cells_var(
   size_t buffer_free_space = buffer_size - buffer_offset; 
   buffer_free_space = (buffer_free_space / cell_size) * cell_size;
   size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
-
-  // TileDB traverses the offsets and data in lock step - can't have different skip values
-  assert(remaining_skip_count == remaining_skip_count_var);
-
   // Handle overflow
   if((buffer_free_space == 0 || buffer_var_free_space == 0)
       && remaining_skip_count == 0u) { // Overflow
