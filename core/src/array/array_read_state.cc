@@ -554,12 +554,37 @@ int ArrayReadState::copy_cells(
 
 int ArrayReadState::copy_cells_var(
     int attribute_id,
-    void* buffer,  
+    void* buffer,
     size_t buffer_size,
     size_t& buffer_offset,
-    void* buffer_var,  
+    void* buffer_var,
     size_t buffer_var_size,
-    size_t& buffer_var_offset) {
+    size_t& buffer_var_offset)
+{
+  size_t remaining_skip_count = 0u;
+  size_t remaining_skip_count_var = 0u;
+  return copy_cells_var(
+      attribute_id,
+      buffer,
+      buffer_size,
+      buffer_offset,
+      remaining_skip_count,
+      buffer_var,
+      buffer_var_size,
+      buffer_var_offset,
+      remaining_skip_count_var);
+}
+
+int ArrayReadState::copy_cells_var(
+    int attribute_id,
+    void* buffer,
+    size_t buffer_size,
+    size_t& buffer_offset,
+    size_t& remaining_skip_count,
+    void* buffer_var,
+    size_t buffer_var_size,
+    size_t& buffer_var_offset,
+    size_t& remaining_skip_count_var) {
   // For easy reference
   int type = array_schema_->type(attribute_id);
 
@@ -571,45 +596,55 @@ int ArrayReadState::copy_cells_var(
              buffer, 
              buffer_size, 
              buffer_offset,
+             remaining_skip_count,
              buffer_var, 
              buffer_var_size,
-             buffer_var_offset);
+             buffer_var_offset,
+             remaining_skip_count_var);
   else if(type == TILEDB_INT64)
     rc = copy_cells_var<int64_t>(
              attribute_id,
              buffer, 
              buffer_size, 
              buffer_offset,
+             remaining_skip_count,
              buffer_var, 
              buffer_var_size,
-             buffer_var_offset);
+             buffer_var_offset,
+             remaining_skip_count_var);
   else if(type == TILEDB_FLOAT32)
     rc = copy_cells_var<float>(
              attribute_id,
              buffer, 
              buffer_size, 
              buffer_offset,
+             remaining_skip_count,
              buffer_var, 
              buffer_var_size,
-             buffer_var_offset);
+             buffer_var_offset,
+             remaining_skip_count_var);
   else if(type == TILEDB_FLOAT64)
     rc = copy_cells_var<double>(
              attribute_id,
              buffer, 
              buffer_size, 
              buffer_offset,
+             remaining_skip_count,
              buffer_var, 
              buffer_var_size,
-             buffer_var_offset);
+             buffer_var_offset,
+             remaining_skip_count_var);
   else if(type == TILEDB_CHAR)
     rc = copy_cells_var<char>(
              attribute_id,
              buffer, 
              buffer_size, 
              buffer_offset,
+             remaining_skip_count,
              buffer_var, 
              buffer_var_size,
-             buffer_var_offset);
+             buffer_var_offset,
+             remaining_skip_count_var);
   else
     rc = TILEDB_ARS_ERR;
 
@@ -627,9 +662,11 @@ int ArrayReadState::copy_cells_var(
     void* buffer,  
     size_t buffer_size,
     size_t& buffer_offset,
+    size_t& remaining_skip_count,
     void* buffer_var,  
     size_t buffer_var_size,
-    size_t& buffer_var_offset) {
+    size_t& buffer_var_offset,
+    size_t& remaining_skip_count_var) {
   // For easy reference
   int64_t pos = fragment_cell_pos_ranges_vec_pos_[attribute_id];
   FragmentCellPosRanges& fragment_cell_pos_ranges = 
@@ -654,9 +691,11 @@ int ArrayReadState::copy_cells_var(
            buffer,
            buffer_size,
            buffer_offset,
+           remaining_skip_count,
            buffer_var,
            buffer_var_size,
            buffer_var_offset,
+           remaining_skip_count_var,
            cell_pos_range);
       if(overflow_[attribute_id])
         break;
@@ -671,9 +710,11 @@ int ArrayReadState::copy_cells_var(
            buffer,
            buffer_size,
            buffer_offset,
+           remaining_skip_count,
            buffer_var,
            buffer_var_size,
            buffer_var_offset,
+           remaining_skip_count_var,
            cell_pos_range) != TILEDB_RS_OK) {
        tiledb_ars_errmsg = tiledb_rs_errmsg;
        return TILEDB_ARS_ERR;
@@ -771,9 +812,11 @@ void ArrayReadState::copy_cells_with_empty_var(
     void* buffer,  
     size_t buffer_size,
     size_t& buffer_offset,
+    size_t& remaining_skip_count,
     void* buffer_var,  
     size_t buffer_var_size,
     size_t& buffer_var_offset,
+    size_t& remaining_skip_count_var,
     const CellPosRange& cell_pos_range) {
   // For easy reference
   size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
@@ -787,8 +830,12 @@ void ArrayReadState::copy_cells_with_empty_var(
   size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
   buffer_var_free_space = (buffer_var_free_space/cell_size_var)*cell_size_var;
 
+  // TileDB traverses the offsets and data in lock step - can't have different skip values
+  assert(remaining_skip_count == remaining_skip_count_var);
+
   // Handle overflow
-  if(buffer_free_space == 0 || buffer_var_free_space == 0) { // Overflow
+  if((buffer_free_space == 0 || buffer_var_free_space == 0)
+      && remaining_skip_count == 0u) { // Overflow
     overflow_[attribute_id] = true; 
     return;
   }
@@ -800,6 +847,19 @@ void ArrayReadState::copy_cells_with_empty_var(
   int64_t cell_num_in_range = cell_pos_range.second - cell_pos_range.first + 1; 
   int64_t cell_num_left_to_copy = 
       cell_num_in_range - empty_cells_written_[attribute_id]; 
+
+  //If #cells to skip >= cell_num_left_to_copy, no need to copy anything
+  if(static_cast<size_t>(cell_num_left_to_copy) <= remaining_skip_count) {
+    remaining_skip_count -= cell_num_left_to_copy;
+    remaining_skip_count_var -= cell_num_left_to_copy;
+    empty_cells_written_[attribute_id] = 0; //done with this range
+    return;
+  }
+
+  //#cells to copy - deduct remaining_skip_count
+  assert(remaining_skip_count < static_cast<size_t>(cell_num_left_to_copy));
+  cell_num_left_to_copy -= remaining_skip_count;
+
   size_t bytes_left_to_copy = cell_num_left_to_copy * cell_size;
   size_t bytes_left_to_copy_var = cell_num_left_to_copy * cell_size_var;
   size_t bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space); 
@@ -825,7 +885,12 @@ void ArrayReadState::copy_cells_with_empty_var(
         cell_size_var);
     buffer_var_offset += cell_size_var;
   }
-  empty_cells_written_[attribute_id] += cell_num_to_copy;
+
+  // include #cells skipped in the empty_cells_written_ value
+  empty_cells_written_[attribute_id] += (cell_num_to_copy + remaining_skip_count);
+  // reset remaining_skip_count
+  remaining_skip_count = 0u;
+  remaining_skip_count_var = 0u;
 
   // Handle buffer overflow
   if(empty_cells_written_[attribute_id] != cell_num_in_range)  
@@ -1711,9 +1776,11 @@ int ArrayReadState::read_sparse_attr_var(
              buffer, 
              buffer_size, 
              buffer_offset,
+             skip_count,
              buffer_var, 
              buffer_var_size,
-             buffer_var_offset) != TILEDB_ARS_OK)
+             buffer_var_offset,
+             skip_count_var) != TILEDB_ARS_OK)
         return TILEDB_ARS_ERR;
 
     // Check for overflow
@@ -1746,9 +1813,11 @@ int ArrayReadState::read_sparse_attr_var(
              buffer, 
              buffer_size, 
              buffer_offset,
+             skip_count,
              buffer_var, 
              buffer_var_size,
-             buffer_var_offset) != TILEDB_ARS_OK)
+             buffer_var_offset,
+             skip_count_var) != TILEDB_ARS_OK)
       return TILEDB_ARS_ERR;
 
     // Check for buffer overflow

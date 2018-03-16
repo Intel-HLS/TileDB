@@ -367,9 +367,11 @@ int ReadState::copy_cells_var(
     void* buffer,  
     size_t buffer_size,
     size_t& buffer_offset,
+    size_t& remaining_skip_count,
     void* buffer_var,  
     size_t buffer_var_size,
     size_t& buffer_var_offset,
+    size_t& remaining_skip_count_var,
     const CellPosRange& cell_pos_range) {
   // For easy reference
   size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
@@ -379,8 +381,12 @@ int ReadState::copy_cells_var(
   buffer_free_space = (buffer_free_space / cell_size) * cell_size;
   size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
 
+  // TileDB traverses the offsets and data in lock step - can't have different skip values
+  assert(remaining_skip_count == remaining_skip_count_var);
+
   // Handle overflow
-  if(buffer_free_space == 0 || buffer_var_free_space == 0) { // Overflow
+  if((buffer_free_space == 0 || buffer_var_free_space == 0)
+      && remaining_skip_count == 0u) { // Overflow
     overflow_[attribute_id] = true; 
     return TILEDB_RS_OK;
   }
@@ -406,6 +412,22 @@ int ReadState::copy_cells_var(
     tiles_offsets_[attribute_id] = start_offset;
   else if(tiles_offsets_[attribute_id] > end_offset) // This range is written
     return TILEDB_RS_OK;
+
+  // Calculate number of bytes to skip
+  auto bytes_to_skip = remaining_skip_count * cell_size;
+
+  //#cells remaining in this cell range <= remaining_skip_count
+  if(tiles_offsets_[attribute_id] + bytes_to_skip > end_offset) { // This range is written
+    assert(remaining_skip_count > 0u);
+    auto num_cells_skipped = (end_offset - tiles_offsets_[attribute_id] + 1u)/cell_size;
+    assert(num_cells_skipped <= remaining_skip_count);
+    remaining_skip_count -= num_cells_skipped;
+    remaining_skip_count_var -= num_cells_skipped;
+    return TILEDB_RS_OK;
+  }
+
+  //skip some cells
+  tiles_offsets_[attribute_id] += bytes_to_skip;
 
   // Calculate the total size to copy
   bytes_left_to_copy = end_offset - tiles_offsets_[attribute_id] + 1;
@@ -434,6 +456,8 @@ int ReadState::copy_cells_var(
       start_cell_pos,
       tile_var_start) != TILEDB_RS_OK)
     return TILEDB_RS_ERR;
+
+  // this also takes care of skipped cells
   if(tiles_var_offsets_[attribute_id] < *tile_var_start) 
     tiles_var_offsets_[attribute_id] = *tile_var_start;
 
@@ -470,6 +494,10 @@ int ReadState::copy_cells_var(
   // Check for overflow
   if(tiles_offsets_[attribute_id] != end_offset + 1) 
     overflow_[attribute_id] = true;
+
+  //if some cells had remained to be skipped, they would have been caught by the if statement 80 lines above
+  remaining_skip_count = 0u;
+  remaining_skip_count_var = 0u;
 
   // Entering this if condition implies that the var data in this cell is so 
   // large that the allocated buffer cannot hold it
