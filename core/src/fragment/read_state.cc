@@ -1079,6 +1079,16 @@ void ReadState::get_next_overlapping_tile_sparse(
 /*         PRIVATE METHODS        */
 /* ****************************** */
 
+std::string ReadState::construct_filename(int attribute_id, bool is_var) {
+  std::string filename;
+  if (attribute_id == attribute_num_) {
+    filename = fragment_->fragment_name() + "/" + TILEDB_COORDS + TILEDB_FILE_SUFFIX;
+  } else {
+    filename = fragment_->fragment_name() + "/" + array_schema_->attribute(attribute_id) + (is_var?"_var":"") +TILEDB_FILE_SUFFIX;
+  }
+  return filename;
+}
+
 void ReadState::reset_file_buffers() {
   for(int i=0; i<attribute_num_+1; ++i) {
     if (file_buffer_[i] != NULL) {
@@ -1089,6 +1099,11 @@ void ReadState::reset_file_buffers() {
       delete file_var_buffer_[i];
       file_var_buffer_[i] = NULL;
     }
+
+    StorageFS *fs = array_->config()->get_filesystem();
+    close_file(fs, construct_filename(i, true));
+    close_file(fs, construct_filename(i, false));
+
   }
 }
 
@@ -1113,15 +1128,10 @@ int ReadState::read_segment(int attribute_num, bool is_var, off_t offset, void *
   }
 
   // Construct the attribute file name
-  std::string filename;
-  if (attribute_num == attribute_num_) {
-    filename = fragment_->fragment_name() + "/" + TILEDB_COORDS + TILEDB_FILE_SUFFIX;
-  } else {
-    filename = fragment_->fragment_name() + "/" + array_schema_->attribute(attribute_num) + (is_var?"_var":"") +TILEDB_FILE_SUFFIX;
-  }
+  std::string filename = construct_filename(attribute_num, is_var);
 
   // Experimental buffered reading to help with cloud performance
-  if (is_hdfs_path(filename)) { 
+  /*  if (is_hdfs_path(filename)) { 
     Buffer *file_buffer;
     if (is_var) {
       assert((attribute_num < attribute_num_) && "Coords attribute cannot be variable");
@@ -1147,6 +1157,7 @@ int ReadState::read_segment(int attribute_num, bool is_var, off_t offset, void *
       }
     }
   }
+  */
   
   // Read segment directly
   int read_method = array_->config()->read_method();

@@ -46,6 +46,7 @@
 #include <iostream>
 #include <memory>
 #include <cstdlib>
+#include <unistd.h>
 
 #ifdef TILEDB_VERBOSE
 #  define PRINT_ERROR(x) std::cerr << TILEDB_FS_ERRMSG << "hdfs: " << x << std::endl
@@ -54,8 +55,40 @@
 #endif
 
 // Forward declarations
+static void invoke_function(hdfsFS hdfs_handle, std::unordered_map<std::string, hdfsFile>& map, int (*fn)(hdfsFS, hdfsFile, const std::string&));
 static int sync_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& path);
 static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& path);
+
+#include <sys/time.h>
+#include <sys/resource.h>
+int get_rlimits(struct rlimit *limits) {
+  if (getrlimit(RLIMIT_NOFILE, limits)) {
+    PRINT_ERROR(std::string("Could not execute getrlimit ") + std::strerror(errno));
+    return -1;
+  }
+  TRACE_FN_ARG(std::string("current rlimit for open file handles=") << limits->rlim_cur);
+  TRACE_FN_ARG(std::string("hard rlimit for open file handles=") << limits->rlim_max);
+  return 0;
+}
+
+void maximize_rlimits() {
+  struct rlimit limits;
+  if (get_rlimits(&limits)) {
+    return;
+  }
+
+  if (limits.rlim_cur == limits.rlim_max) {
+    return;
+  }
+
+  limits.rlim_cur = limits.rlim_max;
+  if (setrlimit(RLIMIT_NOFILE, &limits)) {
+    PRINT_ERROR(std::string("Could not execute setrlimit ") + std::strerror(errno));
+    return;
+  }
+  
+  get_rlimits(&limits);
+}
 
 HDFS::HDFS(const std::string& home) {
   struct hdfsBuilder *builder = hdfsNewBuilder();
@@ -105,22 +138,24 @@ HDFS::HDFS(const std::string& home) {
     hdfsSetWorkingDirectory(hdfs_handle_, home.c_str());
   }
   hdfsGetWorkingDirectory(hdfs_handle_, home_dir, TILEDB_NAME_MAX_LEN);
+
+  // Maximize open file handle limits
+  maximize_rlimits();
 }
 
 HDFS::~HDFS() {
-    // Flush out and close any files that have not been written out.
-  for (auto it = write_map_.begin(); it != write_map_.end(); ++it) {
-    std::string filename = it->first;
-    hdfsFile hdfs_file_handle = it->second;
-    //    TRACE_FN_ARG(std::string("Filename=") << filename << "has not been closed");
-    //assert(false && "File should have been closed already");
-    close_kernel(hdfs_handle_, hdfs_file_handle, filename);
-  }
+  // Close any files that have been opened and not closed.
+  invoke_function(hdfs_handle_, read_map_, &close_kernel);
+  read_map_.clear();
+  
+  invoke_function(hdfs_handle_, write_map_, &sync_kernel);
+  invoke_function(hdfs_handle_, write_map_, &close_kernel);
   write_map_.clear();
 
   if (hdfsDisconnect(hdfs_handle_)) {
     PRINT_ERROR("disconnect error");
   }
+  
   hdfs_handle_ = NULL;
 }
 
@@ -132,12 +167,29 @@ static int print_errmsg(const std::string& errmsg) {
   return TILEDB_FS_ERR;
 }
 
-static hdfsFile get_hdfsFile(const std::string& filename, std::unordered_map<std::string, hdfsFile> map) {
+static hdfsFile get_hdfsFile(const std::string& filename, std::unordered_map<std::string, hdfsFile>& map) {
   auto search = map.find(filename);
   if (search != map.end()) {
     return search->second;
   } else {
     return NULL;
+  }
+}
+
+static void remove_hdfsFile(const std::string& filename, std::unordered_map<std::string, hdfsFile>& map, std::mutex& mtx) {
+  mtx.lock();
+  map.erase(filename);
+  mtx.unlock();
+}
+
+static void invoke_function(hdfsFS hdfs_handle, std::unordered_map<std::string, hdfsFile>& map, int (*fn)(hdfsFS, hdfsFile, const std::string&)) {
+  for (auto it = map.begin(); it != map.end(); ++it) {
+    std::string filename = it->first;
+    hdfsFile hdfs_file_handle = it->second;
+    TRACE_FN_ARG("invoke_function called on " << filename);
+
+    // Call function kernel
+    fn(hdfs_handle, hdfs_file_handle, filename);
   }
 }
 
@@ -247,10 +299,8 @@ int HDFS::create_file(const std::string& filename, int flags, mode_t mode) {
 }
 
 int HDFS::delete_file(const std::string& filename) {
-  hdfsFile file = get_hdfsFile(filename, write_map_);
-  if (file) {
-    close_kernel(hdfs_handle_, file, filename);
-    // TODO remove file from map
+  if (get_hdfsFile(filename, read_map_) || get_hdfsFile(filename, write_map_)) {
+    return print_errmsg(std::string("Cannot delete file ") + filename + " as it is open in this context");
   }
   
   if (is_file(filename)) {
@@ -265,11 +315,6 @@ int HDFS::delete_file(const std::string& filename) {
 }
 
 size_t HDFS::file_size(const std::string& filename) {
-  hdfsFile file = get_hdfsFile(filename, write_map_);
-  if (file) {
-    sync_kernel(hdfs_handle_, file, filename);
-  }
-
   hdfsFileInfo* file_info = hdfsGetPathInfo(hdfs_handle_, filename.c_str());
   if (!file_info) {
     print_errmsg(std::string("Cannot get path info for file ") + filename);
@@ -323,48 +368,56 @@ static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer
   return TILEDB_FS_OK;
 }
 
-int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
-    TRACE_FN_ARG("filename="<<std::string(filename) << " offset=" << offset << " length=" << length);
-
-        // TODO remove file from map
-
+static hdfsFile filtered_hdfs_open_file_for_read(hdfsFS hdfs_handle, const std::string& filename, size_t buffer_size) {
   // Workaround for error messages of the type -
   // readDirect: FSDataInputStream#read error:
   // java.lang.UnsupportedOperationException: Byte-buffer read unsupported by input stream
   //	at org.apache.hadoop.fs.FSDataInputStream.read(FSDataInputStream.java:146)
-
+  // This practically litters the output!!
   int old_fd, new_fd;
   fflush(stderr);
   old_fd = dup(2);
   new_fd = open("/dev/null", O_WRONLY);
   dup2(new_fd, 2);
   close(new_fd);
-
-  size_t size = file_size(filename);
-
-#define MAX_SIZE 16*1024*1024
   
-  hdfsFile file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_RDONLY, size>MAX_SIZE?MAX_SIZE:size, 0, 0);
-
+  hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_RDONLY, buffer_size, 0, 0);
+  
   fflush(stderr);
   dup2(old_fd, 2);
   close(old_fd);
 
+  return file;
+}
+
+// heuristic for io.file.buffer.size for good hdfs performance
+#define MAX_SIZE 16*1024*1024
+
+int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
+  TRACE_FN_ARG("filename="<<std::string(filename) << " offset=" << offset << " length=" << length);
+
+  // Not supporting simultaneous read/writes.
+  if (get_hdfsFile(filename, write_map_)) {
+    print_errmsg(std::string("File=") + filename + " is open simultaneously for reads/writes");
+    assert(false && "No support for simultaneous reads/writes");
+  }
+
+  size_t size = file_size(filename);
+
+  hdfsFile file = get_hdfsFile(filename, read_map_);
   if (!file) {
-    std::string errmsg = std::string("Cannot open file ") + filename + " for read " + std::strerror(errno);
-    return print_errmsg(errmsg);
+    read_map_mtx_.lock();
+    file = filtered_hdfs_open_file_for_read(hdfs_handle_, filename, size>MAX_SIZE?MAX_SIZE:((size/getpagesize())+1)*getpagesize());
+    if (file) {
+      read_map_.emplace(filename, file);
+    }
+    read_map_mtx_.unlock();
+    if (!file) {
+      return print_errmsg(std::string("Cannot open file ") + filename + " for read");
+    }
   }
 
-  int rc = TILEDB_FS_OK;;
-  if(read_from_file_kernel(hdfs_handle_, file, buffer, length>size?size:length, offset)) {
-    rc = print_errmsg(std::string("Cannot read file ") + filename);
-  }
-
-  if (hdfsCloseFile(hdfs_handle_, file)) {
-    rc = print_errmsg(std::string("Cannot close file ") + filename + " after read " + std::strerror(errno));
-  }
-
-  return rc;
+  return read_from_file_kernel(hdfs_handle_, file, buffer, length>size?size:length, offset);
 }
 
 static int write_to_file_kernel(hdfsFS hdfs_handle, hdfsFile file, const void* buffer, size_t buffer_size, size_t max_bytes) {
@@ -393,7 +446,6 @@ int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t 
     return TILEDB_FS_ERR;
   }
 
-  int rc = TILEDB_FS_OK;
   hdfsFile file = get_hdfsFile(filename, write_map_);
   if (!file) {
     if (is_file(filename)) {
@@ -410,16 +462,10 @@ int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t 
     }
   }
 
-  if (write_to_file_kernel(hdfs_handle_, file, buffer, buffer_size, max_bytes)) {
-    rc = print_errmsg(std::string("Cannot write to file " + filename));
-  } /*else if (hdfsHSync(hdfs_handle_, file)) {
-    rc = print_errmsg(std::string("Cannot synch file " + filename + " after write"));
-    }*/
-
-  return rc;
+  return write_to_file_kernel(hdfs_handle_, file, buffer, buffer_size, max_bytes);
 }
 
-int HDFS::move_path(const std::string& old_path, const std::string& new_path) {  
+int HDFS::move_path(const std::string& old_path, const std::string& new_path) {
   if (!hdfsExists(hdfs_handle_, new_path.c_str())) {
     return print_errmsg(std::string("Cannot move path ") + old_path + " to " + new_path + " as it exists");
   }
@@ -450,28 +496,39 @@ int HDFS::sync_path(const std::string& path) {
   return rc;
 }
 
-static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& path) {
+static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std::string& filename) {
   if (hdfsCloseFile(hdfs_handle, hdfs_file_handle)) {
-    return print_errmsg(std::string("Cannot close file " + path + " after write"));
+    return print_errmsg(std::string("Cannot close file ") + filename);
   }
-
   return TILEDB_FS_OK;
 }
 
 int HDFS::close_file(const std::string& filename) {
-  int rc = TILEDB_FS_OK;
+  hdfsFile read_file_handle = get_hdfsFile(filename, read_map_);
+  hdfsFile write_file_handle = get_hdfsFile(filename, write_map_);
 
-  sync_path(filename);
-
-  hdfsFile file = get_hdfsFile(filename, write_map_);
-  if (file) {
-    write_map_mtx_.lock();
-    rc = close_kernel(hdfs_handle_, file, filename);
-    write_map_.erase(filename);
-    write_map_mtx_.unlock();
+  if (read_file_handle && write_file_handle) {
+    print_errmsg(std::string("Read and Write file handles open simultaneously for ") + filename);
   }
 
-  return rc;
+  int read_close_rc;
+  if (read_file_handle) {
+    read_close_rc = close_kernel(hdfs_handle_, read_file_handle, filename);
+    remove_hdfsFile(filename, read_map_, read_map_mtx_);
+  }
+
+  int write_close_rc;
+  if (write_file_handle) {
+    sync_kernel(hdfs_handle_, write_file_handle, filename);
+    write_close_rc = close_kernel(hdfs_handle_, write_file_handle, filename);
+    remove_hdfsFile(filename, write_map_, write_map_mtx_);
+  }
+
+  if (read_close_rc || write_close_rc) {
+    return TILEDB_FS_ERR;
+  } else {
+    return TILEDB_FS_OK;
+  }
 }
 
 bool HDFS::consolidation_support() {

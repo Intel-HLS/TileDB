@@ -499,6 +499,8 @@ class ReadState {
   /*          PRIVATE METHODS          */
   /* ********************************* */
 
+  std::string construct_filename(int attribute_id, bool is_var);
+
   /**
    * Resets all internal buffers associated with attribute files.
    */

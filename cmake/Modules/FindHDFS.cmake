@@ -64,9 +64,14 @@ message(STATUS "Found env HADOOP_HOME: " ${HADOOP_HOME})
 if (IS_DIRECTORY ${HADOOP_HOME}/include)
   set(HDFS_INCLUDE_PATH ${JNI_INCLUDE_DIRS} ${HADOOP_HOME}/include)
 else()
-  message(FATAL_ERROR "HADOOP_HOME=" ${HADOOP_HOME}
-	" does NOT seem to contain an include folder")
-  return()
+  find_path(HDFS_INCLUDE_PATH hdfs.h PATHS ~/include)
+  if(HDFS_INCLUDE_PATH)
+    message(STATUS "Found hdfs.h in " ${HDFS_INCLUDE_PATH})
+  else()
+    message(STATUS "HADOOP_HOME=" ${HADOOP_HOME}
+        " does NOT seem to contain an include folder")
+    return()
+  endif()
 endif()
 
 find_library(HDFS_STATIC_LIBRARY libhdfs.a PATHS ${HADOOP_HOME}/lib/native)
