@@ -58,4 +58,8 @@ int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, of
 
 int write_to_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size);
 
+int delete_file(const TileDB_CTX* tiledb_ctx, const std::string& filename);
+
+int close_file(const TileDB_CTX* tiledb_ctx, const std::string& filename);
+
 #endif /*  __TILEDB_STORAGE_H__ */

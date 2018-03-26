@@ -83,6 +83,11 @@ class HDFS : public StorageFS {
 #else
 
 class HDFS : public StorageFS {
+
+ public:
+  HDFS(const std::string& home) {};
+  ~HDFS() {};
+
   HDFS(const char *home) {};
 };
 
