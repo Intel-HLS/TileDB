@@ -308,7 +308,7 @@ int HDFS::delete_file(const std::string& filename) {
       return print_errmsg(std::string("Cannot delete file ") + filename);
     }
   } else {
-    return print_errmsg(std::string("Cannot delete file") + filename + " that is not a file");
+    return print_errmsg(std::string("Cannot delete file ") + filename + " as it either does not exist or is not a file");
   }
   
   return TILEDB_FS_OK;
