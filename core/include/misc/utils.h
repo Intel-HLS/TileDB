@@ -228,7 +228,7 @@ int create_file(StorageFS *fs, const std::string& filename, int flags, mode_t mo
  * @param filename The name of the file to be deleted.
  * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
  */
-int delete_file(StorageFS *fs, std::string& filename);
+int delete_file(StorageFS *fs, const std::string& filename);
 
 /**
  * Creates a special file to indicate that the input directory is a

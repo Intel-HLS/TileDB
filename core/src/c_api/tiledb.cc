@@ -1763,35 +1763,35 @@ inline bool sanity_check_fs(const TileDB_CTX* tiledb_ctx) {
   return false;
 }
 
-bool is_workspace(TileDB_CTX* tiledb_ctx, const std::string dir) {
+bool is_workspace(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
   if (sanity_check_fs(tiledb_ctx)) {
     return is_workspace(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
   }
   return false;
 }
 
-bool is_group(TileDB_CTX* tiledb_ctx, const std::string dir)  {
+bool is_group(const TileDB_CTX* tiledb_ctx, const std::string& dir)  {
   if (sanity_check_fs(tiledb_ctx)) {
     return is_group(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
   }
   return false;
 }
 
-bool is_array(TileDB_CTX* tiledb_ctx, const std::string dir)  {
+bool is_array(const TileDB_CTX* tiledb_ctx, const std::string& dir)  {
   if (sanity_check_fs(tiledb_ctx)) {
     return is_array(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
   }
   return false;
 }
 
-bool is_fragment(TileDB_CTX* tiledb_ctx, const std::string dir) {
+bool is_fragment(TileDB_CTX* tiledb_ctx, const std::string& dir) {
    if (sanity_check_fs(tiledb_ctx)) {
     return is_fragment(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
   }
   return false;
 }
 
-bool is_metadata(TileDB_CTX* tiledb_ctx, const std::string dir)  {
+bool is_metadata(const TileDB_CTX* tiledb_ctx, const std::string& dir)  {
   if (sanity_check_fs(tiledb_ctx)) {
     return is_metadata(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
   }
@@ -1799,25 +1799,25 @@ bool is_metadata(TileDB_CTX* tiledb_ctx, const std::string dir)  {
 }
 
 
-bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string dir) {
+bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
   if (sanity_check_fs(tiledb_ctx)) {
     return is_dir(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
   }
   return false;
 }
 
-bool is_file(const TileDB_CTX* tiledb_ctx, std::string file) {
+bool is_file(const TileDB_CTX* tiledb_ctx, const std::string& file) {
   if (sanity_check_fs(tiledb_ctx)) {
     return is_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), file);
   }
   return false;
 }
 
-std::string parent_dir(std::string path) {
+std::string parent_dir(const std::string& path) {
   return parent_dir(NULL, path);
 }
 
-size_t file_size(const TileDB_CTX* tiledb_ctx, std::string file) {
+size_t file_size(const TileDB_CTX* tiledb_ctx, const std::string& file) {
   if (sanity_check_fs(tiledb_ctx)) {;
     return file_size(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), file);
   }
@@ -1838,5 +1838,16 @@ int write_to_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, con
   return TILEDB_ERR;
 }
 
+int delete_file(const TileDB_CTX* tiledb_ctx, const std::string& filename) {
+  if (sanity_check(tiledb_ctx)) {
+    return delete_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename);
+  }
+  return TILEDB_ERR;
+}
 
-
+int close_file(const TileDB_CTX* tiledb_ctx, const std::string& filename) {
+  if (sanity_check(tiledb_ctx)) {
+    return close_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename);
+  }
+  return TILEDB_ERR;
+}

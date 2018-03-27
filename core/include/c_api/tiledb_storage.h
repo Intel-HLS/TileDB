@@ -36,23 +36,25 @@
 #include "tiledb.h"
 #include <string>
 
-bool is_workspace(TileDB_CTX* tiledb_ctx, const std::string dir);
+bool is_hdfs_path(const std::string& path);
 
-bool is_group(TileDB_CTX* tiledb_ctx, const std::string dir);
+bool is_workspace(const TileDB_CTX* tiledb_ctx, const std::string& dir);
 
-bool is_array(TileDB_CTX* tiledb_ctx, const std::string dir);
+bool is_group(const TileDB_CTX* tiledb_ctx, const std::string& dir);
 
-bool is_fragment(TileDB_CTX* tiledb_ctx, const std::string dir);
+bool is_array(const TileDB_CTX* tiledb_ctx, const std::string& dir);
 
-bool is_metadata(TileDB_CTX* tiledb_ctx, const std::string dir);
+bool is_fragment(const TileDB_CTX* tiledb_ctx, const std::string& dir);
 
-bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string dir);
+bool is_metadata(const TileDB_CTX* tiledb_ctx, const std::string& dir);
 
-bool is_file(const TileDB_CTX* tiledb_ctx, const std::string file);
+bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string& dir);
 
-std::string parent_dir(const std::string path);
+bool is_file(const TileDB_CTX* tiledb_ctx, const std::string& file);
 
-size_t file_size(const TileDB_CTX* tiledb_ctx, const std::string file);
+std::string parent_dir(const std::string& path);
+
+size_t file_size(const TileDB_CTX* tiledb_ctx, const std::string& file);
 
 int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length);
 

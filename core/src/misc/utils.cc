@@ -257,7 +257,7 @@ int create_file(StorageFS *fs, const std::string& filename, int flags, mode_t mo
   return fs->create_file(filename, flags, mode);
 }
 
-int delete_file(StorageFS *fs, std::string& filename) {
+int delete_file(StorageFS *fs, const std::string& filename) {
   TRACE_FN_ARG("Filename=" << filename);
   return fs->delete_file(filename);
 }
