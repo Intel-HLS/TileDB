@@ -416,7 +416,7 @@ int Array::consolidate(
   // Success
   return TILEDB_AR_OK;
 }
-
+    
 int Array::consolidate(
     Fragment* new_fragment,
     int attribute_id) {
@@ -434,6 +434,10 @@ int Array::consolidate(
   // Count the number of variable attributes
   int var_attribute_num = array_schema_->var_attribute_num();
 
+  // Cache the buffer indices associated with the attribute
+  int buffer_index = -1;
+  int buffer_var_index = -1;
+
   // Populate the buffers
   int buffer_num = attribute_num + 1 + var_attribute_num;
   buffers = (void**) malloc(buffer_num * sizeof(void*));
@@ -442,11 +446,11 @@ int Array::consolidate(
   for(int i=0; i<attribute_num+1; ++i) {
     if(i == attribute_id) {
       buffers[buffer_i] = malloc(TILEDB_CONSOLIDATION_BUFFER_SIZE);
-      buffer_sizes[buffer_i] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+      buffer_index = buffer_i;
       ++buffer_i;
       if(array_schema_->var_size(i)) {
         buffers[buffer_i] = malloc(TILEDB_CONSOLIDATION_BUFFER_SIZE);
-        buffer_sizes[buffer_i] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+        buffer_var_index = buffer_i;
         ++buffer_i;
       }
     } else {
@@ -465,6 +469,12 @@ int Array::consolidate(
   int rc_write = TILEDB_FG_OK; 
   int rc_read = TILEDB_FG_OK; 
   do {
+    // Set or reset buffer sizes as they are modified by the reads
+    buffer_sizes[buffer_index] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+    if (buffer_var_index != -1) {
+      buffer_sizes[buffer_var_index] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+    }
+    
     // Read
     rc_read = read(buffers, buffer_sizes);
     if(rc_read != TILEDB_FG_OK)

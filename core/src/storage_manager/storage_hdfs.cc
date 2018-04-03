@@ -345,6 +345,10 @@ static tSize max_tsize() {
 }
 
 static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer, size_t length, off_t offset) {
+  if (length == 0) {
+    return TILEDB_FS_OK;
+  }
+   
   if (hdfsSeek(hdfs_handle, file, (tOffset)offset) < 0) {
     return print_errmsg(std::string("Cannot seek to offset in file"));
   }
