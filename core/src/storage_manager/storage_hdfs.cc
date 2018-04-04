@@ -217,9 +217,12 @@ static bool is_path(const hdfsFS hdfs_handle, const char *path, const char kind)
   }
   return false;
 }
-
-  
+ 
 bool HDFS::is_dir(const std::string& dir) {
+  std::string slash("/");
+  if (dir.back() != '/') {
+    return is_path(hdfs_handle_, (dir + slash).c_str(), 'D');
+  }
   return is_path(hdfs_handle_, dir.c_str(), 'D');
 }
 
@@ -345,10 +348,6 @@ static tSize max_tsize() {
 }
 
 static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer, size_t length, off_t offset) {
-  if (length == 0) {
-    return TILEDB_FS_OK;
-  }
-   
   if (hdfsSeek(hdfs_handle, file, (tOffset)offset) < 0) {
     return print_errmsg(std::string("Cannot seek to offset in file"));
   }
@@ -373,6 +372,7 @@ static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer
 }
 
 static hdfsFile filtered_hdfs_open_file_for_read(hdfsFS hdfs_handle, const std::string& filename, size_t buffer_size) {
+  TRACE_FN_ARG("Opening file for " << filename);
   // Workaround for error messages of the type -
   // readDirect: FSDataInputStream#read error:
   // java.lang.UnsupportedOperationException: Byte-buffer read unsupported by input stream
@@ -398,7 +398,7 @@ static hdfsFile filtered_hdfs_open_file_for_read(hdfsFS hdfs_handle, const std::
 #define MAX_SIZE 16*1024*1024
 
 int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
-  TRACE_FN_ARG("filename="<<std::string(filename) << " offset=" << offset << " length=" << length);
+  TRACE_FN_ARG("filename="<< filename << " offset=" << offset << " length=" << length);
 
   // Not supporting simultaneous read/writes.
   if (get_hdfsFile(filename, write_map_)) {
