@@ -578,7 +578,7 @@ int HDFS::close_file(const std::string& filename) {
     print_errmsg(std::string("Read and Write file handles open simultaneously for ") + filename);
   }
 
-  int rc_close_read, rc_close_write;
+  int rc_close_read = TILEDB_FS_OK, rc_close_write=TILEDB_FS_OK;
   if (read_file_handle) {
    TRACE_FN_ARG("Closing file=" << filename << " opened for read");
    rc_close_read = close_read_hdfsFile(hdfs_handle_, filename, read_map_, read_count_, read_map_mtx_);
