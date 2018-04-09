@@ -151,9 +151,7 @@ ReadState::ReadState(
   reset_file_buffers();
 }
 
-ReadState::~ReadState() {
-  reset_file_buffers();
- 
+ReadState::~ReadState() { 
   if(last_tile_coords_ != NULL)
     free(last_tile_coords_);
 
@@ -203,6 +201,19 @@ ReadState::~ReadState() {
 }
 
 
+  /* ********************************* */
+  /*              MUTATORS             */
+  /* ********************************* */
+
+  /**
+   * Finalizes the fragment.
+   *
+   * @return TILEDB_WS_OK for success and TILEDB_WS_ERR for error. 
+   */
+int ReadState::finalize() {
+  reset_file_buffers();
+  return TILEDB_RS_OK;
+}
 
 
 /* ****************************** */
@@ -1103,7 +1114,6 @@ void ReadState::reset_file_buffers() {
     StorageFS *fs = array_->config()->get_filesystem();
     close_file(fs, construct_filename(i, true));
     close_file(fs, construct_filename(i, false));
-
   }
 }
 

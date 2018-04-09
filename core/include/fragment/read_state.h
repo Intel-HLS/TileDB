@@ -121,6 +121,16 @@ class ReadState {
   ~ReadState();
 
 
+  /* ********************************* */
+  /*              MUTATORS             */
+  /* ********************************* */
+
+  /**
+   * Finalizes the fragment.
+   *
+   * @return TILEDB_WS_OK for success and TILEDB_WS_ERR for error. 
+   */
+  int finalize();
 
 
   /* ********************************* */

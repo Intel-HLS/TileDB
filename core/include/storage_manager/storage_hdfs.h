@@ -78,6 +78,7 @@ class HDFS : public StorageFS {
   hdfsFS hdfs_handle_ = NULL;
   std::mutex read_map_mtx_, write_map_mtx_;
   std::unordered_map<std::string, hdfsFile> read_map_, write_map_;
+  std::unordered_map<std::string, int> read_count_;
 };
 
 #else

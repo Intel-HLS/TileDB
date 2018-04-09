@@ -180,8 +180,7 @@ int Fragment::finalize() {
     // Success
     return TILEDB_FG_OK;
   } else {                    // READ
-    // Nothing to be done
-    return TILEDB_FG_OK;
+    return read_state_->finalize();
   } 
 }
 

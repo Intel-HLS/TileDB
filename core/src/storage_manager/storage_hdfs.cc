@@ -140,17 +140,24 @@ HDFS::HDFS(const std::string& home) {
   hdfsGetWorkingDirectory(hdfs_handle_, home_dir, TILEDB_NAME_MAX_LEN);
 
   // Maximize open file handle limits
-  maximize_rlimits();
+  //maximize_rlimits();
 }
 
 HDFS::~HDFS() {
   // Close any files that have been opened and not closed.
+  if (read_map_.size() > 0) {
+	  std::cerr << "Leaking file handles read_map size=" << read_map_.size() << std::endl;
+  }
+  if (write_map_.size() > 0) {
+	  std::cerr << "Leaking file handles. write_map size=" << write_map_.size() << std::endl;
+  }
+
   invoke_function(hdfs_handle_, read_map_, &close_kernel);
   read_map_.clear();
   
   invoke_function(hdfs_handle_, write_map_, &sync_kernel);
   invoke_function(hdfs_handle_, write_map_, &close_kernel);
-  write_map_.clear();
+  write_map_.clear(); 
 
   if (hdfsDisconnect(hdfs_handle_)) {
     PRINT_ERROR("disconnect error");
@@ -176,17 +183,47 @@ static hdfsFile get_hdfsFile(const std::string& filename, std::unordered_map<std
   }
 }
 
-static void remove_hdfsFile(const std::string& filename, std::unordered_map<std::string, hdfsFile>& map, std::mutex& mtx) {
+static int close_read_hdfsFile(hdfsFS hdfs_handle, const std::string& filename, std::unordered_map<std::string, hdfsFile>& map, std::unordered_map<std::string, int>& count_map, std::mutex& mtx) {
+  int rc = TILEDB_FS_OK;
+
   mtx.lock();
+  hdfsFile hdfs_file_handle = get_hdfsFile(filename, map);
+  if (hdfs_file_handle) {
+    int count = 0;
+    auto search = count_map.find(filename);
+    if (search != count_map.end()) {
+      count =  search->second;
+    }
+    if (count == 0) {
+      rc = close_kernel(hdfs_handle, hdfs_file_handle, filename);
+    }
+  }
   map.erase(filename);
   mtx.unlock();
+
+  return rc;
+}
+
+static int close_write_hdfsFile(hdfsFS hdfs_handle, const std::string& filename, std::unordered_map<std::string, hdfsFile>& map, std::mutex& mtx) {
+  int rc = TILEDB_FS_OK;
+
+  mtx.lock();
+  hdfsFile hdfs_file_handle = get_hdfsFile(filename, map);
+  if (hdfs_file_handle) {
+    sync_kernel(hdfs_handle, hdfs_file_handle, filename);
+    rc = close_kernel(hdfs_handle, hdfs_file_handle, filename);
+  }
+  map.erase(filename);
+  mtx.unlock();
+
+  return rc;
 }
 
 static void invoke_function(hdfsFS hdfs_handle, std::unordered_map<std::string, hdfsFile>& map, int (*fn)(hdfsFS, hdfsFile, const std::string&)) {
   for (auto it = map.begin(); it != map.end(); ++it) {
     std::string filename = it->first;
     hdfsFile hdfs_file_handle = it->second;
-    TRACE_FN_ARG("invoke_function called on " << filename);
+    print_errmsg("invoke_function called on " + filename);
 
     // Call function kernel
     fn(hdfs_handle, hdfs_file_handle, filename);
@@ -217,7 +254,7 @@ static bool is_path(const hdfsFS hdfs_handle, const char *path, const char kind)
   }
   return false;
 }
- 
+
 bool HDFS::is_dir(const std::string& dir) {
   std::string slash("/");
   if (dir.back() != '/') {
@@ -397,6 +434,25 @@ static hdfsFile filtered_hdfs_open_file_for_read(hdfsFS hdfs_handle, const std::
 // heuristic for io.file.buffer.size for good hdfs performance
 #define MAX_SIZE 16*1024*1024
 
+int read_count(const std::string& filename, std::unordered_map<std::string, int>& read_count_map, bool incr) {
+  int count = 0;
+  auto search = read_count_map.find(filename);
+  if (search != read_count_map.end()) {
+    count = search->second;
+  }
+  if (incr) {
+    ++count;
+  } else {
+    --count;
+  }
+  if (search != read_count_map.end()) {
+    search->second = count;
+  } else {
+    read_count_map.emplace(filename, count);
+  }
+  return count;
+}
+
 int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
   TRACE_FN_ARG("filename="<< filename << " offset=" << offset << " length=" << length);
 
@@ -408,20 +464,30 @@ int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer
 
   size_t size = file_size(filename);
 
-  hdfsFile file = get_hdfsFile(filename, read_map_);
+  hdfsFile file;
+
+  read_map_mtx_.lock();
+  file = get_hdfsFile(filename, read_map_);
   if (!file) {
-    read_map_mtx_.lock();
     file = filtered_hdfs_open_file_for_read(hdfs_handle_, filename, size>MAX_SIZE?MAX_SIZE:((size/getpagesize())+1)*getpagesize());
     if (file) {
       read_map_.emplace(filename, file);
     }
-    read_map_mtx_.unlock();
-    if (!file) {
-      return print_errmsg(std::string("Cannot open file ") + filename + " for read");
-    }
+  }
+  int count = read_count(filename, read_count_, true);
+  assert(count > 0 && "Read File Count cannot be less than 1");
+  read_map_mtx_.unlock();
+
+  if (!file) {
+    return print_errmsg(std::string("Cannot open file ") + filename + " for read");
   }
 
-  return read_from_file_kernel(hdfs_handle_, file, buffer, length>size?size:length, offset);
+  int rc = read_from_file_kernel(hdfs_handle_, file, buffer, length>size?size:length, offset);
+  read_map_mtx_.lock();
+  assert(read_count(filename, read_count_, false) >= 0 && "Read File Count cannot be negative");
+  read_map_mtx_.unlock();
+
+  return rc;
 }
 
 static int write_to_file_kernel(hdfsFS hdfs_handle, hdfsFile file, const void* buffer, size_t buffer_size, size_t max_bytes) {
@@ -508,6 +574,10 @@ static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std
 }
 
 int HDFS::close_file(const std::string& filename) {
+  if (!is_file(filename)) {
+    return TILEDB_FS_OK;
+  }
+
   hdfsFile read_file_handle = get_hdfsFile(filename, read_map_);
   hdfsFile write_file_handle = get_hdfsFile(filename, write_map_);
 
@@ -515,28 +585,30 @@ int HDFS::close_file(const std::string& filename) {
     print_errmsg(std::string("Read and Write file handles open simultaneously for ") + filename);
   }
 
-  int read_close_rc;
+  int rc_close_read, rc_close_write;
   if (read_file_handle) {
-    read_close_rc = close_kernel(hdfs_handle_, read_file_handle, filename);
-    remove_hdfsFile(filename, read_map_, read_map_mtx_);
+   TRACE_FN_ARG("Closing file=" << filename << " opened for read");
+   rc_close_read = close_read_hdfsFile(hdfs_handle_, filename, read_map_, read_count_, read_map_mtx_);
   }
 
-  int write_close_rc;
   if (write_file_handle) {
-    sync_kernel(hdfs_handle_, write_file_handle, filename);
-    write_close_rc = close_kernel(hdfs_handle_, write_file_handle, filename);
-    remove_hdfsFile(filename, write_map_, write_map_mtx_);
+    rc_close_write = close_write_hdfsFile(hdfs_handle_, filename, write_map_, write_map_mtx_);
   }
 
-  if (read_close_rc || write_close_rc) {
-    return TILEDB_FS_ERR;
+  if (read_file_handle) {
+    return rc_close_read;
   } else {
-    return TILEDB_FS_OK;
+    return rc_close_write;
   }
 }
 
+static bool done_printing_consolidation_support_message = false;
+
 bool HDFS::consolidation_support() {
-  print_errmsg("TBD: No consolidation locking support for distributed file systems.");
+  if (!done_printing_consolidation_support_message) {
+    print_errmsg("TBD: No consolidation locking support for distributed file systems.");
+    done_printing_consolidation_support_message = true;
+  }
   return false;
 }
 

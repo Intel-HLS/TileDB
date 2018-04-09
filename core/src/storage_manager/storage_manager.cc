@@ -88,6 +88,8 @@ StorageManager::StorageManager() {
 }
 
 StorageManager::~StorageManager() {
+  if (config_ != NULL)
+     delete config_;
 }
 
 
@@ -98,9 +100,6 @@ StorageManager::~StorageManager() {
 /* ****************************** */
 
 int StorageManager::finalize() {
-  if(config_ != NULL)
-    delete config_;
-
   return open_array_mtx_destroy();
 }
 

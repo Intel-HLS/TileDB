@@ -44,6 +44,7 @@
 
 StorageManagerConfig::StorageManagerConfig() {
   // Default values
+  fs_ = new PosixFS();
   home_ = "";
   read_method_ = TILEDB_IO_MMAP;
   write_method_ = TILEDB_IO_WRITE;
@@ -71,6 +72,7 @@ void StorageManagerConfig::init(
     int write_method) {
   // Initialize home
    if (is_hdfs_path(home)) {
+	   delete fs_;
      home_ = home;
      fs_ = new HDFS(home_);
      read_method_ = TILEDB_IO_READ;
@@ -128,7 +130,5 @@ int StorageManagerConfig::write_method() const {
 }
 
 StorageFS* StorageManagerConfig::get_filesystem() const {
-  if (fs_ == NULL)
-    return new PosixFS();
   return fs_;
 }

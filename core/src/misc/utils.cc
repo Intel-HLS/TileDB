@@ -1723,11 +1723,13 @@ int write_to_file_after_compression(StorageFS *fs, const std::string& filename, 
   deflateEnd(&strm);
 
   if (write_to_file(fs, filename, gzip_buffer->get_buffer(), gzip_buffer->get_buffer_size()) == TILEDB_UT_ERR) {
-      std::string errmsg = std::string("Could not write compressed bytes to internal buffer");
-      PRINT_ERROR(errmsg);
-      tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
-      return TILEDB_UT_ERR;
-    }
+    std::string errmsg = std::string("Could not write compressed bytes to internal buffer");
+    PRINT_ERROR(errmsg);
+    tiledb_ut_errmsg = TILEDB_UT_ERRMSG + errmsg; 
+    return TILEDB_UT_ERR;
+  }
+
+  delete gzip_buffer;
 
   sync_path(fs, filename);
   close_file(fs, filename);
