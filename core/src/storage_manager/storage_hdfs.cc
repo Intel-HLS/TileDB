@@ -145,13 +145,6 @@ HDFS::HDFS(const std::string& home) {
 
 HDFS::~HDFS() {
   // Close any files that have been opened and not closed.
-  if (read_map_.size() > 0) {
-	  std::cerr << "Leaking file handles read_map size=" << read_map_.size() << std::endl;
-  }
-  if (write_map_.size() > 0) {
-	  std::cerr << "Leaking file handles. write_map size=" << write_map_.size() << std::endl;
-  }
-
   invoke_function(hdfs_handle_, read_map_, &close_kernel);
   read_map_.clear();
   
@@ -223,7 +216,7 @@ static void invoke_function(hdfsFS hdfs_handle, std::unordered_map<std::string, 
   for (auto it = map.begin(); it != map.end(); ++it) {
     std::string filename = it->first;
     hdfsFile hdfs_file_handle = it->second;
-    print_errmsg("invoke_function called on " + filename);
+    TRACE_FN_ARG(std::string("invoke_function called on ") << filename << std::string(" for leaked file handle"));
 
     // Call function kernel
     fn(hdfs_handle, hdfs_file_handle, filename);
