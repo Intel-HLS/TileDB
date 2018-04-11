@@ -143,6 +143,19 @@ class ArrayIterator {
       size_t* buffer_sizes);
 
   /**
+   * Resets the subarray used upon initialization of the iterator. This is useful
+   * when the array is used for reading, and the user wishes to change the
+   * query subarray without having to finalize and re-initialize the array
+   * with a different subarray.
+   *
+   * @param subarray The new subarray. Note that the type of the values in
+   *     *subarray* should match the coordinates type in the array schema.
+   *     If not null, array_->reset_subarray() is called
+   * @return TILEDB_AIT_OK on success, and TILEDB_AIT_ERR on error.
+   */
+  int reset_subarray(const void* subarray);
+
+  /**
    * Finalizes the array iterator, properly freeing the allocating memory space.
    * 
    * @return TILEDB_AIT_OK on success, and TILEDB_AIT_ERR on error.

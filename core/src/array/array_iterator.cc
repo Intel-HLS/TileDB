@@ -149,8 +149,6 @@ int ArrayIterator::init(
   buffer_i_.resize(attribute_id_num);
 
   for(int i=0, buffer_i=0; i<attribute_id_num; ++i) {
-    pos_[i] = 0;
-    cell_num_[i] = 0;
     cell_sizes_[i] = array_schema->cell_size(attribute_ids[i]);
     buffer_i_[i] = buffer_i;
     buffer_allocated_sizes_.push_back(buffer_sizes[buffer_i]);
@@ -163,36 +161,58 @@ int ArrayIterator::init(
     }
   }
 
-  // Perform first read
-  if(array_->read(buffers, buffer_sizes) != TILEDB_AR_OK) {
-    tiledb_ait_errmsg = tiledb_ar_errmsg; 
+  reset_subarray(0);
+
+  // Return
+  return TILEDB_AIT_OK;
+}
+
+int ArrayIterator::reset_subarray(const void* subarray) {
+  end_ = false;
+
+  //Reset pos_, cell_num_, buffer_sizes_
+  pos_.assign(pos_.size(), 0ull);
+  cell_num_.assign(cell_num_.size(), 0ull);
+  memcpy(buffer_sizes_, &(buffer_allocated_sizes_[0]), buffer_allocated_sizes_.size()*sizeof(size_t));
+
+  // Reset subarray
+  if(subarray != 0 && array_->reset_subarray(subarray) != TILEDB_AR_OK) {
+    tiledb_ait_errmsg = tiledb_ar_errmsg;
     return TILEDB_AIT_ERR;
   }
 
+  // Perform first read
+  if(array_->read(buffers_, buffer_sizes_) != TILEDB_AR_OK) {
+    tiledb_ait_errmsg = tiledb_ar_errmsg;
+    return TILEDB_AIT_ERR;
+  }
+
+  const std::vector<int> attribute_ids = array_->attribute_ids();
+  int attribute_id_num = attribute_ids.size();
   // Check if initialization went well and update internal state
   for(int i=0; i<attribute_id_num; ++i) {
     // End
-    if(buffer_sizes_[buffer_i_[i]] == 0 && 
+    if(buffer_sizes_[buffer_i_[i]] == 0 &&
        !array_->overflow(attribute_ids[i])) {
       end_ = true;
       return TILEDB_AIT_OK;
-    } 
+    }
 
     // Error
-    if(buffer_sizes_[buffer_i_[i]] == 0 && 
+    if(buffer_sizes_[buffer_i_[i]] == 0 &&
        array_->overflow(attribute_ids[i])) {
-      std::string errmsg = 
+      std::string errmsg =
           "Array iterator initialization failed; Buffer overflow";
       PRINT_ERROR(errmsg);
-      tiledb_ait_errmsg = TILEDB_AIT_ERRMSG + errmsg; 
+      tiledb_ait_errmsg = TILEDB_AIT_ERRMSG + errmsg;
       return TILEDB_AIT_ERR;
     }
 
     // Update cell num
     if(cell_sizes_[i] == TILEDB_VAR_SIZE)  // VARIABLE
-      cell_num_[i] = buffer_sizes[buffer_i_[i]] / TILEDB_CELL_VAR_OFFSET_SIZE;
-    else                                   // FIXED 
-      cell_num_[i] = buffer_sizes[buffer_i_[i]] / cell_sizes_[i]; 
+      cell_num_[i] = buffer_sizes_[buffer_i_[i]] / TILEDB_CELL_VAR_OFFSET_SIZE;
+    else                                   // FIXED
+      cell_num_[i] = buffer_sizes_[buffer_i_[i]] / cell_sizes_[i];
   }
 
   // Return

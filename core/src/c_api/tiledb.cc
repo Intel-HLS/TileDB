@@ -869,6 +869,22 @@ int tiledb_array_iterator_init(
   return TILEDB_OK;
 }
 
+int tiledb_array_iterator_reset_subarray(
+    TileDB_ArrayIterator* tiledb_array_it,
+    const void* subarray) {
+
+  int rc = tiledb_array_it->array_it_->reset_subarray(subarray);
+
+  // Error
+  if(rc != TILEDB_AIT_OK) {
+    strcpy(tiledb_errmsg, tiledb_ait_errmsg.c_str());
+    return TILEDB_ERR;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
 int tiledb_array_iterator_get_value(
     TileDB_ArrayIterator* tiledb_array_it,
     int attribute_id,

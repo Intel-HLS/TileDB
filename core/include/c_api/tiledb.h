@@ -715,7 +715,24 @@ TILEDB_EXPORT int tiledb_array_iterator_init(
     void** buffers,
     size_t* buffer_sizes);
 
-/** 
+/**
+ * Resets the subarray used upon initialization of the iterator. This is useful
+ * when the array is used for reading, and the user wishes to change the
+ * query subarray without having to finalize and re-initialize the array.
+ *
+ * @param tiledb_array_it The TileDB iterator.
+ * @param subarray The new subarray. It should be a sequence of [low, high]
+ *     pairs (one pair per dimension), whose type should be the same as that of
+ *     the coordinates. If it is NULL, then the subarray is set to the entire
+ *     array domain. For the case of writes, this is meaningful only for
+ *     dense arrays, and specifically dense writes.
+ * @return TILEDB_OK on success, and TILEDB_ERR on error.
+ */
+TILEDB_EXPORT int tiledb_array_iterator_reset_subarray(
+    TileDB_ArrayIterator* tiledb_array_it,
+    const void* subarray);
+
+/**
  * Retrieves the current cell value for a particular attribute.
  *
  * @param tiledb_array_it The TileDB array iterator.
