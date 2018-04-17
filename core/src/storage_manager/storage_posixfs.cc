@@ -61,13 +61,15 @@ std::string PosixFS::current_dir() {
 }
   
 bool PosixFS::is_dir(const std::string& dir) {
-   struct stat st;
-  return stat(dir.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+  struct stat st;
+  memset(&st, 0, sizeof(struct stat));
+  return !stat(dir.c_str(), &st) && S_ISDIR(st.st_mode);
 }
 
 bool PosixFS::is_file(const std::string& file) {
   struct stat st;
-  return (stat(file.c_str(), &st) == 0)  && !S_ISDIR(st.st_mode);
+  memset(&st, 0, sizeof(struct stat));
+  return !stat(file.c_str(), &st) && S_ISREG(st.st_mode);
 }
 
 void adjacent_slashes_dedup(std::string& value) {
@@ -304,6 +306,7 @@ size_t PosixFS::file_size(const std::string& filename) {
   }
 
   struct stat st;
+  memset(&st, 0, sizeof(struct stat));
   fstat(fd, &st);
   off_t file_size = st.st_size;
   
