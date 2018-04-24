@@ -72,15 +72,18 @@ void StorageManagerConfig::init(
     int write_method) {
   // Initialize home
    if (is_hdfs_path(home)) {
-	   delete fs_;
+     if (fs_ != NULL)
+       delete fs_;
      home_ = home;
      fs_ = new HDFS(home_);
      read_method_ = TILEDB_IO_READ;
      write_method_ = TILEDB_IO_WRITE;
      return;
    }
-   
-   fs_ = new PosixFS();
+
+   if (fs_ == NULL)
+     fs_ = new PosixFS();
+
    if(home == NULL) {
      home_ = "";
    } else {
