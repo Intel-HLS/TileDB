@@ -567,10 +567,6 @@ static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std
 }
 
 int HDFS::close_file(const std::string& filename) {
-  if (!is_file(filename)) {
-    return TILEDB_FS_OK;
-  }
-
   hdfsFile read_file_handle = get_hdfsFile(filename, read_map_);
   hdfsFile write_file_handle = get_hdfsFile(filename, write_map_);
 
