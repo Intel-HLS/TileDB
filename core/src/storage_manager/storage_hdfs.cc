@@ -187,11 +187,12 @@ static int close_read_hdfsFile(hdfsFS hdfs_handle, const std::string& filename, 
     if (search != count_map.end()) {
       count =  search->second;
     }
+    TRACE_FN_ARG("Really closing file " << filename << " Count =" << count);
     if (count == 0) {
       rc = close_kernel(hdfs_handle, hdfs_file_handle, filename);
+      map.erase(filename);
     }
   }
-  map.erase(filename);
   mtx.unlock();
 
   return rc;
@@ -476,8 +477,10 @@ int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer
   }
 
   int rc = read_from_file_kernel(hdfs_handle_, file, buffer, length>size?size:length, offset);
+
   read_map_mtx_.lock();
-  assert(read_count(filename, read_count_, false) >= 0 && "Read File Count cannot be negative");
+  count = read_count(filename, read_count_, false);
+  assert(count >= 0 && "Read File Count cannot be negative");
   read_map_mtx_.unlock();
 
   return rc;
@@ -567,28 +570,17 @@ static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std
 }
 
 int HDFS::close_file(const std::string& filename) {
-  hdfsFile read_file_handle = get_hdfsFile(filename, read_map_);
-  hdfsFile write_file_handle = get_hdfsFile(filename, write_map_);
-
-  if (read_file_handle && write_file_handle) {
-    print_errmsg(std::string("Read and Write file handles open simultaneously for ") + filename);
-  }
+  TRACE_FN_ARG("Closing file=" << filename << " opened for read");
 
   int rc_close_read = TILEDB_FS_OK, rc_close_write=TILEDB_FS_OK;
-  if (read_file_handle) {
-   TRACE_FN_ARG("Closing file=" << filename << " opened for read");
-   rc_close_read = close_read_hdfsFile(hdfs_handle_, filename, read_map_, read_count_, read_map_mtx_);
-  }
+  rc_close_read = close_read_hdfsFile(hdfs_handle_, filename, read_map_, read_count_, read_map_mtx_);
+  rc_close_write = close_write_hdfsFile(hdfs_handle_, filename, write_map_, write_map_mtx_);
 
-  if (write_file_handle) {
-    rc_close_write = close_write_hdfsFile(hdfs_handle_, filename, write_map_, write_map_mtx_);
-  }
-
-  if (read_file_handle) {
+  if (rc_close_read) {
     return rc_close_read;
-  } else {
-    return rc_close_write;
   }
+
+  return rc_close_write;
 }
 
 static bool done_printing_consolidation_support_message = false;

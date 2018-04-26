@@ -547,6 +547,7 @@ int StorageManager::array_load_schema(
   }
 
   // Clean up
+  close_file(fs_, filename);
   free(buffer);
 
   // Success
@@ -978,6 +979,7 @@ int StorageManager::metadata_load_schema(
   }
 
   // Clean up
+  close_file(fs_, filename);
   free(buffer);
 
   // Success

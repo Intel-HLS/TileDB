@@ -37,6 +37,7 @@
 #include "utils.h"
 
 #include <assert.h>
+#include <string.h>
 
 /* ****************************** */
 /*   CONSTRUCTORS & DESTRUCTORS   */
@@ -74,7 +75,7 @@ void StorageManagerConfig::init(
    if (is_hdfs_path(home)) {
      if (fs_ != NULL)
        delete fs_;
-     home_ = home;
+     home_ = std::string(home, strlen(home));
      fs_ = new HDFS(home_);
      read_method_ = TILEDB_IO_READ;
      write_method_ = TILEDB_IO_WRITE;
@@ -87,7 +88,7 @@ void StorageManagerConfig::init(
    if(home == NULL) {
      home_ = "";
    } else {
-     home_ = home;
+     home_ = std::string(home, strlen(home));
    } 
 
 #ifdef HAVE_MPI
