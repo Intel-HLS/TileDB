@@ -42,6 +42,9 @@
 #include <cstring>
 #include <iostream>
 
+#include <dirent.h>
+#include "utils.h"
+
 /* ****************************** */
 /*             MACROS             */
 /* ****************************** */
@@ -1702,4 +1705,140 @@ void tiledb_array_set_zlib_compression_level(
     const int level)
 {
   tiledb_array->array_->set_zlib_compression_level(level);
+}
+
+int tiledb_create_directory(const char* directory_name)
+{
+  if(is_dir(directory_name)) //pre-existing directory
+    return TILEDB_OK;
+  auto status = create_dir(directory_name);
+  if(status == TILEDB_UT_OK)
+    return TILEDB_OK;
+  else
+  {
+    strcpy(tiledb_errmsg, tiledb_ut_errmsg.c_str());
+    return TILEDB_ERR;
+  }
+}
+
+int tiledb_ls_directory(
+    const char* directory_name,
+    char** directory_entries,
+    unsigned char* entries_type,
+    size_t* num_directory_entries)
+{
+  auto directory_entries_capacity = *num_directory_entries;
+  *num_directory_entries = 0u;
+  struct dirent* next_entry;
+  DIR* c_dir = opendir(directory_name);
+
+  if(c_dir == NULL)
+  {
+    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
+    return TILEDB_ERR;
+  }
+  auto index = 0u;
+  errno = 0;
+  while((next_entry = readdir(c_dir)))
+  {
+    if(!strcmp(next_entry->d_name, ".") ||
+       !strcmp(next_entry->d_name, ".."))
+      continue;
+    strncpy(directory_entries[index], next_entry->d_name, NAME_MAX);
+    entries_type[index] = next_entry->d_type;
+    ++index;
+    if(index >= directory_entries_capacity)
+      break;
+  }
+
+  //Error
+  if(next_entry == 0 && errno != 0)
+  {
+    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
+    return TILEDB_ERR;
+  }
+
+  // Close array directory
+  auto status = closedir(c_dir);
+  if(status != 0)
+  {
+    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
+    return TILEDB_ERR;
+  }
+
+  *num_directory_entries = index;
+
+  return TILEDB_OK;
+}
+
+int tiledb_delete_directory(const char* directory_name)
+{
+  auto status = delete_dir(directory_name);
+  if(status == TILEDB_UT_OK)
+    return TILEDB_OK;
+  else
+  {
+    strcpy(tiledb_errmsg, tiledb_ut_errmsg.c_str());
+    return TILEDB_ERR;
+  }
+}
+
+void* tiledb_open_file(const char* filename, const char* mode)
+{
+  if(mode[1] != '\0' || (mode [0] != 'r' && mode[0] != 'w'))
+  {
+    sprintf(tiledb_errmsg,
+        "TileDB error: mode \"%s\" is not supported, only \"r\" and \"w\" are supported in tiledb_open_file",
+        mode);
+    return 0;
+  }
+  FILE* fptr = fopen(filename, mode);
+  return reinterpret_cast<void*>(fptr);
+}
+
+size_t tiledb_fread(void* buffer, size_t element_size, size_t nmemb,
+    void* fptr)
+{
+  return fread(buffer, element_size, nmemb, reinterpret_cast<FILE*>(fptr));
+}
+
+size_t tiledb_fwrite(const void* buffer, size_t element_size, size_t nmemb,
+    void* fptr)
+{
+  return fwrite(buffer, element_size, nmemb, reinterpret_cast<FILE*>(fptr));
+}
+
+int tiledb_ferror(void* fptr)
+{
+  return ferror(reinterpret_cast<FILE*>(fptr));
+}
+
+int tiledb_feof(void* fptr)
+{
+  return feof(reinterpret_cast<FILE*>(fptr));
+}
+
+int tiledb_close_file(void* fptr)
+{
+  auto fileptr = reinterpret_cast<FILE*>(fptr);
+  auto status = fclose(fileptr);
+  if(status == 0)
+    return TILEDB_OK;
+  else
+  {
+    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
+    return TILEDB_ERR;
+  }
+}
+
+int tiledb_delete_file(const char* filename)
+{
+  auto status = unlink(filename);
+  if(status == 0)
+    return TILEDB_OK;
+  else
+  {
+    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
+    return TILEDB_ERR;
+  }
 }
