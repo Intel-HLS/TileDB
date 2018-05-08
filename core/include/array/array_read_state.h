@@ -174,9 +174,12 @@ class ArrayReadState {
    *     on an overflow flag which can be checked with function overflow(). The
    *     next invocation will resume for the point the previous one stopped,
    *     without inflicting a considerable performance penalty due to overflow.
+   * @param skip_counts Number of cells to skip before reading data into buffer.
+   *     This can be NULL (no skip). If non NULL, the number of entries in skip_counts
+   *     must be equal to the number of entries in buffer_sizes
    * @return TILEDB_ARS_OK for success and TILEDB_ARS_ERR for error.
    */
-  int read(void** buffers, size_t* buffer_sizes); 
+  int read(void** buffers, size_t* buffer_sizes, size_t* skip_counts=0);
 
 
 
@@ -298,6 +301,24 @@ class ArrayReadState {
    * @param buffer The buffer where the read copy be performed into.
    * @param buffer_size The size (in bytes) of *buffer*.
    * @param buffer_offset The offset in *buffer* where the copy will start from.
+   * @param remaining_skip_count The number of cells to skip before copying
+   * @return TILEDB_ARS on success and TILEDB_ARS_ERR on error.
+   */
+  int copy_cells(
+      int attribute_id,
+      void* buffer,
+      size_t buffer_size,
+      size_t& buffer_offset,
+      size_t& remaining_skip_count);
+
+  /**
+   * Copies the cell ranges calculated in the current read round into the
+   * targeted attribute buffer.
+   *
+   * @param attribute_id The id of the targeted attribute.
+   * @param buffer The buffer where the read copy be performed into.
+   * @param buffer_size The size (in bytes) of *buffer*.
+   * @param buffer_offset The offset in *buffer* where the copy will start from.
    * @return TILEDB_ARS on success and TILEDB_ARS_ERR on error.
    */
   int copy_cells(
@@ -315,6 +336,7 @@ class ArrayReadState {
    * @param buffer The buffer where the read copy be performed into.
    * @param buffer_size The size (in bytes) of *buffer*.
    * @param buffer_offset The offset in *buffer* where the copy will start from.
+   * @param remaining_skip_count The number of cells to skip before copying
    * @return TILEDB_ARS on success and TILEDB_ARS_ERR on error.
    */
   template<class T>
@@ -322,7 +344,37 @@ class ArrayReadState {
       int attribute_id,
       void* buffer,
       size_t buffer_size,
-      size_t& buffer_offset);
+      size_t& buffer_offset,
+      size_t& remaining_skip_count);
+
+  /**
+   * Copies the cell ranges calculated in the current read round into the
+   * targeted attribute buffer, focusing on a **variable-sized** attribute.
+   *
+   * @param attribute_id The id of the targeted attribute.
+   * @param buffer The buffer where the read will be performed into - offsets of
+   *     cells in *buffer_var*.
+   * @param buffer_size The size (in bytes) of *buffer*.
+   * @param buffer_offset The offset in *buffer* where the copy will start from.
+   * @param remaining_skip_count The number of cells to skip before copying
+   * @param buffer_var The buffer where the copy will be performed into - actual
+   *     variable-sized cell values.
+   * @param buffer_var_size The size (in bytes) of *buffer_var*.
+   * @param buffer_var_offset The offset in *buffer_var* where the copy will
+   *     start from.
+   * @param remaining_skip_count_var The number of cells to skip before copying for var field
+   * @return TILEDB_ARS on success and TILEDB_ARS_ERR on error.
+   */
+  int copy_cells_var(
+      int attribute_id,
+      void* buffer,
+      size_t buffer_size,
+      size_t& buffer_offset,
+      size_t& remaining_skip_count,
+      void* buffer_var,
+      size_t buffer_var_size,
+      size_t& buffer_var_offset,
+      size_t& remaining_skip_count_var);
 
   /**
    * Copies the cell ranges calculated in the current read round into the
@@ -359,11 +411,13 @@ class ArrayReadState {
    *     cells in *buffer_var*.
    * @param buffer_size The size (in bytes) of *buffer*.
    * @param buffer_offset The offset in *buffer* where the copy will start from.
+   * @param remaining_skip_count The number of cells to skip before copying
    * @param buffer_var The buffer where the copy will be performed into - actual
    *     variable-sized cell values.
    * @param buffer_var_size The size (in bytes) of *buffer_var*.
    * @param buffer_var_offset The offset in *buffer_var* where the copy will
    *     start from.
+   * @param remaining_skip_count The number of cells to skip before copying for var field
    * @return TILEDB_ARS on success and TILEDB_ARS_ERR on error.
    */
   template<class T>
@@ -372,9 +426,11 @@ class ArrayReadState {
       void* buffer,
       size_t buffer_size,
       size_t& buffer_offset,
+      size_t& remaining_skip_count,
       void* buffer_var,
       size_t buffer_var_size,
-      size_t& buffer_var_offset);
+      size_t& buffer_var_offset,
+      size_t& remaining_skip_count_var);
 
   /**
    * Copies the cell ranges calculated in the current read round into the
@@ -386,6 +442,7 @@ class ArrayReadState {
    * @param buffer_size The size (in bytes) of *buffer*.
    * @param buffer_offset The offset in *buffer* where the copy will start from.
    * @param cell_pos_range The cell range to be copied.
+   * @param remaining_skip_count The number of cells to skip before copying
    * @return TILEDB_ARS on success and TILEDB_ARS_ERR on error.
    */
   template<class T>
@@ -394,7 +451,8 @@ class ArrayReadState {
       void* buffer,
       size_t buffer_size,
       size_t& buffer_offset,
-      const CellPosRange& cell_pos_range);
+      const CellPosRange& cell_pos_range,
+      size_t& remaining_skip_count);
 
   /**
    * Copies the cell ranges calculated in the current read round into the
@@ -407,11 +465,13 @@ class ArrayReadState {
    *     cells in *buffer_var*.
    * @param buffer_size The size (in bytes) of *buffer*.
    * @param buffer_offset The offset in *buffer* where the copy will start from.
+   * @param remaining_skip_count The number of cells to skip before copying
    * @param buffer_var The buffer where the copy will be performed into - actual
    *     variable-sized cell values.
    * @param buffer_var_size The size (in bytes) of *buffer_var*.
    * @param buffer_var_offset The offset in *buffer_var* where the copy will
    *     start from.
+   * @param remaining_skip_count_var The number of cells to skip before copying for the var field
    * @param cell_pos_range The cell range to be copied.
    * @return TILEDB_ARS on success and TILEDB_ARS_ERR on error.
    */
@@ -421,9 +481,11 @@ class ArrayReadState {
       void* buffer,
       size_t buffer_size,
       size_t& buffer_offset,
+      size_t& remaining_skip_count,
       void* buffer_var,
       size_t buffer_var_size,
       size_t& buffer_var_offset,
+      size_t& remaining_skip_count_var,
       const CellPosRange& cell_pos_range);
 
   /**
@@ -576,9 +638,10 @@ class ArrayReadState {
    * 
    * @param buffers See read().
    * @param buffer_sizes See read().
+   * @param skip_counts See read()
    * @return TILEDB_ARS_OK for success and TILEDB_ARS_ERR for error.
    */
-  int read_sparse(void** buffers, size_t* buffer_sizes); 
+  int read_sparse(void** buffers, size_t* buffer_sizes, size_t* skip_counts);
 
   /**
    * Performs a read operation in a **sparse** array, focusing on a single
@@ -587,12 +650,14 @@ class ArrayReadState {
    * @param attribute_id The attribute this read focuses on.
    * @param buffer See read().
    * @param buffer_size See read().
+   * @param skip_count See read()
    * @return TILEDB_ARS_OK for success and TILEDB_ARS_ERR for error.
    */
   int read_sparse_attr(
       int attribute_id,
       void* buffer, 
-      size_t& buffer_size); 
+      size_t& buffer_size,
+      size_t& skip_count);
 
   /**
    * Performs a read operation in a **sparse** array, focusing on a single
@@ -602,13 +667,15 @@ class ArrayReadState {
    * @param attribute_id The attribute this read focuses on.
    * @param buffer See read().
    * @param buffer_size See read().
+   * @param skip_count See read()
    * @return TILEDB_ARS_OK for success and TILEDB_ARS_ERR for error.
    */
   template<class T>
   int read_sparse_attr(
       int attribute_id,
       void* buffer, 
-      size_t& buffer_size);
+      size_t& buffer_size,
+      size_t& skip_count);
 
   /**
    * Performs a read operation in a **sparse** array, focusing on a single
@@ -617,16 +684,20 @@ class ArrayReadState {
    * @param attribute_id The attribute this read focuses on.
    * @param buffer See read() - start offsets in *buffer_var*.
    * @param buffer_size See read().
+   * @param skip_count See read()
    * @param buffer_var See read() - actual variable-sized cell values.
    * @param buffer_var_size See read().
+   * @param skip_count_var See read()
    * @return TILEDB_ARS_OK for success and TILEDB_ARS_ERR for error.
    */
   int read_sparse_attr_var(
       int attribute_id,
       void* buffer, 
       size_t& buffer_size,
+      size_t& skip_count,
       void* buffer_var, 
-      size_t& buffer_var_size);
+      size_t& buffer_var_size,
+      size_t& skip_count_var);
 
   /**
    * Performs a read operation in a **sparse** array, focusing on a single
@@ -636,8 +707,10 @@ class ArrayReadState {
    * @param attribute_id The attribute this read focuses on.
    * @param buffer See read() - start offsets in *buffer_var*.
    * @param buffer_size See read().
+   * @param skip_count See read()
    * @param buffer_var See read() - actual variable-sized cell values.
    * @param buffer_var_size See read().
+   * @param skip_count_var See read()
    * @return TILEDB_ARS_OK for success and TILEDB_ARS_ERR for error.
    */
   template<class T>
@@ -645,8 +718,10 @@ class ArrayReadState {
       int attribute_id,
       void* buffer, 
       size_t& buffer_size,
+      size_t& skip_count,
       void* buffer_var, 
-      size_t& buffer_var_size);
+      size_t& buffer_var_size,
+      size_t& skip_count_var);
 
   /**
    * Uses the heap algorithm to cut and sort the relevant cell ranges for

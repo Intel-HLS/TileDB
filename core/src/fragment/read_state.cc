@@ -295,7 +295,8 @@ int ReadState::copy_cells(
     void* buffer,  
     size_t buffer_size,
     size_t& buffer_offset,
-    const CellPosRange& cell_pos_range) {
+    const CellPosRange& cell_pos_range,
+    size_t& remaining_skip_count) {
   // Trivial case
   if(is_empty_attribute(attribute_id))
     return TILEDB_RS_OK;
@@ -303,17 +304,26 @@ int ReadState::copy_cells(
   // For easy reference
   size_t cell_size = array_schema_->cell_size(attribute_id);
 
-  // Prepare attribute tile
-  if(prepare_tile_for_reading(attribute_id, tile_i) != TILEDB_RS_OK)
-    return TILEDB_RS_ERR;
+  //If this tile hasn't been fetched and all the cells in this tile should be skipped,
+  //then there is no need to fetch the tile from disk (and decompress)
+  size_t num_cells_in_curr_tile = (cell_pos_range.second - cell_pos_range.first + 1u);
+  if(fetched_tile_[attribute_id] != tile_i
+      && remaining_skip_count >= num_cells_in_curr_tile) {
+    remaining_skip_count -= num_cells_in_curr_tile;
+    return TILEDB_RS_OK;
+  }
 
   // Calculate free space in buffer
   size_t buffer_free_space = buffer_size - buffer_offset; 
   buffer_free_space = (buffer_free_space / cell_size) * cell_size;
-  if(buffer_free_space == 0) { // Overflow
+  if(buffer_free_space == 0 && remaining_skip_count == 0u) { // Overflow
     overflow_[attribute_id] = true;
     return TILEDB_RS_OK;
   }
+
+  // Prepare attribute tile
+  if(prepare_tile_for_reading(attribute_id, tile_i) != TILEDB_RS_OK)
+    return TILEDB_RS_ERR;
 
   // Sanity check
   assert(!array_schema_->var_size(attribute_id));
@@ -332,6 +342,21 @@ int ReadState::copy_cells(
   else if(tiles_offsets_[attribute_id] > end_offset) // This range is written
     return TILEDB_RS_OK;
 
+  // Calculate number of bytes to skip
+  auto bytes_to_skip = remaining_skip_count * cell_size;
+
+  //#cells remaining in this cell range <= remaining_skip_count
+  if(tiles_offsets_[attribute_id] + bytes_to_skip > end_offset) { // This range is written
+    assert(remaining_skip_count > 0u);
+    auto num_cells_skipped = (end_offset - tiles_offsets_[attribute_id] + 1u)/cell_size;
+    assert(num_cells_skipped <= remaining_skip_count);
+    remaining_skip_count -= num_cells_skipped;
+    return TILEDB_RS_OK;
+  }
+
+  //skip some cells
+  tiles_offsets_[attribute_id] += bytes_to_skip;
+
   // Calculate the total size to copy
   bytes_left_to_copy = end_offset - tiles_offsets_[attribute_id] + 1;
   bytes_to_copy = std::min(bytes_left_to_copy, buffer_free_space);  
@@ -349,6 +374,9 @@ int ReadState::copy_cells(
     buffer_free_space = buffer_size - buffer_offset;
   }
 
+  //if some cells had remained to be skipped, they would have been caught by the if statement 30 lines above
+  remaining_skip_count = 0u;
+
   // Handle buffer overflow
   if(tiles_offsets_[attribute_id] != end_offset + 1) 
     overflow_[attribute_id] = true;
@@ -363,10 +391,26 @@ int ReadState::copy_cells_var(
     void* buffer,  
     size_t buffer_size,
     size_t& buffer_offset,
+    size_t& remaining_skip_count,
     void* buffer_var,  
     size_t buffer_var_size,
     size_t& buffer_var_offset,
+    size_t& remaining_skip_count_var,
     const CellPosRange& cell_pos_range) {
+
+  // TileDB traverses the offsets and data in lock step - can't have different skip values
+  assert(remaining_skip_count == remaining_skip_count_var);
+
+  //If this tile hasn't been fetched and all the cells in this tile should be skipped,
+  //then there is no need to fetch the tile from disk (and decompress)
+  size_t num_cells_in_curr_tile = (cell_pos_range.second - cell_pos_range.first + 1u);
+  if(fetched_tile_[attribute_id] != tile_i
+      && remaining_skip_count >= num_cells_in_curr_tile) {
+    remaining_skip_count -= num_cells_in_curr_tile;
+    remaining_skip_count_var -= num_cells_in_curr_tile;
+    return TILEDB_RS_OK;
+  }
+
   // For easy reference
   size_t cell_size = TILEDB_CELL_VAR_OFFSET_SIZE;
 
@@ -374,9 +418,9 @@ int ReadState::copy_cells_var(
   size_t buffer_free_space = buffer_size - buffer_offset; 
   buffer_free_space = (buffer_free_space / cell_size) * cell_size;
   size_t buffer_var_free_space = buffer_var_size - buffer_var_offset;
-
   // Handle overflow
-  if(buffer_free_space == 0 || buffer_var_free_space == 0) { // Overflow
+  if((buffer_free_space == 0 || buffer_var_free_space == 0)
+      && remaining_skip_count == 0u) { // Overflow
     overflow_[attribute_id] = true; 
     return TILEDB_RS_OK;
   }
@@ -402,6 +446,22 @@ int ReadState::copy_cells_var(
     tiles_offsets_[attribute_id] = start_offset;
   else if(tiles_offsets_[attribute_id] > end_offset) // This range is written
     return TILEDB_RS_OK;
+
+  // Calculate number of bytes to skip
+  auto bytes_to_skip = remaining_skip_count * cell_size;
+
+  //#cells remaining in this cell range <= remaining_skip_count
+  if(tiles_offsets_[attribute_id] + bytes_to_skip > end_offset) { // This range is written
+    assert(remaining_skip_count > 0u);
+    auto num_cells_skipped = (end_offset - tiles_offsets_[attribute_id] + 1u)/cell_size;
+    assert(num_cells_skipped <= remaining_skip_count);
+    remaining_skip_count -= num_cells_skipped;
+    remaining_skip_count_var -= num_cells_skipped;
+    return TILEDB_RS_OK;
+  }
+
+  //skip some cells
+  tiles_offsets_[attribute_id] += bytes_to_skip;
 
   // Calculate the total size to copy
   bytes_left_to_copy = end_offset - tiles_offsets_[attribute_id] + 1;
@@ -430,6 +490,8 @@ int ReadState::copy_cells_var(
       start_cell_pos,
       tile_var_start) != TILEDB_RS_OK)
     return TILEDB_RS_ERR;
+
+  // this also takes care of skipped cells
   if(tiles_var_offsets_[attribute_id] < *tile_var_start) 
     tiles_var_offsets_[attribute_id] = *tile_var_start;
 
@@ -466,6 +528,10 @@ int ReadState::copy_cells_var(
   // Check for overflow
   if(tiles_offsets_[attribute_id] != end_offset + 1) 
     overflow_[attribute_id] = true;
+
+  //if some cells had remained to be skipped, they would have been caught by the if statement 80 lines above
+  remaining_skip_count = 0u;
+  remaining_skip_count_var = 0u;
 
   // Entering this if condition implies that the var data in this cell is so 
   // large that the allocated buffer cannot hold it

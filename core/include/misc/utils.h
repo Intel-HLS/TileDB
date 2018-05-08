@@ -47,6 +47,8 @@
   #include <omp.h>
 #endif
 
+#include "tiledb_constants.h"
+
 
 /* ********************************* */
 /*             CONSTANTS             */
@@ -879,5 +881,42 @@ int delete_directories(StorageFS *fs, const std::vector<std::string>& directorie
  * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
  */
 int move_path(StorageFS *fs, const std::string& old_path, const std::string& new_path);
+
+/*
+ * Return the TileDB empty value for the datatype
+ */
+template<class T>
+inline T get_tiledb_empty_value();
+
+//Template specialization for get_tiledb_empty_value()
+template<>
+inline int get_tiledb_empty_value()
+{
+  return TILEDB_EMPTY_INT32;
+}
+
+template<>
+inline int64_t get_tiledb_empty_value()
+{
+  return TILEDB_EMPTY_INT64;
+}
+
+template<>
+inline float get_tiledb_empty_value()
+{
+  return TILEDB_EMPTY_FLOAT32;
+}
+
+template<>
+inline double get_tiledb_empty_value()
+{
+  return TILEDB_EMPTY_FLOAT64;
+}
+
+template<>
+inline char get_tiledb_empty_value()
+{
+  return TILEDB_EMPTY_CHAR;
+}
 
 #endif

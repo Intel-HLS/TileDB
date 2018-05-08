@@ -194,9 +194,12 @@ class Array {
    *     on an overflow flag which can be checked with function overflow(). The
    *     next invocation will resume for the point the previous one stopped,
    *     without inflicting a considerable performance penalty due to overflow.
+   * @param skip_counts Number of cells to skip before reading data into buffer.
+   *     This can be NULL (no skip). If non NULL, the number of entries in skip_counts
+   *     must be equal to the number of entries in buffer_sizes
    * @return TILEDB_AR_OK for success and TILEDB_AR_ERR for error.
    */
-  int read(void** buffers, size_t* buffer_sizes); 
+  int read(void** buffers, size_t* buffer_sizes, size_t* skip_counts=0);
 
 #ifdef ENABLE_MUPARSERX_EXPRESSIONS
   /**
@@ -258,9 +261,12 @@ class Array {
    *     on an overflow flag which can be checked with function overflow(). The
    *     next invocation will resume for the point the previous one stopped,
    *     without inflicting a considerable performance penalty due to overflow.
+   * @param skip_counts Number of cells to skip before reading data into buffer.
+   *     This can be NULL (no skip). If non NULL, the number of entries in skip_counts
+   *     must be equal to the number of entries in buffer_sizes
    * @return TILEDB_AR_OK for success and TILEDB_AR_ERR for error.
    */
-  int read_default(void** buffers, size_t* buffer_sizes); 
+  int read_default(void** buffers, size_t* buffer_sizes, size_t* skip_counts=0);
 
   /** Returns true if the array is in read mode. */
   bool read_mode() const;

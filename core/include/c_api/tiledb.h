@@ -546,6 +546,24 @@ TILEDB_EXPORT int tiledb_array_read(
     void** buffers,
     size_t* buffer_sizes);
 
+/**
+ * Identical to tiledb_array_read, but skips N cells for each attribute
+ * before reading data into the buffer. An example where this is useful is
+ * as follows - user queries fields/attributes [ F0, F1, F2 ], but is only
+ * interested in cells where F0 > C. So, a good query would read blocks of F0
+ * data, determine which cells are needed and would only fetch data from F1
+ * and F2 for the required cells. This can be achieved by skipping over the
+ * discarded cells
+ * @params - identical to tiledb_array_read()
+ * @param skip_counts The number of cells to skip over for each buffer/attribute.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_array_skip_and_read(
+    const TileDB_Array* tiledb_array,
+    void** buffers,
+    size_t* buffer_sizes,
+    size_t* skip_counts);
+
 #ifdef ENABLE_MUPARSERX_EXPRESSIONS
 /**
  * Performs a filter operation on an array.
@@ -697,7 +715,24 @@ TILEDB_EXPORT int tiledb_array_iterator_init(
     void** buffers,
     size_t* buffer_sizes);
 
-/** 
+/**
+ * Resets the subarray used upon initialization of the iterator. This is useful
+ * when the array is used for reading, and the user wishes to change the
+ * query subarray without having to finalize and re-initialize the array.
+ *
+ * @param tiledb_array_it The TileDB iterator.
+ * @param subarray The new subarray. It should be a sequence of [low, high]
+ *     pairs (one pair per dimension), whose type should be the same as that of
+ *     the coordinates. If it is NULL, then the subarray is set to the entire
+ *     array domain. For the case of writes, this is meaningful only for
+ *     dense arrays, and specifically dense writes.
+ * @return TILEDB_OK on success, and TILEDB_ERR on error.
+ */
+TILEDB_EXPORT int tiledb_array_iterator_reset_subarray(
+    TileDB_ArrayIterator* tiledb_array_it,
+    const void* subarray);
+
+/**
  * Retrieves the current cell value for a particular attribute.
  *
  * @param tiledb_array_it The TileDB array iterator.
@@ -1333,6 +1368,81 @@ TILEDB_EXPORT int tiledb_array_aio_write(
 TILEDB_EXPORT void tiledb_array_set_zlib_compression_level(
     TileDB_Array* tiledb_array,
     const int level);
+
+/*
+ * For GenomicsDB metadata - since TileDB might be on POSIX fs/HDFS/object store
+ */
+
+/*
+ * Create directory
+ * @param directory_name path to directory
+ * @return TILEDB_OK on success or pre-existing directory, else TILEDB_ERR
+ */
+TILEDB_EXPORT int tiledb_create_directory(
+    const char* directory_name);
+/*
+ * Returns entries in a directory and type
+ * @param directory_name path to directory
+ * @param directory_entries - effectively a vector of strings which will be filled with dir entry names
+ *            Ideally, each string should be sized NAME_MAX+1. Vector capacity should be specified in
+ *            num_directory_entries
+ * @param directory_entries_type vector of entry types - see d_type in man 3 readdir (dirent.h)
+ * @param num_directory_entries - should be set to capacity of vectors directory_entries and 
+ *            directory_entries_type. It is modified to the number of entries actually found. If this
+ *            is equal to the capacity, the caller must call this function again with larger vectors to
+ *            get all the entries
+ * @return TILEDB_OK on success, else TILEDB_ERR
+ */
+TILEDB_EXPORT int tiledb_ls_directory(
+    const char* directory_name,
+    char** directory_entries,
+    unsigned char* directory_entries_type,
+    size_t* num_directory_entries);
+
+/*
+ * Delete directory (recursively)
+ * @param directory_name path to directory
+ * @return TILEDB_OK on success, else TILEDB_ERR
+ */
+TILEDB_EXPORT int tiledb_delete_directory(
+    const char* directory_name);
+
+/*
+ * Open file
+ * @param filename file path
+ * @param mode "w" or "r"
+ * @return an opaque file pointer, NULL in case of failure
+ */
+TILEDB_EXPORT void* tiledb_open_file(
+    const char* filename,
+    const char* mode);
+/*
+ * Close file 
+ * @param fptr opaque file pointer returned by tiledb_open_file()
+ * @return TILEDB_OK on success, else TILEDB_ERR
+ */
+TILEDB_EXPORT int tiledb_close_file(void* fptr);
+
+/*
+ * The following are counterparts of fread, fwrite, feof, ferror
+ */
+TILEDB_EXPORT size_t tiledb_fread(void* buffer, size_t element_size, size_t nmemb,
+    void* fptr);
+
+TILEDB_EXPORT size_t tiledb_fwrite(const void* buffer, size_t element_size, size_t nmemb,
+    void* fptr);
+
+TILEDB_EXPORT int tiledb_feof(void* fptr);
+
+TILEDB_EXPORT int tiledb_ferror(void* fptr);
+
+/*
+ * Open file
+ * @param filename file path
+ * @return TILEDB_OK on success, else TILEDB_ERR
+ */
+TILEDB_EXPORT int tiledb_delete_file(
+    const char* filename);
 
 #undef TILEDB_EXPORT
 #ifdef __cplusplus
