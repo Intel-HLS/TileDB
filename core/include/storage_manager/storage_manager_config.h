@@ -41,6 +41,7 @@
 #include "storage_fs.h"
 #include "storage_posixfs.h"
 #include "storage_hdfs.h"
+#include "storage_gcs.h"
 
 /** 
  * This class is responsible for the TileDB storage manager configuration 

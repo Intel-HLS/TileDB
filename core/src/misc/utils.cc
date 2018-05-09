@@ -32,8 +32,6 @@
 
 #include "tiledb_constants.h"
 #include "utils.h"
-#include "hdfs_utils.h"
-#include "fs_utils.h"
 #include "buffer.h"
 #include "trace.h"
 
@@ -235,8 +233,20 @@ int cmp_row_order(
   return 0;
 }
 
+bool is_gcs_path(const std::string& pathURL) {
+  if (!pathURL.empty() && starts_with(pathURL, "gs:")) {
+#ifdef USE_HDFS
+    return true;
+#else
+    assert(false && "GCS functionality not enabled in TileDB, build with -DUSE_HDFS=1");
+#endif
+  } else {
+    return false;
+ }
+}
+
 bool is_hdfs_path(const std::string& pathURL) {
-  if (!pathURL.empty() && (starts_with(pathURL, "hdfs:") || starts_with(pathURL, "s3:") || starts_with(pathURL, "gs:"))) {
+  if (!pathURL.empty() && (starts_with(pathURL, "hdfs:") || starts_with(pathURL, "s3:"))) {
 #ifdef USE_HDFS
     return true;
 #else

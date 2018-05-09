@@ -28,12 +28,11 @@
 # Function that builds an executable per example
 function(build_TileDB_example TARGET)
   add_executable(${TARGET} EXCLUDE_FROM_ALL src/${TARGET}.cc)
-  if(HDFS_SHARED_LIBRARY)
-    target_link_libraries(${TARGET} tiledb_static ${TILEDB_LIB_DEPENDENCIES})
-  else()
-    target_link_libraries(${TARGET} tiledb_static ${TILEDB_LIB_DEPENDENCIES} ${HDFS_STATIC_LIBRARY})
-  endif()
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ldl" )
+  target_link_libraries(${TARGET} tiledb_static ${TILEDB_LIB_DEPENDENCIES})
 endfunction()
+
+SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -ldl" )
 
 # Get the example sources
 file(GLOB TILEDB_EXAMPLE_SOURCES "src/*.cc")

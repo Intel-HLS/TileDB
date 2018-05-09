@@ -121,19 +121,7 @@ endif()
 set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} pthread)
 
 # Add HDFS support
-set(USE_HDFS False CACHE BOOL "Enables HDFS")
-if(USE_HDFS AND NOT APPLE)
-  find_package(HDFS REQUIRED)
-  include_directories(${HDFS_INCLUDE_PATH})
-  if(HDFS_SHARED_LIBRARY)
-    set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${HDFS_SHARED_LIBRARY} ${JAVA_JVM_LIBRARY})
-  else()
-    set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${JAVA_JVM_LIBRARY})
-  endif()
-  add_definitions(-DUSE_HDFS)
-else()
-  message(STATUS "No support for HDFS in TileDB. Compile with -DUSE_HDFS=1 if support is required.")
-endif()
+add_definitions(-DUSE_HDFS)
 
 # Set C++ 2011 flag
 include(SetCXX2011Flag)

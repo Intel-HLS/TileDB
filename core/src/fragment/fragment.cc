@@ -305,7 +305,7 @@ int Fragment::rename_fragment() {
     return TILEDB_FG_OK;
 
   // No rename of fragment required for cloud based filenames
-  if (is_hdfs_path(fragment_name_)) {
+  if (is_hdfs_path(fragment_name_) || is_gcs_path(fragment_name_)) {
     return TILEDB_FG_OK;
   }
 

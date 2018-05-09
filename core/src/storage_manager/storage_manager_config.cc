@@ -37,6 +37,7 @@
 #include "utils.h"
 
 #include <assert.h>
+#include <iostream>
 #include <string.h>
 
 /* ****************************** */
@@ -72,11 +73,18 @@ void StorageManagerConfig::init(
     int read_method,
     int write_method) {
   // Initialize home
-   if (is_hdfs_path(home)) {
+  if (strstr(home, "://")) {
      if (fs_ != NULL)
        delete fs_;
      home_ = std::string(home, strlen(home));
-     fs_ = new HDFS(home_);
+     if (is_hdfs_path(home)) {
+       fs_ = new HDFS(home_);
+     } else if (is_gcs_path(home)) {
+       fs_ = new GCS(home_);
+     } else {
+       std::cerr << "No TileDB support for Home=" << home_ << std::endl << std::flush;
+       assert(false && "No TileDB support for this URL");
+     }
      read_method_ = TILEDB_IO_READ;
      write_method_ = TILEDB_IO_WRITE;
      return;

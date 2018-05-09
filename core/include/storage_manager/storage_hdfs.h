@@ -36,10 +36,13 @@
 
 #ifdef USE_HDFS
 
+#include "cloud_storage_prototypes.h"
 #include "tiledb_constants.h"
-#include <hdfs.h>
+
 #include <mutex>
 #include <unordered_map>
+
+extern void load_hdfs_library();
 
 class HDFS : public StorageFS {
  public:

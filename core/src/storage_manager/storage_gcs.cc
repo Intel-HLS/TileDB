@@ -1,5 +1,5 @@
 /**
- * @file   storage_hdfs.cc
+ * @file storage_gcs.cc
  *
  * @section LICENSE
  *
@@ -25,20 +25,17 @@
  *
  * @section DESCRIPTION
  *  
- * HDFS Support for StorageFS
+ * GCS Support for StorageFS
  */
 
-#include "storage_hdfs.h"
-
-#include <assert.h>
+#include "storage_gcs.h"
 
 #ifdef USE_HDFS
 
-#include "url.h"
+#include "storage_posixfs.h"
 #include "utils.h"
 
-#include "trace.h"
-
+#include <assert.h>
 #include <cerrno>
 #include <cstring>
 #include <clocale>
@@ -60,36 +57,64 @@ static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std
 
 #include <sys/time.h>
 #include <sys/resource.h>
-int get_rlimits(struct rlimit *limits) {
-  if (getrlimit(RLIMIT_NOFILE, limits)) {
-    PRINT_ERROR(std::string("Could not execute getrlimit ") + std::strerror(errno));
-    return -1;
+char *trim(char *value) {
+  while (value[0] == '\"' || value[0] == ' ' || value[0] == '\n') {
+    value++;
+  } 
+  while (value[strlen(value)-1] == '\"' || value[strlen(value)-1] == ' ' || value[strlen(value)-1] == '\n') {
+    value[strlen(value)-1] = 0;
   }
-  TRACE_FN_ARG(std::string("current rlimit for open file handles=") << limits->rlim_cur);
-  TRACE_FN_ARG(std::string("hard rlimit for open file handles=") << limits->rlim_max);
-  return 0;
+  if (strcmp(value, "{") == 0 || strcmp(value, "}") == 0) {
+    return NULL;
+  }
+  return value;
 }
 
-void maximize_rlimits() {
-  struct rlimit limits;
-  if (get_rlimits(&limits)) {
-    return;
+char *parse_json(char *filename, const char *key) {
+  PosixFS *fs = new PosixFS();
+  size_t size;
+
+  if (!fs->is_file(filename) || (size = fs->file_size(filename)) <= 0) {
+    return NULL;
   }
 
-  if (limits.rlim_cur == limits.rlim_max) {
-    return;
-  }
+  char *buffer = (char *)malloc(size + 1);
+  assert(buffer && "Failed to allocate buffer");
+  memset((void *)buffer, 0, size+1);
 
-  limits.rlim_cur = limits.rlim_max;
-  if (setrlimit(RLIMIT_NOFILE, &limits)) {
-    PRINT_ERROR(std::string("Could not execute setrlimit ") + std::strerror(errno));
-    return;
-  }
+  int rc = fs->read_from_file(filename, 0, buffer, size);
+  assert(!rc && "Failure to read file");
+
+  delete fs;
   
-  get_rlimits(&limits);
+  char *value = NULL;
+  char *saveptr;
+  char *token = strtok_r(buffer, ",\n ", &saveptr);
+  while (token) {
+    token = trim(token);
+    if (token) {
+      char *sub_saveptr;
+      char *sub_token = strtok_r(token, ":", &sub_saveptr);
+      if (strcmp(trim(sub_token), key) == 0) {
+	value = strtok_r(NULL, ":", &sub_saveptr);
+	free(buffer);
+	value = trim(value);
+	if (value) {
+	  return strdup(value);
+	} else {
+	  return NULL;
+	}
+      }
+    }
+    token = strtok_r(NULL, ",", &saveptr);
+  }
+  free(buffer);
+  return NULL;
 }
 
-HDFS::HDFS(const std::string& home) {
+#define GCS_PREFIX "gs://"
+
+GCS::GCS(const std::string& home) {
   load_hdfs_library();
   struct hdfsBuilder *builder = hdfsNewBuilder();
   if (!builder) {
@@ -98,52 +123,47 @@ HDFS::HDFS(const std::string& home) {
 
   hdfsBuilderSetForceNewInstance(builder);
 
-  url path_url(home);
-  std::string name_node;
-  int16_t nport = 0;
+  assert(starts_with(home, GCS_PREFIX) && "Home URL not supported");
 
-  assert((!path_url.protocol().compare("hdfs") || !path_url.protocol().compare("s3") || !path_url.protocol().compare("gs"))
-         && "Home URL not supported");
-
-  if (path_url.host().empty()) {
-    if (!path_url.port().empty()) {
-      PRINT_ERROR(std::string("home=") + home + " not supported. hdfs host and port have to be both empty");
-      assert(false && "Home URL not supported: hdfs host and port have to be both empty");
-    }
-    name_node.assign("default");
-  } else if (path_url.protocol().compare("hdfs") != 0) { // s3/gs protocols
-    name_node.assign(path_url.protocol() + "://" + path_url.host());
+  std::string gcs_bucket;
+  std::string working_dir;
+  auto n = home.find("/", strlen(GCS_PREFIX));
+  if (n == std::string::npos){
+    gcs_bucket = home;
+    working_dir.assign("/");
   } else {
-    if (path_url.port().empty()) {
-      PRINT_ERROR(std::string("home=") + home + "not supported.hdfs host and port have to be specified together");
-      assert(false && "Home URL not supported: hdfs host and port have to be specified together");
+    gcs_bucket = home.substr(0, n);
+    working_dir.assign(home.substr(n));
+  }
+  assert(!gcs_bucket.empty() && "GCS bucket name could not be deduced from home URL");
+
+  hdfsBuilderSetNameNode(builder, gcs_bucket.c_str());
+
+  char *gcs_creds = getenv("GOOGLE_APPLICATION_CREDENTIALS");
+  char *value;
+  if (gcs_creds) {
+    value = parse_json(gcs_creds, "project_id"); // free value after hdfsBuilderConnect as it is shallow copied
+    if (value) {
+      hdfsBuilderConfSetStr(builder, "google.cloud.auth.service.account.enable", "true");
+      hdfsBuilderConfSetStr(builder, "google.cloud.auth.service.account.json.keyfile", gcs_creds);
+      hdfsBuilderConfSetStr(builder, "fs.gs.project.id", value);
+      hdfsBuilderConfSetStr(builder, "fs.gs.working.dir", working_dir.c_str());
     }
-    name_node.assign(path_url.host());
-    nport = path_url.nport();
   }
-  
-  hdfsBuilderSetNameNode(builder, name_node.c_str());
-  if (!path_url.port().empty()) {
-    hdfsBuilderSetNameNodePort(builder, nport);
-  }
-  
+    
   hdfs_handle_ = hdfsBuilderConnect(builder);
   if (!hdfs_handle_) {
     assert(false && "Error with hdfs builder connection");
   }
 
-  if (path_url.path().empty()) {
-    hdfsSetWorkingDirectory(hdfs_handle_, "/");
-  } else {
-    hdfsSetWorkingDirectory(hdfs_handle_, home.c_str());
+  if (value) {
+    free(value);
   }
-  hdfsGetWorkingDirectory(hdfs_handle_, home_dir, TILEDB_NAME_MAX_LEN);
 
-  // Maximize open file handle limits
-  //maximize_rlimits();
+  hdfsSetWorkingDirectory(hdfs_handle_, working_dir.c_str());
 }
 
-HDFS::~HDFS() {
+GCS::~GCS() {
   // Close any files that have been opened and not closed.
   invoke_function(hdfs_handle_, read_map_, &close_kernel);
   read_map_.clear();
@@ -187,7 +207,6 @@ static int close_read_hdfsFile(hdfsFS hdfs_handle, const std::string& filename, 
     if (search != count_map.end()) {
       count =  search->second;
     }
-    TRACE_FN_ARG("Really closing file " << filename << " Count =" << count);
     if (count == 0) {
       rc = close_kernel(hdfs_handle, hdfs_file_handle, filename);
       map.erase(filename);
@@ -217,14 +236,13 @@ static void invoke_function(hdfsFS hdfs_handle, std::unordered_map<std::string, 
   for (auto it = map.begin(); it != map.end(); ++it) {
     std::string filename = it->first;
     hdfsFile hdfs_file_handle = it->second;
-    TRACE_FN_ARG(std::string("invoke_function called on ") << filename << std::string(" for leaked file handle"));
 
     // Call function kernel
     fn(hdfs_handle, hdfs_file_handle, filename);
   }
 }
 
-std::string HDFS::current_dir() {
+std::string GCS::current_dir() {
   char working_dir[TILEDB_NAME_MAX_LEN];
   if (hdfsGetWorkingDirectory(hdfs_handle_, working_dir, TILEDB_NAME_MAX_LEN) == NULL) {
     print_errmsg("Could not get current working dir");
@@ -249,7 +267,7 @@ static bool is_path(const hdfsFS hdfs_handle, const char *path, const char kind)
   return false;
 }
 
-bool HDFS::is_dir(const std::string& dir) {
+bool GCS::is_dir(const std::string& dir) {
   std::string slash("/");
   if (dir.back() != '/') {
     return is_path(hdfs_handle_, (dir + slash).c_str(), 'D');
@@ -257,27 +275,27 @@ bool HDFS::is_dir(const std::string& dir) {
   return is_path(hdfs_handle_, dir.c_str(), 'D');
 }
 
-bool HDFS::is_file(const std::string& file) {
+bool GCS::is_file(const std::string& file) {
   return is_path(hdfs_handle_, file.c_str(), 'F');
 }
 
-std::string HDFS::real_dir(const std::string& dir) {
+std::string GCS::real_dir(const std::string& dir) {
   if (dir.empty()) {
     return current_dir();
-  } else if (is_hdfs_path(dir)) {
+  } else if (is_gcs_path(dir)) {
     // absolute path
     return dir;
   } else if (starts_with(dir, "/")) {
     // seems to be an absolute path but without protocol/host information.
-    print_errmsg(dir + ": Not a valid HDFS path");
-    assert(false && "Not a valid HDFS path");
+    print_errmsg(dir + ": Not a valid GCS path");
+    assert(false && "Not a valid GCS path");
   } else {
     // relative path
     return current_dir() + "/" + dir;
   }
 }
   
-int HDFS::create_dir(const std::string& dir) {
+int GCS::create_dir(const std::string& dir) {
   if (is_dir(dir)) {
     return print_errmsg(std::string("Cannot create directory ") + dir + "; Directory already exists");
   }
@@ -289,7 +307,7 @@ int HDFS::create_dir(const std::string& dir) {
   return TILEDB_FS_OK;
 }
 
-int HDFS::delete_dir(const std::string& dir) {
+int GCS::delete_dir(const std::string& dir) {
   if (is_dir(dir)) {
     if (hdfsDelete(hdfs_handle_, dir.c_str(), 1) < 0) {
       return print_errmsg(std::string("Cannot delete directory ") + dir);
@@ -301,7 +319,7 @@ int HDFS::delete_dir(const std::string& dir) {
   return TILEDB_FS_OK;
 }
 
-std::vector<std::string> HDFS::get_dirs(const std::string& dir) {
+std::vector<std::string> GCS::get_dirs(const std::string& dir) {
   std::vector<std::string> path_list;
 
   int num_entries = 0;
@@ -315,11 +333,12 @@ std::vector<std::string> HDFS::get_dirs(const std::string& dir) {
       }
     }
   }
+  hdfsFreeFileInfo(file_info, 1);
 
   return path_list;
 }
     
-int HDFS::create_file(const std::string& filename, int flags, mode_t mode) {
+int GCS::create_file(const std::string& filename, int flags, mode_t mode) {
   hdfsFile file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_WRONLY, 0, 0, 0);
   if (!file) {
     return print_errmsg(std::string("Cannot create file ") + filename + "; Open error " + std::strerror(errno));
@@ -332,7 +351,7 @@ int HDFS::create_file(const std::string& filename, int flags, mode_t mode) {
   return TILEDB_FS_OK;
 }
 
-int HDFS::delete_file(const std::string& filename) {
+int GCS::delete_file(const std::string& filename) {
   if (get_hdfsFile(filename, read_map_) || get_hdfsFile(filename, write_map_)) {
     return print_errmsg(std::string("Cannot delete file ") + filename + " as it is open in this context");
   }
@@ -348,7 +367,7 @@ int HDFS::delete_file(const std::string& filename) {
   return TILEDB_FS_OK;
 }
 
-size_t HDFS::file_size(const std::string& filename) {
+size_t GCS::file_size(const std::string& filename) {
   hdfsFileInfo* file_info = hdfsGetPathInfo(hdfs_handle_, filename.c_str());
   if (!file_info) {
     print_errmsg(std::string("Cannot get path info for file ") + filename);
@@ -403,7 +422,6 @@ static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer
 }
 
 static hdfsFile filtered_hdfs_open_file_for_read(hdfsFS hdfs_handle, const std::string& filename, size_t buffer_size) {
-  TRACE_FN_ARG("Opening file for " << filename);
   // Workaround for error messages of the type -
   // readDirect: FSDataInputStream#read error:
   // java.lang.UnsupportedOperationException: Byte-buffer read unsupported by input stream
@@ -447,9 +465,7 @@ static int read_count(const std::string& filename, std::unordered_map<std::strin
   return count;
 }
 
-int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
-  TRACE_FN_ARG("filename="<< filename << " offset=" << offset << " length=" << length);
-
+int GCS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
   // Not supporting simultaneous read/writes.
   if (get_hdfsFile(filename, write_map_)) {
     print_errmsg(std::string("File=") + filename + " is open simultaneously for reads/writes");
@@ -505,8 +521,7 @@ static int write_to_file_kernel(hdfsFS hdfs_handle, hdfsFile file, const void* b
   return TILEDB_FS_OK;
 }
 
-int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t buffer_size) {
-  TRACE_FN_ARG("filename:"<<std::string(filename));
+int GCS::write_to_file(const std::string& filename, const void *buffer, size_t buffer_size) {
   size_t max_bytes = max_tsize();
   if (max_bytes == 0) {
     return TILEDB_FS_ERR;
@@ -515,7 +530,7 @@ int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t 
   hdfsFile file = get_hdfsFile(filename, write_map_);
   if (!file) {
     write_map_mtx_.lock();
-    file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_WRONLY, max_bytes, 0, 0);
+    file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_WRONLY, 0, 0, 0);
     if (file) {
       write_map_.emplace(filename, file);
     }
@@ -528,7 +543,7 @@ int HDFS::write_to_file(const std::string& filename, const void *buffer, size_t 
   return write_to_file_kernel(hdfs_handle_, file, buffer, buffer_size, max_bytes);
 }
 
-int HDFS::move_path(const std::string& old_path, const std::string& new_path) {
+int GCS::move_path(const std::string& old_path, const std::string& new_path) {
   if (!hdfsExists(hdfs_handle_, new_path.c_str())) {
     return print_errmsg(std::string("Cannot move path ") + old_path + " to " + new_path + " as it exists");
   }
@@ -548,7 +563,7 @@ static int sync_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std:
   return TILEDB_FS_OK;
 }
 
-int HDFS::sync_path(const std::string& path) {
+int GCS::sync_path(const std::string& path) {
   int rc = TILEDB_FS_OK;
   
   auto search = write_map_.find(path);
@@ -566,9 +581,7 @@ static int close_kernel(hdfsFS hdfs_handle, hdfsFile hdfs_file_handle, const std
   return TILEDB_FS_OK;
 }
 
-int HDFS::close_file(const std::string& filename) {
-  TRACE_FN_ARG("Closing file=" << filename << " opened for read");
-
+int GCS::close_file(const std::string& filename) {
   int rc_close_read = TILEDB_FS_OK, rc_close_write=TILEDB_FS_OK;
   rc_close_read = close_read_hdfsFile(hdfs_handle_, filename, read_map_, read_count_, read_map_mtx_);
   rc_close_write = close_write_hdfsFile(hdfs_handle_, filename, write_map_, write_map_mtx_);
@@ -582,9 +595,9 @@ int HDFS::close_file(const std::string& filename) {
 
 static bool done_printing_consolidation_support_message = false;
 
-bool HDFS::consolidation_support() {
+bool GCS::consolidation_support() {
   if (!done_printing_consolidation_support_message) {
-    print_errmsg("TBD: No consolidation locking support for distributed file systems.");
+    print_errmsg("TBD: No consolidation locking support for cloud file systems.");
     done_printing_consolidation_support_message = true;
   }
   return false;

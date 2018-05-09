@@ -1,11 +1,9 @@
 /**
- * @file   hdfs_utils.h
+ * @ storage_gcs.h
  *
  * @section LICENSE
  *
  * The MIT License
- *
- * @copyright Copyright (c) 2018 UCLA. License pursuant to original Intel MIT license.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,48 +25,76 @@
  * 
  * @section DESCRIPTION
  *
- * This file contains hdfs utility functions.
+ * GCS derived from StorageFS for Google Cloud Services
+ *
  */
 
-#ifndef __HDFS_UTILS_H__
-#define __HDFS_UTILS_H__
+#ifndef __STORAGE_GCS_H__
+#define  __STORAGE_GCS_H__
 
-#include "utils.h"
+#include "storage_fs.h"
 
-#include <string>
+#ifdef USE_HDFS
 
-namespace hdfs {
-  int connect(const std::string& path);
-  void disconnect();
+#include "cloud_storage_prototypes.h"
+#include "tiledb_constants.h"
 
-  bool is_hdfs_path(const std::string& path);
-  bool is_hdfs();
+#include <mutex>
+#include <unordered_map>
 
-  char *get_home_dir();
+extern void load_hdfs_library();
+
+class GCS : public StorageFS {
+ public:
+  GCS(const std::string& home);
+  ~GCS();
+
   std::string current_dir();
 
   bool is_dir(const std::string& dir);
   bool is_file(const std::string& file);
   std::string real_dir(const std::string& dir);
-    
+               
   int create_dir(const std::string& dir);
   int delete_dir(const std::string& dir);
   std::vector<std::string> get_dirs(const std::string& dir);
-    
-  int create_file(const std::string& filename, int flags);
+  
+  int create_file(const std::string& filename, int flags, mode_t mode);
   int delete_file(const std::string& filename);
 
   size_t file_size(const std::string& filename);
 
   int read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length);
-  int write_to_file(const char *filename, const void *buffer, size_t buffer_size);
-
+  int write_to_file(const std::string& filename, const void *buffer, size_t buffer_size);
+  
   int move_path(const std::string& old_path, const std::string& new_path);
     
-  int sync(const char* filename);
+  int sync_path(const std::string& path);
 
-  int move_to_fs(const std::string& hdfs_path, const std::string& fs_path);
-  int move_from_fs(const std::string& fs_path, const std::string& hdfs_path);
-}
+  int close_file(const std::string& filename);
 
-#endif /* __HDFS_UTILS_H__ */
+  bool consolidation_support();
+
+  private:
+  hdfsFS hdfs_handle_ = NULL;
+  std::mutex read_map_mtx_, write_map_mtx_;
+  std::unordered_map<std::string, hdfsFile> read_map_, write_map_;
+  std::unordered_map<std::string, int> read_count_;
+};
+
+#else
+
+class GCS : public StorageFS {
+
+ public:
+  GCS(const std::string& home) {};
+  ~GCS() {};
+
+  GCS(const char *home) {};
+};
+
+#endif
+
+
+#endif /* __STORAGE_GCS_H__ */
+
