@@ -1790,54 +1790,44 @@ inline bool sanity_check_fs(const TileDB_CTX* tiledb_ctx) {
   return false;
 }
 
-bool is_workspace(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
+inline bool invoke_bool_fs_fn(const TileDB_CTX* tiledb_ctx, const std::string& dir, bool (*fn)(StorageFS*, const std::string&)) {
   if (sanity_check_fs(tiledb_ctx)) {
-    return is_workspace(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+    tiledb_fs_errmsg.clear(); 
+    bool rc = fn(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+    if (!tiledb_fs_errmsg.empty())
+      strcpy(tiledb_errmsg, tiledb_fs_errmsg.c_str()); 
+    return rc;
   }
   return false;
+}
+
+bool is_workspace(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
+  return invoke_bool_fs_fn(tiledb_ctx, dir, &is_workspace);
+
 }
 
 bool is_group(const TileDB_CTX* tiledb_ctx, const std::string& dir)  {
-  if (sanity_check_fs(tiledb_ctx)) {
-    return is_group(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
-  }
-  return false;
+  return invoke_bool_fs_fn(tiledb_ctx, dir, &is_group);
 }
 
 bool is_array(const TileDB_CTX* tiledb_ctx, const std::string& dir)  {
-  if (sanity_check_fs(tiledb_ctx)) {
-    return is_array(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
-  }
-  return false;
+  return invoke_bool_fs_fn(tiledb_ctx, dir, &is_array);
 }
 
 bool is_fragment(TileDB_CTX* tiledb_ctx, const std::string& dir) {
-   if (sanity_check_fs(tiledb_ctx)) {
-    return is_fragment(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
-  }
-  return false;
+  return invoke_bool_fs_fn(tiledb_ctx, dir, &is_fragment);
 }
 
 bool is_metadata(const TileDB_CTX* tiledb_ctx, const std::string& dir)  {
-  if (sanity_check_fs(tiledb_ctx)) {
-    return is_metadata(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
-  }
-  return false;
+  return invoke_bool_fs_fn(tiledb_ctx, dir, &is_metadata);
 }
 
-
 bool is_dir(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
-  if (sanity_check_fs(tiledb_ctx)) {
-    return is_dir(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
-  }
-  return false;
+  return invoke_bool_fs_fn(tiledb_ctx, dir, &is_dir);
 }
 
 bool is_file(const TileDB_CTX* tiledb_ctx, const std::string& file) {
-  if (sanity_check_fs(tiledb_ctx)) {
-    return is_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), file);
-  }
-  return false;
+  return invoke_bool_fs_fn(tiledb_ctx, file, &is_file);
 }
 
 std::string parent_dir(const std::string& path) {
@@ -1851,170 +1841,63 @@ size_t file_size(const TileDB_CTX* tiledb_ctx, const std::string& file) {
   return 0;
 }
 
+inline bool invoke_int_fs_fn(const TileDB_CTX* tiledb_ctx, const std::string& dir, int (*fn)(StorageFS*, const std::string&)) {
+  if (sanity_check_fs(tiledb_ctx)) {
+    tiledb_fs_errmsg.clear(); 
+    bool rc = fn(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+    if (!tiledb_fs_errmsg.empty())
+      strcpy(tiledb_errmsg, tiledb_fs_errmsg.c_str()); 
+    return rc;
+  }
+  return false;
+}
+
+int create_dir(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
+  return invoke_int_fs_fn(tiledb_ctx, dir, &create_dir);
+}
+
+int delete_dir(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
+  return invoke_int_fs_fn(tiledb_ctx, dir, &delete_dir);
+}
+
+std::vector<std::string> get_dirs(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
+  if (sanity_check_fs(tiledb_ctx)) {;
+    return get_dirs(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return std::vector<std::string>{};
+}
+ 
+std::vector<std::string> get_files(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
+  if (sanity_check_fs(tiledb_ctx)) {;
+    return get_files(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), dir);
+  }
+  return std::vector<std::string>{};
+
+}
+
 int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length) {
   if (sanity_check_fs(tiledb_ctx)) {
-    return read_from_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, offset, buffer, length);
+    if (!read_from_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, offset, buffer, length))
+       strcpy(tiledb_errmsg, tiledb_fs_errmsg.c_str());
+    return TILEDB_OK;
   }
   return TILEDB_ERR;
 }
 
 int write_to_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size) {
   if (sanity_check(tiledb_ctx)) {
-    return write_to_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, buffer, buffer_size);
+    if (!write_to_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, buffer, buffer_size))
+      strcpy(tiledb_errmsg, tiledb_fs_errmsg.c_str()); 
+    return TILEDB_OK;
   }
   return TILEDB_ERR;
 }
 
 int delete_file(const TileDB_CTX* tiledb_ctx, const std::string& filename) {
-  if (sanity_check(tiledb_ctx)) {
-    return delete_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename);
-  }
-  return TILEDB_ERR;
+  return invoke_int_fs_fn(tiledb_ctx, filename, &delete_file);
 }
 
 int close_file(const TileDB_CTX* tiledb_ctx, const std::string& filename) {
-  if (sanity_check(tiledb_ctx)) {
-    return close_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename);
-  }
-  return TILEDB_ERR;
+  return invoke_int_fs_fn(tiledb_ctx, filename, &close_file);
 }
 
-// Karthik's changes
-
-int tiledb_create_directory(const char* directory_name)
-{
-  /*if(is_dir(directory_name)) //pre-existing directory
-    return TILEDB_OK;
-  auto status = create_dir(directory_name);
-  if(status == TILEDB_UT_OK)
-    return TILEDB_OK;
-  else
-  {
-    strcpy(tiledb_errmsg, tiledb_ut_errmsg.c_str());
-    return TILEDB_ERR;
-  }*/
-   return TILEDB_ERR;
-}
-
-int tiledb_ls_directory(
-    const char* directory_name,
-    char** directory_entries,
-    unsigned char* entries_type,
-    size_t* num_directory_entries)
-{
-  auto directory_entries_capacity = *num_directory_entries;
-  *num_directory_entries = 0u;
-  struct dirent* next_entry;
-  DIR* c_dir = opendir(directory_name);
-
-  if(c_dir == NULL)
-  {
-    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
-    return TILEDB_ERR;
-  }
-  auto index = 0u;
-  errno = 0;
-  while((next_entry = readdir(c_dir)))
-  {
-    if(!strcmp(next_entry->d_name, ".") ||
-       !strcmp(next_entry->d_name, ".."))
-      continue;
-    strncpy(directory_entries[index], next_entry->d_name, NAME_MAX);
-    entries_type[index] = next_entry->d_type;
-    ++index;
-    if(index >= directory_entries_capacity)
-      break;
-  }
-
-  //Error
-  if(next_entry == 0 && errno != 0)
-  {
-    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
-    return TILEDB_ERR;
-  }
-
-  // Close array directory
-  auto status = closedir(c_dir);
-  if(status != 0)
-  {
-    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
-    return TILEDB_ERR;
-  }
-
-  *num_directory_entries = index;
-
-  return TILEDB_OK;
-}
-
-int tiledb_delete_directory(const char* directory_name)
-{
-  /*auto status = delete_dir(directory_name);
-  if(status == TILEDB_UT_OK)
-    return TILEDB_OK;
-  else
-  {
-    strcpy(tiledb_errmsg, tiledb_ut_errmsg.c_str());
-    return TILEDB_ERR;
-  }*/
-  return TILEDB_ERR;
-}
-
-void* tiledb_open_file(const char* filename, const char* mode)
-{
-  if(mode[1] != '\0' || (mode [0] != 'r' && mode[0] != 'w'))
-  {
-    sprintf(tiledb_errmsg,
-        "TileDB error: mode \"%s\" is not supported, only \"r\" and \"w\" are supported in tiledb_open_file",
-        mode);
-    return 0;
-  }
-  FILE* fptr = fopen(filename, mode);
-  return reinterpret_cast<void*>(fptr);
-}
-
-size_t tiledb_fread(void* buffer, size_t element_size, size_t nmemb,
-    void* fptr)
-{
-  return fread(buffer, element_size, nmemb, reinterpret_cast<FILE*>(fptr));
-}
-
-size_t tiledb_fwrite(const void* buffer, size_t element_size, size_t nmemb,
-    void* fptr)
-{
-  return fwrite(buffer, element_size, nmemb, reinterpret_cast<FILE*>(fptr));
-}
-
-int tiledb_ferror(void* fptr)
-{
-  return ferror(reinterpret_cast<FILE*>(fptr));
-}
-
-int tiledb_feof(void* fptr)
-{
-  return feof(reinterpret_cast<FILE*>(fptr));
-}
-
-int tiledb_close_file(void* fptr)
-{
-  auto fileptr = reinterpret_cast<FILE*>(fptr);
-  auto status = fclose(fileptr);
-  if(status == 0)
-    return TILEDB_OK;
-  else
-  {
-    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
-    return TILEDB_ERR;
-  }
-}
-
-int tiledb_delete_file(const char* filename)
-{
-  auto status = unlink(filename);
-  if(status == 0)
-    return TILEDB_OK;
-  else
-  {
-    strerror_r(errno, tiledb_errmsg, TILEDB_ERRMSG_MAX_LEN);
-    return TILEDB_ERR;
-  }
-}

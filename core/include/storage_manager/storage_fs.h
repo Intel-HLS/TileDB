@@ -64,8 +64,10 @@ class StorageFS {
   
   virtual int create_dir(const std::string& dir);
   virtual int delete_dir(const std::string& dir);
+
   virtual std::vector<std::string> get_dirs(const std::string& dir);
-    
+  virtual std::vector<std::string> get_files(const std::string& dir);    
+
   virtual int create_file(const std::string& filename, int flags, mode_t mode);
   virtual int delete_file(const std::string& filename);
 

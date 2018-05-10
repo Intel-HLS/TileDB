@@ -272,6 +272,31 @@ std::vector<std::string> PosixFS::get_dirs(const std::string& dir) {
   return dirs;
 }
     
+std::vector<std::string> PosixFS::get_files(const std::string& dir) {
+  std::vector<std::string> files;
+  std::string filename; 
+  struct dirent *next_file;
+  DIR* c_dir = opendir(dir.c_str());
+
+  if(c_dir == NULL) 
+    return std::vector<std::string>();
+
+  while((next_file = readdir(c_dir))) {
+    if(!strcmp(next_file->d_name, ".") ||
+       !strcmp(next_file->d_name, "..") ||
+       !is_file(dir + "/" + next_file->d_name))
+      continue;
+    filename = dir + "/" + next_file->d_name;
+    files.push_back(filename);
+  } 
+
+  // Close array directory  
+  closedir(c_dir);
+
+  // Return
+  return files;
+}
+
 int PosixFS::create_file(const std::string& filename, int flags, mode_t mode) {
     int fd = open(filename.c_str(), flags, mode);
   if(fd == -1 || close(fd)) {

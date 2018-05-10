@@ -59,7 +59,9 @@ class HDFS : public StorageFS {
                
   int create_dir(const std::string& dir);
   int delete_dir(const std::string& dir);
+
   std::vector<std::string> get_dirs(const std::string& dir);
+  std::vector<std::string> get_files(const std::string& dir);
   
   int create_file(const std::string& filename, int flags, mode_t mode);
   int delete_file(const std::string& filename);

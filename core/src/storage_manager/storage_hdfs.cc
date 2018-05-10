@@ -319,6 +319,24 @@ std::vector<std::string> HDFS::get_dirs(const std::string& dir) {
   return path_list;
 }
     
+std::vector<std::string> HDFS::get_files(const std::string& dir) {
+  std::vector<std::string> path_list;
+
+  int num_entries = 0;
+  hdfsFileInfo *file_info = hdfsListDirectory(hdfs_handle_, dir.c_str(), &num_entries);
+  if (!file_info) {
+    print_errmsg(std::string("Cannot list contents of dir ") + dir);
+  } else {
+    for (int i=0; i<num_entries; i++) {
+      if (file_info[i].mKind == 'F') {
+        path_list.push_back(std::string(file_info[i].mName));
+      }
+    }
+  }
+
+  return path_list;
+}
+
 int HDFS::create_file(const std::string& filename, int flags, mode_t mode) {
   hdfsFile file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_WRONLY, 0, 0, 0);
   if (!file) {

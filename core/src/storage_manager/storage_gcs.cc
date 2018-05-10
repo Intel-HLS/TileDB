@@ -140,7 +140,7 @@ GCS::GCS(const std::string& home) {
   hdfsBuilderSetNameNode(builder, gcs_bucket.c_str());
 
   char *gcs_creds = getenv("GOOGLE_APPLICATION_CREDENTIALS");
-  char *value;
+  char *value = NULL;
   if (gcs_creds) {
     value = parse_json(gcs_creds, "project_id"); // free value after hdfsBuilderConnect as it is shallow copied
     if (value) {
@@ -338,6 +338,24 @@ std::vector<std::string> GCS::get_dirs(const std::string& dir) {
   return path_list;
 }
     
+std::vector<std::string> GCS::get_files(const std::string& dir) {
+   std::vector<std::string> path_list;
+
+  int num_entries = 0;
+  hdfsFileInfo *file_info = hdfsListDirectory(hdfs_handle_, dir.c_str(), &num_entries);
+  if (!file_info) {
+    print_errmsg(std::string("Cannot list contents of dir ") + dir);
+  } else {
+    for (int i=0; i<num_entries; i++) {
+      if (file_info[i].mKind == 'F') {
+        path_list.push_back(std::string(file_info[i].mName));
+      }
+    }
+  }
+
+  return path_list;
+}
+
 int GCS::create_file(const std::string& filename, int flags, mode_t mode) {
   hdfsFile file = hdfsOpenFile(hdfs_handle_, filename.c_str(), O_WRONLY, 0, 0, 0);
   if (!file) {

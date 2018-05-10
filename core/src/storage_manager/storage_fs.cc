@@ -71,6 +71,10 @@ std::vector<std::string> StorageFS::get_dirs(const std::string& dir) {
   assert(false && "Implement in derived class");
 }
     
+std::vector<std::string> StorageFS::get_files(const std::string& dir) {
+  assert(false && "Implement in derived class");
+}
+
 int StorageFS::create_file(const std::string& filename, int flags, mode_t mode) {
   assert(false && "Implement in derived class");
 }

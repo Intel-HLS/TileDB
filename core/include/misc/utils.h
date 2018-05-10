@@ -314,9 +314,16 @@ size_t file_size(StorageFS *fs, const std::string& filename);
  * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The input directory.
  * @return The vector of directories contained in the input directory.
- */
-  
+ */  
 std::vector<std::string> get_dirs(StorageFS *fs, const std::string& dir);
+
+/** Returns the names of the files inside the input directory.
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param dir The input directory.
+ * @return The vector of directories contained in the input directory.
+ */
+std::vector<std::string> get_files(StorageFS *fs, const std::string& dir);
 
 /** Returns the names of the fragments inside the input directory.
  *

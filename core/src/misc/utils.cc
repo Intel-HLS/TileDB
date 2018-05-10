@@ -354,6 +354,11 @@ std::vector<std::string> get_dirs(StorageFS *fs, const std::string& dir) {
   return fs->get_dirs(dir);
 }
 
+std::vector<std::string> get_files(StorageFS *fs, const std::string& dir) {
+  TRACE_FN_ARG("Dir=" << dir);
+  return fs->get_files(dir);
+}
+
 std::vector<std::string> get_fragment_dirs(StorageFS *fs, const std::string& dir) {
   TRACE_FN_ARG("Dir=" << dir);
   std::vector<std::string> dirs = get_dirs(fs, dir);
