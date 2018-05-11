@@ -33,7 +33,6 @@
 #include "tiledb_constants.h"
 #include "utils.h"
 #include "buffer.h"
-#include "trace.h"
 
 #include <algorithm>
 #include <cassert>
@@ -258,22 +257,18 @@ bool is_hdfs_path(const std::string& pathURL) {
 }
 
 int create_dir(StorageFS *fs, const std::string& dir) {
-  TRACE_FN_ARG("Dir=" << dir);
   return fs->create_dir(dir);
 }
 
 int create_file(StorageFS *fs, const std::string& filename, int flags, mode_t mode) {
-  TRACE_FN_ARG("Filename=" << filename);
   return fs->create_file(filename, flags, mode);
 }
 
 int delete_file(StorageFS *fs, const std::string& filename) {
-  TRACE_FN_ARG("Filename=" << filename);
   return fs->delete_file(filename);
 }
 
 int create_fragment_file(StorageFS *fs, const std::string& dir) {
-  TRACE_FN_ARG("Dir=" << dir);
   // Create the special fragment file
   std::string filename = std::string(dir) + "/" + TILEDB_FRAGMENT_FILENAME;
   if (fs->create_file(filename, O_WRONLY | O_CREAT | O_SYNC,  S_IRWXU) == TILEDB_UT_ERR) {
@@ -290,12 +285,10 @@ int create_fragment_file(StorageFS *fs, const std::string& dir) {
 }
 
 int delete_dir(StorageFS *fs, const std::string& dirname) {
-  TRACE_FN_ARG("Dir=" << dirname);
   return fs->delete_dir(dirname);
 }
 
 int move_path(StorageFS *fs, const std::string& old_path, const std::string& new_path) {
-  TRACE_FN_ARG("OldPath=" << old_path << " NewPath=" << new_path);
   return fs->move_path(old_path, new_path);
 }
 
@@ -345,22 +338,18 @@ size_t file_size(StorageFS *fs, const std::string& filename) {
 }
 
 std::string current_dir(StorageFS *fs) {
-  TRACE_FN;
   return fs->current_dir();
 }
 
 std::vector<std::string> get_dirs(StorageFS *fs, const std::string& dir) {
-  TRACE_FN_ARG("Dir=" << dir);
   return fs->get_dirs(dir);
 }
 
 std::vector<std::string> get_files(StorageFS *fs, const std::string& dir) {
-  TRACE_FN_ARG("Dir=" << dir);
   return fs->get_files(dir);
 }
 
 std::vector<std::string> get_fragment_dirs(StorageFS *fs, const std::string& dir) {
-  TRACE_FN_ARG("Dir=" << dir);
   std::vector<std::string> dirs = get_dirs(fs, dir);
   std::vector<std::string> fragment_dirs;
   for (auto const& dir: dirs) { 

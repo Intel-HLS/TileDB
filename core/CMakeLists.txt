@@ -41,7 +41,6 @@ add_library(tiledb_static STATIC $<TARGET_OBJECTS:TILEDB_CORE_OBJECTS>)
 set_target_properties(tiledb_static PROPERTIES OUTPUT_NAME "tiledb")
 
 # Create dynamic library
-set (CMAKE_SHARED_LINKER_FLAGS "-ldl")
 add_library(tiledb_shared SHARED $<TARGET_OBJECTS:TILEDB_CORE_OBJECTS>)
 set_target_properties(tiledb_shared PROPERTIES OUTPUT_NAME "tiledb")
 target_link_libraries(tiledb_shared ${TILEDB_LIB_DEPENDENCIES})

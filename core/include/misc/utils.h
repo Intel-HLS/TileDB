@@ -49,6 +49,14 @@
 
 #include "tiledb_constants.h"
 
+#ifdef TILEDB_TRACE
+#  define TRACE_FN std::cerr << "Trace - Function:" << __func__ << " File:" << __FILE__ << ":" << __LINE__ << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
+#  define TRACE_FN_ARG(X) std::cerr << "Trace - Function:" << __func__ <<  " File:" << __FILE__ << ":" << __LINE__ << " " << X << " tid=" << syscall(SYS_gettid) << std::endl << st
+d::flush
+#else
+#  define TRACE_FN
+#  define TRACE_FN_ARG(X)
+#endif
 
 /* ********************************* */
 /*             CONSTANTS             */

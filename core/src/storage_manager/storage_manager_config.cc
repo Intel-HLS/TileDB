@@ -77,12 +77,13 @@ void StorageManagerConfig::init(
      if (fs_ != NULL)
        delete fs_;
      home_ = std::string(home, strlen(home));
-     if (is_hdfs_path(home)) {
+     /*if (is_hdfs_path(home)) {
        fs_ = new HDFS(home_);
-     } else if (is_gcs_path(home)) {
+     } else */
+     if (is_gcs_path(home)) {
        fs_ = new GCS(home_);
      } else {
-       std::cerr << "No TileDB support for Home=" << home_ << std::endl << std::flush;
+       std::cerr << "No TileDB support for URL=" << home_ << std::endl << std::flush;
        assert(false && "No TileDB support for this URL");
      }
      read_method_ = TILEDB_IO_READ;

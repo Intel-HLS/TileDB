@@ -34,7 +34,6 @@
 
 #include "utils.h"
 #include "storage_fs.h"
-#include "trace.h"
 
 #include <cassert>
 #include <cstring>
@@ -221,8 +220,6 @@ int StorageManager::ls_workspaces(
         tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
         return TILEDB_SM_ERR;
       }
-
-      TRACE_FN_ARG("Found workspace=" << key);
 
       strcpy(workspaces[workspace_i], key);
       ++workspace_i;
@@ -763,7 +760,6 @@ int StorageManager::array_iterator_finalize(
 /* ****************************** */
 
 int StorageManager::metadata_consolidate(const char* metadata_dir) {
-  TRACE_FN_ARG("Dir=" << metadata_dir);
   // Load metadata schema
   ArraySchema* array_schema;
   if(metadata_load_schema(metadata_dir, array_schema) != TILEDB_SM_OK)
@@ -846,8 +842,6 @@ int StorageManager::metadata_create(
     return TILEDB_SM_ERR;
   }
 
-  TRACE_FN_ARG("ArrayName=" << array_schema->array_name());
-
   // Get real array directory name
   std::string dir = array_schema->array_name();
   std::string parent_dir = ::parent_dir(fs_, dir);
@@ -885,8 +879,6 @@ int StorageManager::metadata_create(const ArraySchema* array_schema) const {
     tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
     return TILEDB_SM_ERR;
   }
-
-  TRACE_FN_ARG("Array Name= " << array_schema->array_name());
 
   // Create array directory
   std::string dir = array_schema->array_name();
@@ -943,8 +935,6 @@ int StorageManager::metadata_load_schema(
     return TILEDB_SM_ERR;
   }
 
-  TRACE_FN_ARG("Dir=" << real_metadata_dir);
-
   // Open array schema file 
   std::string filename = 
       real_metadata_dir + "/" + TILEDB_METADATA_SCHEMA_FILENAME;
@@ -1000,8 +990,6 @@ int StorageManager::metadata_init(
     return TILEDB_SM_ERR;
   }
 
-  TRACE_FN_ARG("Dir=" << metadata_dir);
-
   // Load metadata schema
   ArraySchema* array_schema;
   if(metadata_load_schema(metadata_dir, array_schema) != TILEDB_SM_OK)
@@ -1046,8 +1034,6 @@ int StorageManager::metadata_finalize(Metadata* metadata) {
   if(metadata == NULL)
     return TILEDB_SM_OK;
 
-  TRACE_FN_ARG("Array Name=" << metadata->array_schema()->array_name());
-
   // Finalize the metadata and close the underlying array
   std::string array_name = metadata->array_schema()->array_name();
   int mode = metadata->array()->mode();
@@ -1078,7 +1064,6 @@ int StorageManager::metadata_iterator_init(
     int attribute_num,
     void** buffers,
     size_t* buffer_sizes) {
-  TRACE_FN_ARG("Metadata Dir=" << metadata_dir);
   // Create metadata object
   Metadata* metadata;
   if(metadata_init(
@@ -1110,8 +1095,6 @@ int StorageManager::metadata_iterator_finalize(
   // If the metadata iterator is NULL, do nothing
   if(metadata_it == NULL)
     return TILEDB_SM_OK;
-
-  TRACE_FN_ARG("Metadata Name=" << metadata_it->metadata_name());
 
   // Close array and finalize metadata
   std::string metadata_name = metadata_it->metadata_name();
@@ -1617,8 +1600,6 @@ int StorageManager::config_set(StorageManagerConfig* config) {
   }
 
   tiledb_home_ = real_dir(fs_, tiledb_home_);
-
-  TRACE_FN_ARG("tiledb_home_=" << tiledb_home_);
 
   // Success
   return TILEDB_SM_OK;

@@ -32,8 +32,6 @@ function(build_TileDB_example TARGET)
   target_link_libraries(${TARGET} tiledb_static ${TILEDB_LIB_DEPENDENCIES})
 endfunction()
 
-SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -ldl" )
-
 # Get the example sources
 file(GLOB TILEDB_EXAMPLE_SOURCES "src/*.cc")
 
