@@ -36,19 +36,28 @@
 #include <iostream>
 #include <mutex>
 
-bool loaded = false;
-std::mutex loading;
+static bool loaded = false;
+static std::mutex loading;
 
 #define BIND_SYMBOL(X, Y, Z)  X = Z dlsym(handle, Y); if (!X) std::cerr << Y << " HDFS Symbol not found"<< std::endl << std::flush; assert(X && "HDFS Symbol not found")
+
+void *get_dlopen_handle(const char *name) {
+  void *handle = dlopen(name, RTLD_NOLOAD|RTLD_GLOBAL);
+  if (!handle) {
+    handle = dlopen(name, RTLD_LOCAL|RTLD_NOW);
+  }
+  return handle;
+}
 
 void load_hdfs_library() {
   if (!loaded) {
     loading.lock();
     if (!loaded) {
-      void *handle = dlopen("libhdfs.so", RTLD_LAZY);
-      if (!handle) { // Try again
-	handle = dlopen("libhdfs.dylib", RTLD_LAZY);
-      }
+#ifdef __APPLE__
+      void *handle = get_dlopen_handle("libdhfs.dll");
+#else
+      void *handle = get_dlopen_handle("libhdfs.so");
+#endif
       assert(handle && "No support for HDFS; libhdfs could not be loaded");
       
       BIND_SYMBOL(hdfsNewBuilder, "hdfsNewBuilder", (hdfsBuilder* (*)()));

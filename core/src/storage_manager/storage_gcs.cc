@@ -332,8 +332,8 @@ std::vector<std::string> GCS::get_dirs(const std::string& dir) {
         path_list.push_back(std::string(file_info[i].mName));
       }
     }
+    hdfsFreeFileInfo(file_info, num_entries);
   }
-  hdfsFreeFileInfo(file_info, 1);
 
   return path_list;
 }
@@ -351,6 +351,7 @@ std::vector<std::string> GCS::get_files(const std::string& dir) {
         path_list.push_back(std::string(file_info[i].mName));
       }
     }
+    hdfsFreeFileInfo(file_info, num_entries);
   }
 
   return path_list;
