@@ -37,7 +37,21 @@
 #include <stdint.h> /* for uint64_t, etc. */
 #include <time.h> /* for time_t */
 
-extern void load_hdfs_library();
+extern int load_hdfs_library();
+
+/* ********************************* */
+/*             CONSTANTS             */
+/* ********************************* */
+
+/**@{*/
+/** Return code. */
+#define TILEDB_DLL_OK                                                  0
+#define TILEDB_DLL_ERR                                                -1
+/**@}*/
+
+/** Default error message. */
+#define TILEDB_DLL_ERRMSG std::string("[TileDB::DynamicLibaryLoad] Error: ")
+
 
 #ifdef __cplusplus
 extern  "C" {

@@ -42,7 +42,7 @@
 /**@}*/
 
 /** Default error message. */
-#define TILEDB_FS_ERRMSG std::string("[TileDB::filesystem] Error: ")
+#define TILEDB_FS_ERRMSG std::string("[TileDB::FileSystem] Error: ")
 
 /* ********************************* */
 /*          GLOBAL VARIABLES         */

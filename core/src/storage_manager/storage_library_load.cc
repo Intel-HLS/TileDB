@@ -30,35 +30,54 @@
 
 #define LOAD_LIBRARY_IMPL
 #include "cloud_storage_prototypes.h"
+#include "tiledb_constants.h"
+
 #include <assert.h>
 #include <cstring>
 #include <dlfcn.h>
 #include <iostream>
 #include <mutex>
 
+#ifdef TILEDB_VERBOSE
+#  define PRINT_ERROR(x) std::cerr << TILEDB_DLL_ERRMSG << x << std::endl
+#else
+#  define PRINT_ERROR(x) do { } while(0) 
+#endif
+
 static bool loaded = false;
 static std::mutex loading;
 
-#define BIND_SYMBOL(X, Y, Z)  X = Z dlsym(handle, Y); if (!X) std::cerr << Y << " HDFS Symbol not found"<< std::endl << std::flush; assert(X && "HDFS Symbol not found")
+#define BIND_SYMBOL(X, Y, Z)  X = Z dlsym(handle, Y); if (!X) { PRINT_ERROR(Y << " HDFS Symbol not found"); return TILEDB_ERR; }
 
 void *get_dlopen_handle(const char *name) {
-  void *handle = dlopen(name, RTLD_NOLOAD|RTLD_GLOBAL);
+  void *handle = dlopen(name, RTLD_NOLOAD|RTLD_NOW);
   if (!handle) {
     handle = dlopen(name, RTLD_LOCAL|RTLD_NOW);
+  } else {
+    PRINT_ERROR("loaded locally");
+  }
+  if (!handle) {
+    PRINT_ERROR("dlopen for " << name << " failed. dlerror=" << dlerror());
   }
   return handle;
 }
 
-void load_hdfs_library() {
+int load_hdfs_library() {
   if (!loaded) {
     loading.lock();
     if (!loaded) {
 #ifdef __APPLE__
-      void *handle = get_dlopen_handle("libdhfs.dll");
-#else
+      void *handle = get_dlopen_handle("libdhfs.dylib");
+#elif __linux__
       void *handle = get_dlopen_handle("libhdfs.so");
+#else
+      PRINT_ERROR("No TileDB support for this platform");
+      return TILEDB_ERR;
 #endif
-      assert(handle && "No support for HDFS; libhdfs could not be loaded");
+      
+      if (!handle) {
+	return TILEDB_ERR;
+      }
       
       BIND_SYMBOL(hdfsNewBuilder, "hdfsNewBuilder", (hdfsBuilder* (*)()));
       BIND_SYMBOL(hdfsBuilderSetForceNewInstance, "hdfsBuilderSetForceNewInstance", (void (*)(hdfsBuilder*)));
@@ -92,7 +111,10 @@ void load_hdfs_library() {
       BIND_SYMBOL(hdfsDelete, "hdfsDelete", (int (*)(hdfsFS, const char*, int)));
       BIND_SYMBOL(hdfsRename, "hdfsRename", (int (*)(hdfsFS, const char*, const char*))); 
     }
+
+    loaded = true;
      
     loading.unlock();
   } 
+  return TILEDB_OK;
 }

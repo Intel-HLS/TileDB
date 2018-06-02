@@ -39,13 +39,13 @@
 #include "expression.h"
 #endif
 #include "utils.h"
+#include "trace.h"
 
 #include <cassert>
 #include <cstring>
 #include <iostream>
 
 #include <dirent.h>
-#include "utils.h"
 
 /* ****************************** */
 /*             MACROS             */
@@ -88,7 +88,7 @@ int tiledb_ctx_init(
     TRACE_FN_ARG("Home=" << tiledb_config->home_);
     std::string home = std::string(tiledb_config->home_, strlen(tiledb_config->home_));
     if (home.find("://") != std::string::npos) {
-      if (!is_gcs_path(home)) {
+      if (!is_hdfs_path(home) && !is_gcs_path(home)) {
 	std::string errmsg = "No TileDB support for URL=" + home;
 	PRINT_ERROR(errmsg);
 	strcpy(tiledb_errmsg, errmsg.c_str());
@@ -114,13 +114,16 @@ int tiledb_ctx_init(
   // Initialize a Config object
   StorageManagerConfig* config = new StorageManagerConfig();
   if(tiledb_config != NULL)
-    config->init(
+    if (config->init(
         tiledb_config->home_, 
 #ifdef HAVE_MPI
         tiledb_config->mpi_comm_, 
 #endif
         tiledb_config->read_method_, 
-        tiledb_config->write_method_);
+        tiledb_config->write_method_) == TILEDB_SMC_ERR) {
+      strcpy(tiledb_errmsg, tiledb_smc_errmsg.c_str());
+      return TILEDB_ERR;
+    }
 
   // Create storage manager
   (*tiledb_ctx)->storage_manager_ = new StorageManager();
@@ -1722,7 +1725,10 @@ void tiledb_array_set_zlib_compression_level(
   tiledb_array->array_->set_zlib_compression_level(level);
 }
 
-// Expose some filesystem functionality implemented in TileDB.
+/* *********************************************************************** */
+/*        Expose some filesystem functionality implemented in TileDB       */
+/* *********************************************************************** */
+
 inline bool sanity_check_fs(const TileDB_CTX* tiledb_ctx) {
   if (tiledb_ctx && tiledb_ctx->storage_manager_
       && tiledb_ctx->storage_manager_->get_config()
@@ -1750,7 +1756,6 @@ inline bool invoke_bool_fs_fn(const TileDB_CTX* tiledb_ctx, const std::string& d
 
 bool is_workspace(const TileDB_CTX* tiledb_ctx, const std::string& dir) {
   return invoke_bool_fs_fn(tiledb_ctx, dir, &is_workspace);
-
 }
 
 bool is_group(const TileDB_CTX* tiledb_ctx, const std::string& dir)  {
@@ -1822,7 +1827,7 @@ std::vector<std::string> get_files(const TileDB_CTX* tiledb_ctx, const std::stri
 
 }
 
-int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length) {
+int read_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length) {
   if (sanity_check_fs(tiledb_ctx)) {
     if (!read_from_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, offset, buffer, length))
        strcpy(tiledb_errmsg, tiledb_fs_errmsg.c_str());
@@ -1831,7 +1836,7 @@ int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, of
   return TILEDB_ERR;
 }
 
-int write_to_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size) {
+int write_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size) {
   if (sanity_check(tiledb_ctx)) {
     if (!write_to_file(tiledb_ctx->storage_manager_->get_config()->get_filesystem(), filename, buffer, buffer_size))
       strcpy(tiledb_errmsg, tiledb_fs_errmsg.c_str()); 

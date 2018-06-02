@@ -1,9 +1,11 @@
 /**
- * @ storage_gcs.h
+ * @file   trace.h
  *
  * @section LICENSE
  *
  * The MIT License
+ *
+ * @copyright Copyright (c) 2018 University of California, Los Angeles and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,19 +27,22 @@
  * 
  * @section DESCRIPTION
  *
- * GCS derived from StorageFS for Google Cloud Services
- *
+ * Trace Macros if TILEDB_TRACE is defined
  */
 
-#ifndef __STORAGE_GCS_H__
-#define  __STORAGE_GCS_H__
+#ifndef __TDB_TRACE_H__
+#define __TDB_TRACE_H__
 
-#include "cloud_storage_prototypes.h"
-#include "tiledb_constants.h"
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include <string>
+#ifdef TILEDB_TRACE
+#  define TRACE_FN std::cerr << "Trace - Function:" << __func__ << " File:" << __FILE__ << ":" << __LINE__ << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
+#  define TRACE_FN_ARG(X) std::cerr << "Trace - Function:" << __func__ <<  " File:" << __FILE__ << ":" << __LINE__ << " " << X << " tid=" << syscall(SYS_gettid) << std::endl << std::flush
+#else
+#  define TRACE_FN
+#  define TRACE_FN_ARG(X)
+#endif
 
-hdfsFS gcs_connect(struct hdfsBuilder *builder, const std::string& working_dir);
-
-#endif /* __STORAGE_GCS_H__ */
-
+#endif /*__TDB_TRACE_H__*/

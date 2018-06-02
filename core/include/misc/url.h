@@ -1,9 +1,11 @@
 /**
- * @ storage_gcs.h
+ * @file   url.h
  *
  * @section LICENSE
  *
  * The MIT License
+ *
+ * @copyright Copyright (c) 2018 University of California, Los Angeles and Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,22 +24,36 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- * 
+ *
  * @section DESCRIPTION
- *
- * GCS derived from StorageFS for Google Cloud Services
- *
+ *  
+ * URL Parsing Header File
  */
 
-#ifndef __STORAGE_GCS_H__
-#define  __STORAGE_GCS_H__
-
-#include "cloud_storage_prototypes.h"
-#include "tiledb_constants.h"
-
+#ifndef URL_HH_
+#define URL_HH_    
 #include <string>
 
-hdfsFS gcs_connect(struct hdfsBuilder *builder, const std::string& working_dir);
+struct url {
+  url(const std::string& url_s);
 
-#endif /* __STORAGE_GCS_H__ */
+  // Accessors
+  std::string protocol();
+  std::string host();
+  std::string port();
+  int16_t nport();
+  std::string path();
+  std::string query();
 
+ private:
+  void parse(const std::string& url_s);
+
+ private:
+  std::string protocol_;
+  std::string host_;
+  std::string port_;
+  int16_t nport_ = 0;
+  std::string path_;
+  std::string query_;
+};
+#endif /* URL_HH_ */

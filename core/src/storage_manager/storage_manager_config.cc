@@ -30,8 +30,6 @@
  * This file implements the StorageManagerConfig class.
  */
 
-
-
 #include "storage_manager_config.h"
 #include "tiledb_constants.h"
 #include "utils.h"
@@ -39,6 +37,21 @@
 #include <assert.h>
 #include <iostream>
 #include <string.h>
+
+#include <system_error>
+
+/* ****************************** */
+/*             MACROS             */
+/* ****************************** */
+
+#define PRINT_ERROR(x) std::cerr << TILEDB_SMC_ERRMSG << x << ".\n"
+
+
+/* ****************************** */
+/*        GLOBAL VARIABLES        */
+/* ****************************** */
+
+std::string tiledb_smc_errmsg = "";
 
 /* ****************************** */
 /*   CONSTRUCTORS & DESTRUCTORS   */
@@ -65,7 +78,7 @@ StorageManagerConfig::~StorageManagerConfig() {
 /*             MUTATORS           */
 /* ****************************** */
 
-void StorageManagerConfig::init(
+int StorageManagerConfig::init(
     const char* home,
 #ifdef HAVE_MPI
     MPI_Comm* mpi_comm,
@@ -77,18 +90,23 @@ void StorageManagerConfig::init(
      if (fs_ != NULL)
        delete fs_;
      home_ = std::string(home, strlen(home));
-     /*if (is_hdfs_path(home)) {
-       fs_ = new HDFS(home_);
-     } else */
-     if (is_gcs_path(home)) {
-       fs_ = new GCS(home_);
+     if (is_hdfs_path(home) || is_gcs_path(home)) {
+       try {
+	 fs_ = new HDFS(home_);
+       } catch(std::system_error& ex) {
+	 PRINT_ERROR(ex.what());
+	 tiledb_smc_errmsg = "HDFS intialization failed for home=" + home_;
+	 return TILEDB_SMC_ERR;
+       }
      } else {
-       std::cerr << "No TileDB support for URL=" << home_ << std::endl << std::flush;
-       assert(false && "No TileDB support for this URL");
+       tiledb_smc_errmsg = "No TileDB support for home=" + home_;
+       PRINT_ERROR(tiledb_smc_errmsg);
+       return TILEDB_SMC_ERR;
      }
+
      read_method_ = TILEDB_IO_READ;
      write_method_ = TILEDB_IO_WRITE;
-     return;
+     return TILEDB_SMC_OK;
    }
 
    if (fs_ == NULL)
@@ -117,6 +135,8 @@ void StorageManagerConfig::init(
   if(write_method_ != TILEDB_IO_WRITE &&
      write_method_ != TILEDB_IO_MPI)
     write_method_ = TILEDB_IO_WRITE;  // Use default 
+
+  return TILEDB_SMC_OK;
 }
 
 

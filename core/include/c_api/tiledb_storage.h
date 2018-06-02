@@ -165,7 +165,7 @@ size_t file_size(const TileDB_CTX* tiledb_ctx, const std::string& file);
  * @param length The size of the data to be read from the file.
  * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
  */
-int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length);
+int read_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, off_t offset, void *buffer, size_t length);
 
 /** 
  * Writes the input buffer to a file.
@@ -176,7 +176,7 @@ int read_from_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, of
  * @param buffer_size The size of the input buffer.
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
-int write_to_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size);
+int write_file(const TileDB_CTX* tiledb_ctx, const std::string& filename, const void *buffer, size_t buffer_size);
 
 /**
  * Deletes a file from the filesystem

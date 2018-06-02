@@ -1,0 +1,268 @@
+Example 1: Running ./tiledb_workspace_group_create...
+Example 1: Done running ./tiledb_workspace_group_create
+Example 2: Running ./tiledb_array_create_dense...
+Example 2: Done running ./tiledb_array_create_dense
+Example 3: Running ./tiledb_array_create_sparse...
+Example 3: Done running ./tiledb_array_create_sparse
+Example 4: Running ./tiledb_array_primitive...
+Array name: my_workspace/dense_arrays/my_array_A
+Attributes: a1 a2 a3 
+The array is dense
+Array name: my_workspace/sparse_arrays/my_array_B
+Attributes: a1 a2 a3 
+The array is sparse
+Example 4: Done running ./tiledb_array_primitive
+Example 5: Running ./tiledb_array_write_dense_1...
+Example 5: Done running ./tiledb_array_write_dense_1
+Example 6: Running ./tiledb_array_write_sparse_1...
+Example 6: Done running ./tiledb_array_write_sparse_1
+Example 7: Running ./tiledb_array_read_dense_1...
+ a1	    a2	   (a3.first, a3.second)
+-----------------------------------------
+  0	    a		 (  0.1,   0.2)
+  1	   bb		 (  1.1,   1.2)
+  2	  ccc		 (  2.1,   2.2)
+  3	 dddd		 (  3.1,   3.2)
+  4	    e		 (  4.1,   4.2)
+  5	   ff		 (  5.1,   5.2)
+  6	  ggg		 (  6.1,   6.2)
+  7	 hhhh		 (  7.1,   7.2)
+  8	    i		 (  8.1,   8.2)
+  9	   jj		 (  9.1,   9.2)
+ 10	  kkk		 ( 10.1,  10.2)
+ 11	 llll		 ( 11.1,  11.2)
+ 12	    m		 ( 12.1,  12.2)
+ 13	   nn		 ( 13.1,  13.2)
+ 14	  ooo		 ( 14.1,  14.2)
+ 15	 pppp		 ( 15.1,  15.2)
+Example 7: Done running ./tiledb_array_read_dense_1
+Example 8: Running ./tiledb_array_write_dense_2...
+Example 8: Done running ./tiledb_array_write_dense_2
+Example 9: Running ./tiledb_array_read_dense_1...
+ a1	    a2	   (a3.first, a3.second)
+-----------------------------------------
+  0	    a		 (  0.1,   0.2)
+  1	   bb		 (  1.1,   1.2)
+  2	  ccc		 (  2.1,   2.2)
+  3	 dddd		 (  3.1,   3.2)
+  4	    e		 (  4.1,   4.2)
+  5	   ff		 (  5.1,   5.2)
+  6	  ggg		 (  6.1,   6.2)
+  7	 hhhh		 (  7.1,   7.2)
+  8	    i		 (  8.1,   8.2)
+  9	   jj		 (  9.1,   9.2)
+ 10	  kkk		 ( 10.1,  10.2)
+ 11	 llll		 ( 11.1,  11.2)
+ 12	    m		 ( 12.1,  12.2)
+ 13	   nn		 ( 13.1,  13.2)
+ 14	  ooo		 ( 14.1,  14.2)
+ 15	 pppp		 ( 15.1,  15.2)
+Example 9: Done running ./tiledb_array_read_dense_1
+Example 10: Running ./tiledb_array_read_dense_2...
+ a1
+----
+Reading cells...
+  9
+ 11
+ 12
+Reading cells...
+ 13
+ 14
+ 15
+Example 10: Done running ./tiledb_array_read_dense_2
+Example 11: Running ./tiledb_array_write_dense_sorted...
+Example 11: Done running ./tiledb_array_write_dense_sorted
+Example 12: Running ./tiledb_array_read_dense_1...
+ a1	    a2	   (a3.first, a3.second)
+-----------------------------------------
+  0	    a		 (  0.1,   0.2)
+  1	   bb		 (  1.1,   1.2)
+  2	  ccc		 (  2.1,   2.2)
+  3	 dddd		 (  3.1,   3.2)
+  4	    e		 (  4.1,   4.2)
+  5	   ff		 (  5.1,   5.2)
+  6	  ggg		 (  6.1,   6.2)
+  7	 hhhh		 (  7.1,   7.2)
+  8	    i		 (  8.1,   8.2)
+  9	   jj		 (  9.1,   9.2)
+ 10	  kkk		 ( 10.1,  10.2)
+ 11	 llll		 ( 11.1,  11.2)
+ 12	    m		 ( 12.1,  12.2)
+ 13	   nn		 ( 13.1,  13.2)
+ 14	  ooo		 ( 14.1,  14.2)
+ 15	 pppp		 ( 15.1,  15.2)
+Example 12: Done running ./tiledb_array_read_dense_1
+Example 13: Running ./tiledb_array_update_dense_1...
+Example 13: Done running ./tiledb_array_update_dense_1
+Example 14: Running ./tiledb_array_read_dense_1...
+ a1	    a2	   (a3.first, a3.second)
+-----------------------------------------
+  0	    a		 (  0.1,   0.2)
+  1	   bb		 (  1.1,   1.2)
+  2	  ccc		 (  2.1,   2.2)
+  3	 dddd		 (  3.1,   3.2)
+  4	    e		 (  4.1,   4.2)
+  5	   ff		 (  5.1,   5.2)
+  6	  ggg		 (  6.1,   6.2)
+  7	 hhhh		 (  7.1,   7.2)
+  8	    i		 (  8.1,   8.2)
+  9	   jj		 (  9.1,   9.2)
+ 10	  kkk		 ( 10.1,  10.2)
+ 11	 llll		 ( 11.1,  11.2)
+112	    M		 (112.1, 112.2)
+113	   NN		 (113.1, 113.2)
+114	  OOO		 (114.1, 114.2)
+115	 PPPP		 (115.1, 115.2)
+Example 14: Done running ./tiledb_array_read_dense_1
+Example 15: Running ./tiledb_array_update_dense_2...
+Example 15: Done running ./tiledb_array_update_dense_2
+Example 16: Running ./tiledb_array_read_dense_1...
+ a1	    a2	   (a3.first, a3.second)
+-----------------------------------------
+  0	    a		 (  0.1,   0.2)
+  1	   bb		 (  1.1,   1.2)
+  2	  ccc		 (  2.1,   2.2)
+  3	 dddd		 (  3.1,   3.2)
+  4	    e		 (  4.1,   4.2)
+  5	   ff		 (  5.1,   5.2)
+  6	  ggg		 (  6.1,   6.2)
+  7	 hhhh		 (  7.1,   7.2)
+208	    u		 (208.1, 208.2)
+  9	   jj		 (  9.1,   9.2)
+ 10	  kkk		 ( 10.1,  10.2)
+211	 wwww		 (211.1, 211.2)
+212	    x		 (212.1, 212.2)
+213	   yy		 (213.1, 213.2)
+114	  OOO		 (114.1, 114.2)
+115	 PPPP		 (115.1, 115.2)
+Example 16: Done running ./tiledb_array_read_dense_1
+Example 17: Running ./tiledb_array_write_sparse_1...
+Example 17: Done running ./tiledb_array_write_sparse_1
+Example 18: Running ./tiledb_array_read_sparse_1...
+coords	 a1	   a2	     (a3.first, a3.second)
+--------------------------------------------------
+(1, 1)	   0	    a		 (  0.1,   0.2)
+(1, 2)	   1	   bb		 (  1.1,   1.2)
+(1, 4)	   2	  ccc		 (  2.1,   2.2)
+(2, 3)	   3	 dddd		 (  3.1,   3.2)
+(3, 1)	   4	    e		 (  4.1,   4.2)
+(4, 2)	   5	   ff		 (  5.1,   5.2)
+(3, 3)	   6	  ggg		 (  6.1,   6.2)
+(3, 4)	   7	 hhhh		 (  7.1,   7.2)
+Example 18: Done running ./tiledb_array_read_sparse_1
+Example 19: Running ./tiledb_array_read_sparse_2...
+ a1
+----
+Reading cells...
+  5
+  6
+Reading cells...
+  7
+Example 19: Done running ./tiledb_array_read_sparse_2
+Example 20: Running ./tiledb_array_write_sparse_2...
+Example 20: Done running ./tiledb_array_write_sparse_2
+Example 21: Running ./tiledb_array_read_sparse_1...
+coords	 a1	   a2	     (a3.first, a3.second)
+--------------------------------------------------
+(1, 1)	   0	    a		 (  0.1,   0.2)
+(1, 2)	   1	   bb		 (  1.1,   1.2)
+(1, 4)	   2	  ccc		 (  2.1,   2.2)
+(2, 3)	   3	 dddd		 (  3.1,   3.2)
+(3, 1)	   4	    e		 (  4.1,   4.2)
+(4, 2)	   5	   ff		 (  5.1,   5.2)
+(3, 3)	   6	  ggg		 (  6.1,   6.2)
+(3, 4)	   7	 hhhh		 (  7.1,   7.2)
+Example 21: Done running ./tiledb_array_read_sparse_1
+Example 22: Running ./tiledb_array_read_sparse_2...
+ a1
+----
+Reading cells...
+  5
+  6
+Reading cells...
+  7
+Example 22: Done running ./tiledb_array_read_sparse_2
+Example 23: Running ./tiledb_array_update_sparse_1...
+Example 23: Done running ./tiledb_array_update_sparse_1
+Example 24: Running ./tiledb_array_read_sparse_1...
+coords	 a1	   a2	     (a3.first, a3.second)
+--------------------------------------------------
+(1, 1)	   0	    a		 (  0.1,   0.2)
+(1, 2)	   1	   bb		 (  1.1,   1.2)
+(1, 4)	   2	  ccc		 (  2.1,   2.2)
+(2, 3)	   3	 dddd		 (  3.1,   3.2)
+(3, 1)	   4	    e		 (  4.1,   4.2)
+(3, 2)	 104	    u		 (104.1, 104.2)
+(4, 1)	 105	 vvvv		 (105.1, 105.2)
+(4, 2)	   5	   ff		 (  5.1,   5.2)
+(3, 3)	 106	    w		 (106.1, 106.2)
+(3, 4)	 107	  yyy		 (107.1, 107.2)
+Example 24: Done running ./tiledb_array_read_sparse_1
+Example 25: Running ./tiledb_array_read_sparse_2...
+ a1
+----
+Reading cells...
+104
+  5
+Reading cells...
+106
+107
+Example 25: Done running ./tiledb_array_read_sparse_2
+Example 26: Running ./tiledb_array_consolidate...
+Example 26: Done running ./tiledb_array_consolidate
+Example 27: Running ./tiledb_array_read_dense_1...
+ a1	    a2	   (a3.first, a3.second)
+-----------------------------------------
+  0	    a		 (  0.1,   0.2)
+  1	   bb		 (  1.1,   1.2)
+  2	  ccc		 (  2.1,   2.2)
+  3	 dddd		 (  3.1,   3.2)
+  4	    e		 (  4.1,   4.2)
+  5	   ff		 (  5.1,   5.2)
+  6	  ggg		 (  6.1,   6.2)
+  7	 hhhh		 (  7.1,   7.2)
+208	    u		 (208.1, 208.2)
+  9	   jj		 (  9.1,   9.2)
+ 10	  kkk		 ( 10.1,  10.2)
+211	 wwww		 (211.1, 211.2)
+212	    x		 (212.1, 212.2)
+213	   yy		 (213.1, 213.2)
+114	  OOO		 (114.1, 114.2)
+115	 PPPP		 (115.1, 115.2)
+Example 27: Done running ./tiledb_array_read_dense_1
+Example 28: Running ./tiledb_array_read_sparse_1...
+coords	 a1	   a2	     (a3.first, a3.second)
+--------------------------------------------------
+(1, 1)	   0	    a		 (  0.1,   0.2)
+(1, 2)	   1	   bb		 (  1.1,   1.2)
+(1, 4)	   2	  ccc		 (  2.1,   2.2)
+(2, 3)	   3	 dddd		 (  3.1,   3.2)
+(3, 1)	   4	    e		 (  4.1,   4.2)
+(3, 2)	 104	    u		 (104.1, 104.2)
+(4, 1)	 105	 vvvv		 (105.1, 105.2)
+(4, 2)	   5	   ff		 (  5.1,   5.2)
+(3, 3)	 106	    w		 (106.1, 106.2)
+(3, 4)	 107	  yyy		 (107.1, 107.2)
+Example 28: Done running ./tiledb_array_read_sparse_1
+Example 29: Running ./tiledb_array_read_dense_2...
+ a1
+----
+Reading cells...
+  9
+211
+212
+Reading cells...
+213
+114
+115
+Example 29: Done running ./tiledb_array_read_dense_2
+Example 30: Running ./tiledb_array_read_sparse_2...
+ a1
+----
+Reading cells...
+104
+  5
+Reading cells...
+106
+107
+Example 30: Done running ./tiledb_array_read_sparse_2
