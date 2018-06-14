@@ -35,6 +35,7 @@
 
 #include "tiledb.h"
 #include <string>
+#include <vector>
 
 /**
  * Checks if the input directory is a workspace.
