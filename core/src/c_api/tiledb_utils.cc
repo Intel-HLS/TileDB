@@ -58,7 +58,7 @@ static int finalize(TileDB_CTX *tiledb_ctx)
   return tiledb_ctx_finalize(tiledb_ctx);
 }
 
-bool is_cloud_path(std::string path) {
+bool is_cloud_path(const std::string& path) {
   return path.find("://") != std::string::npos;
 }
 

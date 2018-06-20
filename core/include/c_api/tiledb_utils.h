@@ -40,7 +40,7 @@
 
 namespace TileDBUtils {
 
-bool is_cloud_path(std::string path);
+bool is_cloud_path(const std::string& path);
 
 int initialize_workspace(TileDB_CTX **ptiledb_ctx, const std::string& workspace, const bool overwrite);
 

@@ -32,6 +32,7 @@
 
 #include "aio_request.h"
 #include "tiledb.h"
+#include "tiledb_utils.h"
 #include "array_schema_c.h"
 #include "storage_manager.h"
 #include "storage_manager_config.h"
@@ -87,7 +88,7 @@ int tiledb_ctx_init(
   if (tiledb_config && tiledb_config->home_) {
     TRACE_FN_ARG("Home=" << tiledb_config->home_);
     std::string home = std::string(tiledb_config->home_, strlen(tiledb_config->home_));
-    if (home.find("://") != std::string::npos) {
+    if (TileDBUtils::is_cloud_path(home)) {
       if (!is_hdfs_path(home) && !is_gcs_path(home)) {
 	std::string errmsg = "No TileDB support for URL=" + home;
 	PRINT_ERROR(errmsg);
