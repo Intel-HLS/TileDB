@@ -60,7 +60,7 @@ class PosixFS : public StorageFS {
     
   int sync_path(const std::string& path);
 
-  bool consolidation_support();
+  bool locking_support();
 };
 
 #endif /* __STORAGE_POSIXFS_H__ */

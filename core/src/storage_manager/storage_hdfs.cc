@@ -592,9 +592,9 @@ int HDFS::close_file(const std::string& filename) {
 
 static bool done_printing_consolidation_support_message = false;
 
-bool HDFS::consolidation_support() {
+bool HDFS::locking_support() {
   if (!done_printing_consolidation_support_message) {
-    print_errmsg("TBD: No consolidation locking support for HDFS/GCS/EMRFS paths.");
+    print_errmsg("No file locking support for HDFS/GCS/EMRFS paths.");
     done_printing_consolidation_support_message = true;
   }
   return false;

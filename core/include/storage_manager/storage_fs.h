@@ -85,7 +85,7 @@ class StorageFS {
 
   virtual int close_file(const std::string& filename);
 
-  virtual bool consolidation_support(); 
+  virtual bool locking_support();
 };
 
 #endif /* __STORAGE_FS_H__ */

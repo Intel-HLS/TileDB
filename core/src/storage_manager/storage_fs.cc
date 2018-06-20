@@ -45,6 +45,6 @@ int StorageFS::close_file(const std::string& filename) {
   return TILEDB_FS_OK;
 }
 
-bool StorageFS::consolidation_support() {
+bool StorageFS::locking_support() {
   return false;
 }

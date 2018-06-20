@@ -1607,7 +1607,7 @@ int StorageManager::config_set(StorageManagerConfig* config) {
 
 int StorageManager::consolidation_filelock_create(
     const std::string& dir) const {
-  if (!fs_->consolidation_support()) {
+  if (!fs_->locking_support()) {
     return TILEDB_SM_OK;
   }
   
@@ -1628,7 +1628,7 @@ int StorageManager::consolidation_filelock_lock(
     const std::string& array_name,
     int& fd, 
     int lock_type) const {
-  if (!fs_->consolidation_support()) {
+  if (!fs_->locking_support()) {
     return TILEDB_SM_OK;
   }
 
@@ -1679,7 +1679,7 @@ int StorageManager::consolidation_filelock_lock(
 }
 
 int StorageManager::consolidation_filelock_unlock(int fd) const {
-  if (!fs_->consolidation_support()) {
+  if (!fs_->locking_support()) {
     return TILEDB_SM_OK;
   }
 

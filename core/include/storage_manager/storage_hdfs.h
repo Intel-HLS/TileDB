@@ -74,7 +74,7 @@ class HDFS : public StorageFS {
 
   int close_file(const std::string& filename);
 
-  bool consolidation_support();
+  bool locking_support();
 
   protected:
   hdfsFS hdfs_handle_ = NULL;

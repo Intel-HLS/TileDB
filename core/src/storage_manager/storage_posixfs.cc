@@ -482,6 +482,6 @@ int PosixFS::sync_path(const std::string& filename) {
   return TILEDB_FS_OK;
 }
 
-bool PosixFS::consolidation_support() {
+bool PosixFS::locking_support() {
   return true;
 }
