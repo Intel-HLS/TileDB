@@ -58,6 +58,10 @@ static int finalize(TileDB_CTX *tiledb_ctx)
   return tiledb_ctx_finalize(tiledb_ctx);
 }
 
+bool is_cloud_path(std::string path) {
+  return path.find("://") != std::string::npos;
+}
+
 /**
  * Returns 0 when workspace is created
  *        -1 when path is not a directory
