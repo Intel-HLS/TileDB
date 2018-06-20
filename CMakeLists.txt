@@ -58,6 +58,7 @@ else()
   set(USE_OPENMP True CACHE BOOL "Enables OpenMP")
 endif()
 set(TILEDB_VERBOSE False CACHE BOOL "Prints TileDB errors with verbosity")
+set(TILEDB_TRACE False CACHE BOOL "Trace TileDB C API")
 set(MAC_ADDRESS_INTERFACE "" 
     CACHE STRING "The interface carrying the MAC address of the machine."
 )
@@ -119,6 +120,9 @@ endif()
 # Add pthread library to dependencies
 set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} pthread)
 
+# Add HDFS support
+add_definitions(-DUSE_HDFS)
+set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${CMAKE_DL_LIBS})
 
 # Set C++ 2011 flag
 include(SetCXX2011Flag)
@@ -156,6 +160,14 @@ endif()
 if(TILEDB_VERBOSE)
   add_definitions(-DTILEDB_VERBOSE)
   message(STATUS "The TileDB library is compiled with verbosity.")
+endif()
+if(TILEDB_TRACE)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+     add_definitions(-DTILEDB_TRACE)
+     message(STATUS "The TileDB library is compiled with trace.")
+  else()
+     message(STATUS "TileDB in release mode cannot have trace. CMAKE_BUILD_TYPE=" ${CMAKE_BUILD_TYPE})
+  endif()
 endif()
 if(MAC_ADDRESS_INTERFACE)
   add_definitions(-DTILEDB_MAC_ADDRESS_INTERFACE=${MAC_ADDRESS_INTERFACE})

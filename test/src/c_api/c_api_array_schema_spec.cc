@@ -31,6 +31,7 @@
  */
 
 #include "c_api_array_schema_spec.h"
+#include "storage_posixfs.h"
 #include "utils.h"
 #include <unistd.h>
 
@@ -176,7 +177,7 @@ TEST_F(ArraySchemaTestFixture, test_array_schema) {
       static_cast<int64_t*>(array_schema_.tile_extents_);
 
   // Get real array path
-  std::string array_name_real = real_dir(array_name_);
+  std::string array_name_real = real_dir(new PosixFS(), array_name_);
   ASSERT_STRNE(array_name_real.c_str(), "");
 
   // Tests

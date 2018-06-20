@@ -46,10 +46,17 @@ void parallel_read(
     size_t* buffer_sizes,
     int* count);
 
-int main() {
-  // Initialize context with the default configuration parameters
+int main(int argc, char *argv[]) {
+  // Initialize context with home dir if specified in command line, else
+  // initialize with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
-  tiledb_ctx_init(&tiledb_ctx, NULL);
+  if (argc > 1) {
+    TileDB_Config tiledb_config;
+    tiledb_config.home_ = argv[1];
+    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
+  } else {
+    tiledb_ctx_init(&tiledb_ctx, NULL);
+  }
 
   // Array name
   const char* array_name = "my_workspace/sparse_arrays/my_array_B";

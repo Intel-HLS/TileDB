@@ -168,10 +168,22 @@ class WriteState {
   /*         PRIVATE ATTRIBUTES        */
   /* ********************************* */
 
+  /** The array the fragment belongs to. */
+  const Array* array_;
+  /** The array schema. */
+  const ArraySchema* array_schema_;
+      /** The number of array attributes. */
+  int attribute_num_;
+  
   /** The book-keeping structure of the fragment the write state belongs to. */
   BookKeeping* book_keeping_;
   /** The first and last coordinates of the tile currently being populated. */
   void* bounding_coords_;
+
+  /** Internal buffers associated with the attribute files */
+  std::vector<Buffer *> file_buffer_;
+  std::vector<Buffer *> file_var_buffer_;
+
   /**  
    * The current offsets of the variable-sized attributes in their 
    * respective files, or alternatively, the current file size of each
@@ -203,6 +215,9 @@ class WriteState {
   std::vector<size_t> tile_offsets_;
   /** zlib compression level. */
   int zlib_compression_level_;
+
+  /** The Storage Filesystem */
+  StorageFS *fs_;
 
 
 
@@ -407,6 +422,31 @@ class WriteState {
    */
   template<class T>
   void update_book_keeping(const void* buffer, size_t buffer_size);
+
+  std::string construct_filename(int attribute_id, bool is_var);
+
+  /**
+   * Set up memory buffers to cache bytes to be ultimately written out
+   * to the files
+   */
+  void init_file_buffers();
+
+  /**
+   * Persist the bytes in the memory buffers to the associated files
+   *
+   * @return TILEDB_WS_OK on success and TILEDB_WS_ERR on error.
+   */ 
+  int write_file_buffers();
+
+  /**
+   * Writes a segment from the file associated with the attribute.
+   * @param attribute_id The id of the attribute.
+   * @param is_var Boolean to specify whether the attribute is var.
+   * @param segment Pointer to segment to be written out.
+   * @param length Length of the segment to be written out.
+   * @return TILEDB_WS_OK on success and TILEDB_WS_ERR on error.
+   */
+  int write_segment(int attribute_id, bool is_var, const void *segment, size_t length);
 
   /**
    * Takes the appropriate actions for writing the very last tile of this write

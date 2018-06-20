@@ -135,7 +135,11 @@ class StorageManager {
    */
   int init(StorageManagerConfig* config);
 
-
+  /** 
+   * Retrieve the configuration associated with the storage manager.
+   * @return pointer to StorageManagerConfig.
+   */
+  StorageManagerConfig* get_config();
 
 
   /* ********************************* */
@@ -510,6 +514,14 @@ class StorageManager {
    */
   int ls_c(const char* parent_dir, int& dir_num) const;
 
+  /**
+   * Clears all TileDB objects contained in the directory.
+   *
+   * @param parent_dir The parent directory of the TileDB objects to be deleted.
+   * @return TILEDB_SM_OK for success and TILEDB_SM_ERR for error.
+   */
+  int clear_contained_artifacts(const std::string& parent_dir) const;
+
 
   /**
    * Clears a TileDB directory. The corresponding TileDB object (workspace,
@@ -545,6 +557,8 @@ class StorageManager {
 
   /** The TileDB configuration parameters. */
   StorageManagerConfig* config_;
+  /** The Filesystem associated with this configuration */
+  StorageFS* fs_;
   /** The directory of the master catalog. */
   std::string master_catalog_dir_;
   /** OpneMP mutex for creating/deleting an OpenArray object. */
@@ -562,6 +576,16 @@ class StorageManager {
   /*         PRIVATE METHODS           */
   /* ********************************* */
 
+  /**
+   * Re-initialize tiledb_home_ and master_catalog for filestorage systems based on the input dir
+   * if they are different from what was initialized initially via tiledb_context_init.
+   * The assumption is that once these are set, the rest of the calls for that context uses the
+   * same file system.
+   * @param dir
+   * return TILEDB_SM_OK for success and TILEDB_SM_ERR for error.
+   */
+  int filesystem_reinit(const std::string& dir);
+      
   /**
    * Clears a TileDB array. The array will still exist after the execution of
    * the function, but it will be empty (i.e., as if it was just created).

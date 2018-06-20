@@ -33,6 +33,8 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include "storage_fs.h"
+
 #ifdef HAVE_MPI
   #include <mpi.h>
 #endif
@@ -76,14 +78,6 @@ extern std::string tiledb_ut_errmsg;
 /* ********************************* */
 /*             FUNCTIONS             */
 /* ********************************* */
-
-/**  
- * Deduplicates adjacent '/' characters in the input.
- *
- * @param value The string to be deduped.
- * @return void 
- */
-void adjacent_slashes_dedup(std::string& value);
 
 /** Returns true if the input is an array read mode. */
 bool array_read_mode(int mode); 
@@ -200,32 +194,69 @@ int cmp_row_order(
     const T* coords_a, 
     int64_t id_b, 
     const T* coords_b, 
-    int dim_num); 
+    int dim_num);
+
+/**
+ * Checks if a given pathURL is GCS.
+ * @param pathURL URL to path to be checked.
+ * @return true if pathURL starts with gs://
+ */
+bool is_gcs_path(const std::string& pathURL);
+
+/**
+ * Checks if a given pathURL is HDFS.
+ * @param pathURL URL to path to be checked.
+ * @return true of pathURL is HDFS compliant.
+ */
+bool is_hdfs_path(const std::string& pathURL);
 
 /**
  * Creates a new directory.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The name of the directory to be created.
  * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
  */
-int create_dir(const std::string& dir);
+int create_dir(StorageFS *fs, const std::string& dir);
+
+/**
+ * Creates a new file with the given flags and mode.
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param filename The name of the file to be created.
+ * @param flags Status and Access mode flags for the file.
+ * @param mode Permissions for the file to be created
+ * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
+ */
+int create_file(StorageFS *fs, const std::string& filename, int flags, mode_t mode);
+
+/**
+ * Deletes a file from the filesystem
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param filename The name of the file to be deleted.
+ * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
+ */
+int delete_file(StorageFS *fs, const std::string& filename);
 
 /**
  * Creates a special file to indicate that the input directory is a
  * TileDB fragment.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The name of the fragment directory where the file is created.
  * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
  */
-int create_fragment_file(const std::string& dir);
+int create_fragment_file(StorageFS *fs, const std::string& dir);
 
 /** 
  * Returns the directory where the program is executed. 
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @return The directory where the program is executed. If the program cannot
  *     retrieve the current working directory, the empty string is returned.
  */
-std::string current_dir();
+std::string current_dir(StorageFS *fs);
 
 /**
  * Deletes a directory. Note that the directory must not contain other
@@ -234,7 +265,7 @@ std::string current_dir();
  * @param dirname The name of the directory to be deleted.
  * @return TILEDB_UT_OK for success, and TILEDB_UT_ERR for error. 
  */
-int delete_dir(const std::string& dirname);
+int delete_dir(StorageFS *fs, const std::string& dirname);
 
 /**
  * Checks if the input is a special TileDB empty value.
@@ -272,16 +303,36 @@ void expand_mbr(T* mbr, const T* coords, int dim_num);
 /** 
  * Returns the size of the input file.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param filename The name of the file whose size is to be retrieved.
  * @return The file size on success, and TILEDB_UT_ERR for error.
  */
-off_t file_size(const std::string& filename);
+size_t file_size(StorageFS *fs, const std::string& filename);
 
-/** Returns the names of the directories inside the input directory. */
-std::vector<std::string> get_dirs(const std::string& dir);
+/** Returns the names of the directories inside the input directory.
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param dir The input directory.
+ * @return The vector of directories contained in the input directory.
+ */  
+std::vector<std::string> get_dirs(StorageFS *fs, const std::string& dir);
 
-/** Returns the names of the fragments inside the input directory. */
-std::vector<std::string> get_fragment_dirs(const std::string& dir);
+/** Returns the names of the files inside the input directory.
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param dir The input directory.
+ * @return The vector of directories contained in the input directory.
+ */
+std::vector<std::string> get_files(StorageFS *fs, const std::string& dir);
+
+/** Returns the names of the fragments inside the input directory.
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param dir The input directory.
+ * @return The vector of directories that are associated with fragments contained
+ *         in the input directory.
+ */
+std::vector<std::string> get_fragment_dirs(StorageFS *fs, const std::string& dir);
 
 /** 
  * Returns the MAC address of the machine as a 12-char string, e.g.,
@@ -361,10 +412,11 @@ bool intersect(const std::vector<T>& v1, const std::vector<T>& v2);
 /**
  * Checks if the input directory is an array.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The directory to be checked.
  * @return *true* if the directory is an array, and *false* otherwise.
  */
-bool is_array(const std::string& dir);
+bool is_array(StorageFS *fs, const std::string& dir);
 
 /**
  * Checks if one range is fully contained in another.
@@ -384,42 +436,47 @@ bool is_contained(
 /** 
  * Checks if the input is an existing directory. 
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The directory to be checked.
  * @return *true* if *dir* is an existing directory, and *false* otherwise.
  */ 
-bool is_dir(const std::string& dir);
+bool is_dir(StorageFS *fs, const std::string& dir);
 
 /** 
  * Checks if the input is an existing file. 
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param file The file to be checked.
  * @return tTrue* if *file* is an existing file, and *false* otherwise.
  */ 
-bool is_file(const std::string& file);
+bool is_file(StorageFS *fs, const std::string& file);
 
 /**
  * Checks if the input directory is a fragment.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The directory to be checked.
  * @return *true* if the directory is a fragment, and *false* otherwise.
  */
-bool is_fragment(const std::string& dir);
+bool is_fragment(StorageFS *fs, const std::string& dir);
 
 /**
  * Checks if the input directory is a group.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The directory to be checked.
  * @return *true* if the directory is a group, and *false* otherwise.
  */
-bool is_group(const std::string& dir);
+bool is_group(StorageFS *fs, const std::string& dir);
 
 /**
  * Checks if the input directory is a metadata object.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The directory to be checked.
  * @return *true* if the directory is a metadata object, and *false* otherwise.
  */
-bool is_metadata(const std::string& dir);
+bool is_metadata(StorageFS *fs, const std::string& dir);
 
 /** Returns *true* if the input string is a positive (>0) integer number. */
 bool is_positive_integer(const char* s);
@@ -431,10 +488,11 @@ bool is_unary_subarray(const T* subarray, int dim_num);
 /**
  * Checks if the input directory is a workspace.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The directory to be checked.
  * @return *true* if the directory is a workspace, and *false* otherwise.
  */
-bool is_workspace(const std::string& dir);
+bool is_workspace(StorageFS *fs, const std::string& dir);
 
 #ifdef HAVE_MPI
 /**
@@ -551,61 +609,54 @@ int mutex_unlock(pthread_mutex_t* mtx);
 /** 
  * Returns the parent directory of the input directory. 
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The input directory.
  * @return The parent directory of the input directory.
  */
-std::string parent_dir(const std::string& dir);
-
-/**
- * It takes as input an **absolute** path, and returns it in its canonicalized
- * form, after appropriately replacing "./" and "../" in the path.
- *
- * @param path The input path passed by reference, which will be modified
- *     by the function to hold the canonicalized absolute path. Note that the
- *     path must be absolute, otherwise the function fails. In case of error
- *     (e.g., if "../" are not properly used in *path*, or if *path* is not
- *     absolute), the function sets the empty string (i.e., "") to *path*.
- * @return void
- */
-void purge_dots_from_path(std::string& path);
+std::string parent_dir(StorageFS *fs, const std::string& dir);
 
 /**
  * Reads data from a file into a buffer.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param filename The name of the file.
  * @param offset The offset in the file from which the read will start.
  * @param buffer The buffer into which the data will be written.
  * @param length The size of the data to be read from the file.
  * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
  */
-int read_from_file(
+int read_from_file(StorageFS *fs,
     const std::string& filename,
     off_t offset,
     void* buffer,
     size_t length);
 
-/**
- * Reads data from a file into a buffer, using memory map (mmap).
+/*
+ * Reads an entire file into a buffer after decompressing. Memory is allocated by this
+ * routine and a pointer to the buffer and the buffer size are returned. It is the caller's
+ * responsibility to free the buffer when it is no longer needed.
  *
- * @param filename The name of the file
- * @param offset The offset in the file from which the read will start.
- * @param buffer The buffer into which the data will be written.
- * @param length The size of the data to be read from the file.
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param filename The name of the file.
+ * @param buffer Pointer to the allocated buffer for the decompressed data.
+ * @param length Pointer to the size of the buffer.
  * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
  */
-int read_from_file_with_mmap(
+int read_from_file_after_decompression(StorageFS *fs,
     const std::string& filename,
-    off_t offset,
-    void* buffer,
-    size_t length);
+    void** buffer,
+    size_t &buffer_size,
+    const int compression);
+
 
 /**
  * Returns the absolute canonicalized directory path of the input directory.
  *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param dir The input directory to be canonicalized.
  * @return The absolute canonicalized directory path of the input directory.
  */
-std::string real_dir(const std::string& dir);
+std::string real_dir(StorageFS *fs, const std::string& dir);
 
 /**
  * Compresses with RLE. 
@@ -766,24 +817,52 @@ bool starts_with(const std::string& value, const std::string& prefix);
 /** 
  * Syncs a file or directory. If the file/directory does not exist,
  * the function gracefully exits (i.e., it ignores the syncing).
- * 
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param filename The name of the file.
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
-int sync(const char* filename);
+int sync_path(StorageFS *fs, const std::string& path);
+
+/** 
+ * Closes any open file handles associated with a file. If the file does not exist,
+ * or if there are no open file handles it is a noop).
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param filename The name of the file.
+ * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
+ */
+int close_file(StorageFS *fs, const std::string& filename);
 
 /** 
  * Writes the input buffer to a file.
- * 
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
  * @param filename The name of the file.
  * @param buffer The input buffer.
  * @param buffer_size The size of the input buffer.
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
-int write_to_file(
-    const char* filename,
-    const void* buffer, 
-    size_t buffer_size);
+int write_to_file(StorageFS *fs,
+                  const std::string& filename,
+                  const void* buffer, 
+                  size_t buffer_size);
+
+/** 
+ * Writes the input buffer after compression to a file.
+ *
+ * @param fs The storage filesystem type in use. e.g. posix, hdfs, etc.
+ * @param filename The name of the file.
+ * @param buffer The input buffer.
+ * @param buffer_size The size of the input buffer.
+ * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
+ */
+int write_to_file_after_compression(StorageFS *fs,
+                                    const std::string& filename,
+                                    const void* buffer,
+                                    size_t buffer_size,
+                                    const int compression);
+
 
 /** 
  * Write the input buffer to a file, compressed with GZIP.
@@ -793,18 +872,29 @@ int write_to_file(
  * @param buffer_size The size of the input buffer.
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
+/* TODO: Dead Code
 int write_to_file_cmp_gzip(
     const char* filename,
     const void* buffer, 
     size_t buffer_size);
-
+*/
 
 /**
  * Delete directories
+ *
  * @param vector of directory paths
  * @return TILEDB_UT_OK on success, and TILEDB_UT_ERR on error.
  */
-int delete_directories(const std::vector<std::string>& directories);
+int delete_directories(StorageFS *fs, const std::vector<std::string>& directories);
+
+/**
+ * Move(Rename) Path.
+ *
+ * @param original path to be moved
+ * @param name of new path
+ * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
+ */
+int move_path(StorageFS *fs, const std::string& old_path, const std::string& new_path);
 
 /*
  * Return the TileDB empty value for the datatype

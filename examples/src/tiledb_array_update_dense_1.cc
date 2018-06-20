@@ -33,10 +33,17 @@
 
 #include "tiledb.h"
 
-int main() {
-  // Initialize context with the default configuration parameters
+int main(int argc, char *argv[]) {
+  // Initialize context with home dir if specified in command line, else
+  // initialize with the default configuration parameters
   TileDB_CTX* tiledb_ctx;
-  tiledb_ctx_init(&tiledb_ctx, NULL);
+  if (argc > 1) {
+    TileDB_Config tiledb_config;
+    tiledb_config.home_ = argv[1];
+    tiledb_ctx_init(&tiledb_ctx, &tiledb_config);
+  } else {
+    tiledb_ctx_init(&tiledb_ctx, NULL);
+  }
 
   int64_t subarray[] = { 3, 4, 3, 4 };
 

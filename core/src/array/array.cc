@@ -406,7 +406,7 @@ int Array::consolidate(
   // Consolidate on a per-attribute basis
   for(int i=0; i<array_schema_->attribute_num()+1; ++i) {
     if(consolidate(new_fragment, i) != TILEDB_AR_OK) {
-      delete_dir(new_fragment->fragment_name());
+      delete_dir(config_->get_filesystem(), new_fragment->fragment_name());
       delete new_fragment;
       return TILEDB_AR_ERR;
     }
@@ -420,7 +420,7 @@ int Array::consolidate(
   // Success
   return TILEDB_AR_OK;
 }
-
+    
 int Array::consolidate(
     Fragment* new_fragment,
     int attribute_id) {
@@ -438,6 +438,10 @@ int Array::consolidate(
   // Count the number of variable attributes
   int var_attribute_num = array_schema_->var_attribute_num();
 
+  // Cache the buffer indices associated with the attribute
+  int buffer_index = -1;
+  int buffer_var_index = -1;
+
   // Populate the buffers
   int buffer_num = attribute_num + 1 + var_attribute_num;
   buffers = (void**) malloc(buffer_num * sizeof(void*));
@@ -446,11 +450,11 @@ int Array::consolidate(
   for(int i=0; i<attribute_num+1; ++i) {
     if(i == attribute_id) {
       buffers[buffer_i] = malloc(TILEDB_CONSOLIDATION_BUFFER_SIZE);
-      buffer_sizes[buffer_i] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+      buffer_index = buffer_i;
       ++buffer_i;
       if(array_schema_->var_size(i)) {
         buffers[buffer_i] = malloc(TILEDB_CONSOLIDATION_BUFFER_SIZE);
-        buffer_sizes[buffer_i] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+        buffer_var_index = buffer_i;
         ++buffer_i;
       }
     } else {
@@ -469,6 +473,12 @@ int Array::consolidate(
   int rc_write = TILEDB_FG_OK; 
   int rc_read = TILEDB_FG_OK; 
   do {
+    // Set or reset buffer sizes as they are modified by the reads
+    buffer_sizes[buffer_index] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+    if (buffer_var_index != -1) {
+      buffer_sizes[buffer_var_index] = TILEDB_CONSOLIDATION_BUFFER_SIZE;
+    }
+    
     // Read
     rc_read = read(buffers, buffer_sizes);
     if(rc_read != TILEDB_FG_OK)
@@ -653,7 +663,7 @@ int Array::init(
     if(sparse                   && 
        array_clone == NULL      && 
        !coords_found            && 
-       !is_metadata(get_array_path_used()))
+       !is_metadata(config_->get_filesystem(), get_array_path_used()))
       attributes_vec.push_back(TILEDB_COORDS);
   }
 
@@ -1279,14 +1289,17 @@ std::string Array::new_fragment_name() const {
   std::string mac = uuid_str;
 #endif
 
-  // Generate fragment name
-  int n = sprintf(
-              fragment_name, 
-              "%s/.__%s%" PRIu64"_%" PRIu64,
-              get_array_path_used().c_str(),
-              mac.c_str(),
-              tid, 
-              ms);
+  // Generate fragment name. Note that the cloud based filesystems have
+  // fragment names generated "in-place", there will be no rename associated
+  // with those fragments.
+  int n;
+  if (is_hdfs_path(get_array_path_used()) || is_gcs_path(get_array_path_used())) {
+    n = sprintf(fragment_name, "%s/__%s%" PRIu64"_%" PRIu64,
+              get_array_path_used().c_str(), mac.c_str(), tid, ms);  
+  } else {
+      n = sprintf(fragment_name, "%s/.__%s%" PRIu64"_%" PRIu64,
+          get_array_path_used().c_str(), mac.c_str(), tid, ms);
+  }
 
   // Handle error
   if(n<0) 

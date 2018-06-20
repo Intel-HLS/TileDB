@@ -38,8 +38,30 @@
 #endif
 #include <string>
 
+#include "storage_fs.h"
+#include "storage_posixfs.h"
+#include "storage_hdfs.h"
+#include "storage_gcs.h"
 
+/* ********************************* */
+/*             CONSTANTS             */
+/* ********************************* */
 
+/**@{*/
+/** Return code. */
+#define TILEDB_SMC_OK                                                  0
+#define TILEDB_SMC_ERR                                                -1
+/**@}*/
+
+/** Default error message. */
+#define TILEDB_SMC_ERRMSG std::string("[TileDB::StorageManagerConfig] Error: ")
+
+/* ********************************* */
+/*          GLOBAL VARIABLES         */
+/* ********************************* */
+
+/** Stores potential error messages. */
+extern std::string tiledb_smc_errmsg;
 
 /** 
  * This class is responsible for the TileDB storage manager configuration 
@@ -86,7 +108,7 @@ class StorageManagerConfig {
    *          TileDB will use MPI-IO write.
    * @return void. 
    */
-  void init(
+  int init(
       const char* home,
       MPI_Comm* mpi_comm,
       int read_method,
@@ -112,7 +134,7 @@ class StorageManagerConfig {
    *          TileDB will use MPI-IO write.
    * @return void. 
    */
-  void init(
+  int init(
       const char* home,
       int read_method,
       int write_method);
@@ -136,6 +158,9 @@ class StorageManagerConfig {
   /** Returns the write method. */
   int write_method() const;
 
+  /** Returns the supporting filesystem */
+  StorageFS* get_filesystem() const;
+  
  private:
   /* ********************************* */
   /*        PRIVATE ATTRIBUTES         */
@@ -167,6 +192,9 @@ class StorageManagerConfig {
    *      TileDB will use MPI-IO write. 
    */
   int write_method_;
+
+  /** The Filesystem type associated with this configuration */
+  StorageFS *fs_ = NULL;
 };
 
 #endif
