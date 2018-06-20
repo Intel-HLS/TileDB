@@ -31,8 +31,6 @@
 
 #include "storage_fs.h"
 
-#include <assert.h>
-
 /* ****************************** */
 /*        GLOBAL VARIABLES        */
 /* ****************************** */
@@ -41,66 +39,6 @@ std::string tiledb_fs_errmsg = "";
 
 StorageFS::~StorageFS() {
   // Default
-}
-
-std::string StorageFS::current_dir() {
-  assert(false && "Implement in derived class");
-}
-
-bool StorageFS::is_dir(const std::string& dir) {
-  assert(false && "Implement in derived class");
-}
-
-bool StorageFS::is_file(const std::string& file) {
-  assert(false && "Implement in derived class");
-}
-
-std::string StorageFS::real_dir(const std::string& dir) {
-  assert(false && "Implement in derived class");
-}
-  
-int StorageFS::create_dir(const std::string& dir) {
-  assert(false && "Implement in derived class");
-}
-
-int StorageFS::delete_dir(const std::string& dir) {
-  assert(false && "Implement in derived class");
-}
-
-std::vector<std::string> StorageFS::get_dirs(const std::string& dir) {
-  assert(false && "Implement in derived class");
-}
-    
-std::vector<std::string> StorageFS::get_files(const std::string& dir) {
-  assert(false && "Implement in derived class");
-}
-
-int StorageFS::create_file(const std::string& filename, int flags, mode_t mode) {
-  assert(false && "Implement in derived class");
-}
-
-int StorageFS::delete_file(const std::string& filename) {
-  assert(false && "Implement in derived class");
-}
-
-size_t StorageFS::file_size(const std::string& filename) {
-  assert(false && "Implement in derived class");
-}
-
-int StorageFS::read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) {
-  assert(false && "Implement in derived class");
-}
-
-int StorageFS::write_to_file(const std::string& filename, const void *buffer, size_t buffer_size) {
-  assert(false && "Implement in derived class");
-}
-
-int StorageFS::move_path(const std::string& old_path, const std::string& new_path) {
-  assert(false && "Implement in derived class");
-}
-    
-int StorageFS::sync_path(const std::string& path) {
-  assert(false && "Implement in derived class");
 }
 
 int StorageFS::close_file(const std::string& filename) {

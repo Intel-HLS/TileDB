@@ -234,11 +234,7 @@ int cmp_row_order(
 
 bool is_gcs_path(const std::string& pathURL) {
   if (!pathURL.empty() && starts_with(pathURL, "gs:")) {
-#ifdef USE_HDFS
     return true;
-#else
-    assert(false && "GCS functionality not enabled in TileDB, build with -DUSE_HDFS=1");
-#endif
   } else {
     return false;
  }
@@ -246,11 +242,7 @@ bool is_gcs_path(const std::string& pathURL) {
 
 bool is_hdfs_path(const std::string& pathURL) {
   if (!pathURL.empty() && (starts_with(pathURL, "hdfs:") || starts_with(pathURL, "s3:"))) {
-#ifdef USE_HDFS
     return true;
-#else
-    assert(false && "HDFS functionality not enabled in TileDB, build with -DUSE_HDFS=1");
-#endif
   } else {
     return false;
   }

@@ -5,6 +5,8 @@
  *
  * The MIT License
  *
+ * @copyright Copyright (c) 2018 Omics Data Automation Inc. and Intel Corporation
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -34,6 +36,7 @@
 
 #include <string>
 #include <vector>
+#include <sys/stat.h>
 
 /**@{*/
 /** Return code. */
@@ -56,29 +59,29 @@ class StorageFS {
  public:
   virtual ~StorageFS();
 
-  virtual std::string current_dir();
+  virtual std::string current_dir() = 0;
   
-  virtual bool is_dir(const std::string& dir);
-  virtual bool is_file(const std::string& file);
-  virtual std::string real_dir(const std::string& dir);
+  virtual bool is_dir(const std::string& dir) = 0;
+  virtual bool is_file(const std::string& file) = 0;
+  virtual std::string real_dir(const std::string& dir) = 0;
   
-  virtual int create_dir(const std::string& dir);
-  virtual int delete_dir(const std::string& dir);
+  virtual int create_dir(const std::string& dir) = 0;
+  virtual int delete_dir(const std::string& dir) = 0;
 
-  virtual std::vector<std::string> get_dirs(const std::string& dir);
-  virtual std::vector<std::string> get_files(const std::string& dir);    
+  virtual std::vector<std::string> get_dirs(const std::string& dir) = 0;
+  virtual std::vector<std::string> get_files(const std::string& dir) = 0;
 
-  virtual int create_file(const std::string& filename, int flags, mode_t mode);
-  virtual int delete_file(const std::string& filename);
+  virtual int create_file(const std::string& filename, int flags, mode_t mode) = 0;
+  virtual int delete_file(const std::string& filename) = 0;
 
-  virtual size_t file_size(const std::string& filename);
+  virtual size_t file_size(const std::string& filename) = 0;
 
-  virtual int read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length);
-  virtual int write_to_file(const std::string& filename, const void *buffer, size_t buffer_size);
+  virtual int read_from_file(const std::string& filename, off_t offset, void *buffer, size_t length) = 0;
+  virtual int write_to_file(const std::string& filename, const void *buffer, size_t buffer_size) = 0;
 
-  virtual int move_path(const std::string& old_path, const std::string& new_path);
+  virtual int move_path(const std::string& old_path, const std::string& new_path) = 0;
     
-  virtual int sync_path(const std::string& path);
+  virtual int sync_path(const std::string& path) = 0;
 
   virtual int close_file(const std::string& filename);
 

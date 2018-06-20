@@ -31,11 +31,12 @@
  */
 
 #include "url.h"
-#include <assert.h>
+#include <stdint.h>
 #include <string>
 #include <algorithm>
 #include <cctype>
 #include <functional>
+#include <system_error>
 
 using namespace std;
 
@@ -73,7 +74,7 @@ std::string url::query() {
 void url::parse(const string& url_s)
 {
   if (url_s.empty()) {
-    return;
+    throw system_error(EINVAL, std::generic_category(), "Cannot parse empty string as an URL");
   }
   
   const string::const_iterator start_iter = url_s.begin();
@@ -81,6 +82,9 @@ void url::parse(const string& url_s)
   
   const string protocol_end("://");
   string::const_iterator protocol_iter = search(start_iter, end_iter, protocol_end.begin(), protocol_end.end());
+  if (protocol_iter == url_s.end()) {
+    throw system_error(EINVAL, std::generic_category(), "String does not seem to be a URL");
+  }
 
   // protocol is case insensitive
   protocol_.reserve(distance(start_iter, protocol_iter));
@@ -105,8 +109,11 @@ void url::parse(const string& url_s)
     // Convert port into int16_t
     const char *start_ptr = port_.c_str();
     char *end_ptr;
+    errno = 0;
     long port_val = strtol(start_ptr, &end_ptr, 10);
-    assert(errno != ERANGE && (port_val < 0x10000));
+    if (errno == ERANGE || port_val > UINT16_MAX){
+      throw system_error(ERANGE, std::generic_category(), "URL has a bad port #");
+    }
     if (start_ptr != end_ptr) {
       nport_ = (uint16_t)port_val;
     }
