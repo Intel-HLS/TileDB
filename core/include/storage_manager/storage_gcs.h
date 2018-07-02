@@ -32,7 +32,7 @@
 #ifndef __STORAGE_GCS_H__
 #define  __STORAGE_GCS_H__
 
-#include "cloud_storage_prototypes.h"
+#include "hdfs.h"
 #include "tiledb_constants.h"
 
 #include <string>

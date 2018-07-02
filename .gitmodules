@@ -1,3 +1,6 @@
 [submodule "deps/muparserx"]
 	path = deps/muparserx
 	url = https://github.com/beltoforion/muparserx.git
+[submodule "deps/HDFSWrapper"]
+	path = deps/HDFSWrapper
+	url = https://github.com/omicsdataautomation/HDFSWrapper.git

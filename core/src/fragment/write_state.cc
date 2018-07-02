@@ -515,7 +515,7 @@ int WriteState::write_segment(int attribute_id, bool is_var, const void *segment
     } */
 
   // Write_segment directly
-  int rc;
+  int rc = TILEDB_OK;
   int write_method = array_->config()->write_method();
   if(write_method == TILEDB_IO_WRITE) {
     rc = write_to_file(fs_, filename.c_str(), segment, length);

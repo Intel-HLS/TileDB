@@ -37,7 +37,7 @@
 #include "storage_fs.h"
 #include "storage_gcs.h"
 
-#include "cloud_storage_prototypes.h"
+#include "hdfs.h"
 #include "tiledb_constants.h"
 
 #include <mutex>

@@ -48,6 +48,7 @@ endif()
 # Only for Mac OS X warnings
 if(APPLE)
   set(CMAKE_MACOSX_RPATH 1)
+  set(CMAKE_FIND_FRAMEWORK NEVER)
 endif()
 
 # Default user definitions
@@ -121,8 +122,11 @@ endif()
 set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} pthread)
 
 # Add HDFS support
-add_definitions(-DUSE_HDFS)
-set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${CMAKE_DL_LIBS})
+set(HDFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/HDFSWrapper/hadoop-hdfs-native")
+find_package(HDFS REQUIRED)
+include_directories(${HDFS_INCLUDE_DIR})
+set_source_files_properties(${HDFS_OBJS} PROPERTIES GENERATED TRUE)
+set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${JAVA_JVM_LIBRARY} ${CMAKE_DL_LIBS})
 
 # Set C++ 2011 flag
 include(SetCXX2011Flag)
