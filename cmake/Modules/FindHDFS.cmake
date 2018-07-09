@@ -30,6 +30,8 @@ set(HDFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/HDFSWrapper/hadoop-hdfs-native")
 
 include(ExternalProject)
 
+find_package(JNI REQUIRED)
+
 ExternalProject_Add(
   HDFS
   DOWNLOAD_COMMAND ""
@@ -50,8 +52,6 @@ list(APPEND HDFS_OBJS
   ${HDFS_OBJECTS_DIR}/jni_helper.c.o
   ${HDFS_OBJECTS_DIR}/hdfs.c.o
   )
-
-find_package(JNI REQUIRED)
 
 include(FindPackageHandleStandardArgs)
 
