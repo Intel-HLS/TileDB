@@ -30,6 +30,8 @@
  * HDFS Support for StorageFS
  */
 
+#ifdef USE_HDFS
+
 #include "storage_hdfs.h"
 
 #include "url.h"
@@ -578,3 +580,4 @@ bool HDFS::locking_support() {
   return false;
 }
 
+#endif /* USE_HDFS */

@@ -26,6 +26,8 @@
 
 # Build as external project
 
+set(HDFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/HDFSWrapper/hadoop-hdfs-native")
+
 include(ExternalProject)
 
 ExternalProject_Add(

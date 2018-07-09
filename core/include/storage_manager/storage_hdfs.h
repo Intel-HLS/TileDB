@@ -34,6 +34,8 @@
 #ifndef __STORAGE_HDFS_H__
 #define  __STORAGE_HDFS_H__
 
+#ifdef USE_HDFS
+
 #include "storage_fs.h"
 #include "storage_gcs.h"
 
@@ -83,5 +85,6 @@ class HDFS : public StorageFS {
   std::unordered_map<std::string, int> read_count_;
 };
 
-#endif /* __STORAGE_HDFS_H__ */
+#endif /* USE_HDFS */
 
+#endif /* __STORAGE_HDFS_H__ */

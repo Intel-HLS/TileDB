@@ -28,6 +28,8 @@
  * GCS Support for StorageFS
  */
 
+#ifdef USE_HDFS
+
 #include "storage_gcs.h"
 #include "storage_posixfs.h"
 
@@ -138,4 +140,4 @@ hdfsFS gcs_connect(struct hdfsBuilder *builder, const std::string& working_dir) 
   return hdfs_handle;
 }
 
-
+#endif /* USE_HDFS */
