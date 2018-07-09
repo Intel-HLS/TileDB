@@ -35,13 +35,16 @@ file(GLOB_RECURSE TILEDB_CORE_SOURCES "src/*.cc")
 # Compile sources with PIC
 add_library(TILEDB_CORE_OBJECTS OBJECT ${TILEDB_CORE_SOURCES})
 set_property(TARGET TILEDB_CORE_OBJECTS PROPERTY POSITION_INDEPENDENT_CODE ON)
+add_dependencies(TILEDB_CORE_OBJECTS HDFS)
+
+set_source_files_properties(${HDFS_OBJS} PROPERTIES GENERATED TRUE)
 
 # Create static library
-add_library(tiledb_static STATIC $<TARGET_OBJECTS:TILEDB_CORE_OBJECTS>)
+add_library(tiledb_static STATIC $<TARGET_OBJECTS:TILEDB_CORE_OBJECTS> ${HDFS_OBJS})
 set_target_properties(tiledb_static PROPERTIES OUTPUT_NAME "tiledb")
 
 # Create dynamic library
-add_library(tiledb_shared SHARED $<TARGET_OBJECTS:TILEDB_CORE_OBJECTS>)
+add_library(tiledb_shared SHARED $<TARGET_OBJECTS:TILEDB_CORE_OBJECTS> ${HDFS_OBJS})
 set_target_properties(tiledb_shared PROPERTIES OUTPUT_NAME "tiledb")
 target_link_libraries(tiledb_shared ${TILEDB_LIB_DEPENDENCIES})
 

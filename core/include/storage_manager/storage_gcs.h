@@ -32,12 +32,16 @@
 #ifndef __STORAGE_GCS_H__
 #define  __STORAGE_GCS_H__
 
-#include "cloud_storage_prototypes.h"
+#ifdef USE_HDFS
+
+#include "hdfs.h"
 #include "tiledb_constants.h"
 
 #include <string>
 
 hdfsFS gcs_connect(struct hdfsBuilder *builder, const std::string& working_dir);
+
+#endif /* USE_HDFS */
 
 #endif /* __STORAGE_GCS_H__ */
 

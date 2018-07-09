@@ -30,6 +30,8 @@
  * HDFS Support for StorageFS
  */
 
+#ifdef USE_HDFS
+
 #include "storage_hdfs.h"
 
 #include "url.h"
@@ -125,10 +127,6 @@ HDFS::HDFS(const std::string& home) {
       throw std::system_error(EPROTONOSUPPORT, std::generic_category(), "Home URL not supported: hdfs host and port have to be specified together");
     }
     name_node.assign(path_url.host());
-  }
-
-  if (load_hdfs_library()) {
-    throw std::system_error(ELIBACC, std::generic_category(), "libhdfs could not be loaded");
   }
 
   hdfs_handle_ = hdfs_connect(path_url, name_node);
@@ -418,26 +416,8 @@ static int read_from_file_kernel(hdfsFS hdfs_handle, hdfsFile file, void* buffer
   return TILEDB_FS_OK;
 }
 
-static hdfsFile filtered_hdfs_open_file_for_read(hdfsFS hdfs_handle, const std::string& filename, size_t buffer_size) {
-  // Workaround for error messages of the type -
-  // readDirect: FSDataInputStream#read error:
-  // java.lang.UnsupportedOperationException: Byte-buffer read unsupported by input stream
-  //	at org.apache.hadoop.fs.FSDataInputStream.read(FSDataInputStream.java:146)
-  // This practically litters the output!!
-  int old_fd, new_fd;
-  fflush(stderr);
-  old_fd = dup(2);
-  new_fd = open("/dev/null", O_WRONLY);
-  dup2(new_fd, 2);
-  close(new_fd);
-  
-  hdfsFile file = hdfsOpenFile(hdfs_handle, filename.c_str(), O_RDONLY, buffer_size, 0, 0);
-  
-  fflush(stderr);
-  dup2(old_fd, 2);
-  close(old_fd);
-
-  return file;
+static hdfsFile hdfs_open_file_for_read(hdfsFS hdfs_handle, const std::string& filename, size_t buffer_size) {
+  return hdfsOpenFile(hdfs_handle, filename.c_str(), O_RDONLY, buffer_size, 0, 0);
 }
 
 // heuristic for io.file.buffer.size for good hdfs performance
@@ -476,7 +456,7 @@ int HDFS::read_from_file(const std::string& filename, off_t offset, void *buffer
   read_map_mtx_.lock();
   file = get_hdfsFile(filename, read_map_);
   if (!file) {
-    file = filtered_hdfs_open_file_for_read(hdfs_handle_, filename, size>MAX_SIZE?MAX_SIZE:((size/getpagesize())+1)*getpagesize());
+    file = hdfs_open_file_for_read(hdfs_handle_, filename, size>MAX_SIZE?MAX_SIZE:((size/getpagesize())+1)*getpagesize());
     if (file) {
       read_map_.emplace(filename, file);
     }
@@ -600,3 +580,4 @@ bool HDFS::locking_support() {
   return false;
 }
 
+#endif /* USE_HDFS */

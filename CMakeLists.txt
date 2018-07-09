@@ -48,6 +48,7 @@ endif()
 # Only for Mac OS X warnings
 if(APPLE)
   set(CMAKE_MACOSX_RPATH 1)
+  set(CMAKE_FIND_FRAMEWORK NEVER CACHE STRING "Never try to find frameworks on Mac OS X")
 endif()
 
 # Default user definitions
@@ -63,6 +64,7 @@ set(MAC_ADDRESS_INTERFACE ""
     CACHE STRING "The interface carrying the MAC address of the machine."
 )
 set(USE_PARALLEL_SORT False CACHE BOOL "Enables parallel sorting.")
+set(USE_HDFS True CACHE BOOL "Enables HDFS support")
 set(GTEST_FILTER "*" CACHE STRING "Filters for the Google unit tests.")
 set(COMPRESSION_LEVEL_GZIP "" CACHE STRING "Compression level for GZIP.")
 set(COMPRESSION_LEVEL_ZSTD "" CACHE STRING "Compression level for Zstandard.")
@@ -121,8 +123,12 @@ endif()
 set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} pthread)
 
 # Add HDFS support
-add_definitions(-DUSE_HDFS)
-set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${CMAKE_DL_LIBS})
+if(USE_HDFS)
+  find_package(HDFS REQUIRED)
+  include_directories(${HDFS_INCLUDE_DIR})
+  set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${JAVA_JVM_LIBRARY} ${CMAKE_DL_LIBS})
+  add_definitions(-DUSE_HDFS)
+endif()
 
 # Set C++ 2011 flag
 include(SetCXX2011Flag)

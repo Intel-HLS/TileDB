@@ -92,7 +92,11 @@ int StorageManagerConfig::init(
      home_ = std::string(home, strlen(home));
      if (is_hdfs_path(home) || is_gcs_path(home)) {
        try {
+#ifdef USE_HDFS
 	 fs_ = new HDFS(home_);
+#else
+	 throw std::system_error(EPROTONOSUPPORT, std::generic_category(), "TileDB built with HDFS support disabled.");
+#endif
        } catch(std::system_error& ex) {
 	 PRINT_ERROR(ex.what());
 	 tiledb_smc_errmsg = "HDFS intialization failed for home=" + home_;
