@@ -47,6 +47,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#ifdef __APPLE__
+#if !defined(ELIBACC)
+#define ELIBACC -1
+#endif
+#endif
+
 #ifdef TILEDB_VERBOSE
 #  define PRINT_ERROR(x) std::cerr << TILEDB_FS_ERRMSG << "hdfs: " << x << std::endl
 #else
