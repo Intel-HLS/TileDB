@@ -35,9 +35,9 @@
 #include "tiledb_utils.h"
 #include "tiledb_storage.h"
 
+#include <stdlib.h>
 #include <cstring>
 #include <fcntl.h>
-
 #include <trace.h>
 
 namespace TileDBUtils {
@@ -281,7 +281,7 @@ int create_temp_filename(char *path, size_t path_length) {
   }
   char tmp_filename_pattern[64];
   sprintf(tmp_filename_pattern, "%s/TileDBXXXXXX", tmp_dir);
-  int tmp_fd = mkostemp(tmp_filename_pattern, O_APPEND|O_CLOEXEC|O_SYNC);
+  int tmp_fd = mkstemp(tmp_filename_pattern);
   char tmp_proc_lnk[64];
   sprintf(tmp_proc_lnk, "/proc/self/fd/%d", tmp_fd);
   if (readlink(tmp_proc_lnk, path, path_length-1) < 0) {
