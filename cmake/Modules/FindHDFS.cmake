@@ -23,36 +23,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-
-# Build as external project
-
-set(HDFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/HDFSWrapper/hadoop-hdfs-native")
-
-include(ExternalProject)
-
+if(CMAKE_CROSSCOMPILING)
+    set(JAVA_HOME ${TARGET_JAVA_HOME})
+    set(ENV{JAVA_HOME} ${TARGET_JAVA_HOME})
+endif()
 find_package(JNI REQUIRED)
-
-ExternalProject_Add(
-  HDFS
-  DOWNLOAD_COMMAND ""
-  SOURCE_DIR ${HDFS_SOURCE_DIR}
-  STEP_TARGETS build
-  EXCLUDE_FROM_ALL TRUE
-  )
-
-ExternalProject_Get_Property(HDFS BINARY_DIR)
-set(HDFS_OBJECTS_DIR ${BINARY_DIR}/hdfs_objs)
+if(CMAKE_CROSSCOMPILING)
+    unset(JAVA_HOME)
+    unset(ENV{JAVA_HOME})
+endif()
 
 find_path(HDFS_INCLUDE_DIR hdfs.h HINTS ${HDFS_SOURCE_DIR}/main/native/libhdfs)
-list(APPEND HDFS_OBJS 
-  ${HDFS_OBJECTS_DIR}/htable.c.o
-  ${HDFS_OBJECTS_DIR}/mutexes.c.o
-  ${HDFS_OBJECTS_DIR}/thread_local_storage.c.o
-  ${HDFS_OBJECTS_DIR}/exception.c.o
-  ${HDFS_OBJECTS_DIR}/jni_helper.c.o
-  ${HDFS_OBJECTS_DIR}/hdfs.c.o
-  )
-
 include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(HDFS "Could not find HDFS headers ${DEFAULT_MSG}" HDFS_INCLUDE_DIR)
 
+include_directories(${HDFS_INCLUDE_DIR})
+add_definitions(-DUSE_HDFS)
 
+add_subdirectory(${HDFS_SOURCE_DIR} EXCLUDE_FROM_ALL)

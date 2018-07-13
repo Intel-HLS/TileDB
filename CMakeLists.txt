@@ -27,6 +27,7 @@
 
 project(TileDB)
 cmake_minimum_required(VERSION 2.8)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules")
 
 set(ENABLE_LZ4 False CACHE BOOL "Enable lz4 compression")
 set(ENABLE_BLOSC False CACHE BOOL "Enable lz4 compression")
@@ -34,20 +35,11 @@ set(ENABLE_ZSTD False CACHE BOOL "Enable lz4 compression")
 set(ENABLE_MUPARSERX_EXPRESSIONS False CACHE BOOL "Enable MuparserX expression parsing")
 set(LIBUUID_DIR "" CACHE PATH "Path to libuuid install directory")
 set(ENABLE_MASTER_CATALOG True CACHE BOOL "Enable master catalog")
-
-# Set the cmake Module path
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
-
-# Set shared library suffix
-if(APPLE)
-  set(SHARED_LIB_SUFFIX ".dylib")
-else()
-  set(SHARED_LIB_SUFFIX ".so")
-endif()
+set(HDFS_SOURCE_DIR "deps/HDFSWrapper/hadoop-hdfs-native" CACHE PATH "Path to modified libhdfs source dir")
 
 # Only for Mac OS X warnings
 if(APPLE)
-  set(CMAKE_MACOSX_RPATH 1)
+  set(CMAKE_MACOSX_RPATH True CACHE BOOL "Set rpath on OSX")
   set(CMAKE_FIND_FRAMEWORK NEVER CACHE STRING "Never try to find frameworks on Mac OS X")
 endif()
 
@@ -119,15 +111,17 @@ if(USE_OPENMP AND NOT APPLE)
   find_package(OpenMP REQUIRED)
 endif()
 
-# Add pthread library to dependencies
-set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} pthread)
-
 # Add HDFS support
 if(USE_HDFS)
   find_package(HDFS REQUIRED)
-  include_directories(${HDFS_INCLUDE_DIR})
-  set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${JAVA_JVM_LIBRARY} ${CMAKE_DL_LIBS})
-  add_definitions(-DUSE_HDFS)
+  set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${JAVA_JVM_LIBRARY})
+endif()
+
+#Add pthreads as a dependency
+set(CMAKE_THREAD_PREFER_PTHREAD True)
+find_package(Threads REQUIRED)
+if(DEFINED CMAKE_THREAD_LIBS_INIT AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_HP_PTHREADS_INIT))
+  set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 # Set C++ 2011 flag
@@ -148,9 +142,7 @@ set(CMAKE_CXX_FLAGS_COVERAGE "-DDEBUG -g3 -gdwarf-3 --coverage")
 if(NOT APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-literal-suffix")
 endif()
-if(USE_MPI)
-  set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-endif()
+
 if(USE_OPENMP AND NOT APPLE)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
@@ -207,9 +199,11 @@ add_subdirectory(core)
 # Build examples
 add_subdirectory(examples)
 
-# Build unit tests
-if(GTEST_FOUND)
-  add_subdirectory(test)
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    # Build unit tests
+    if(GTEST_FOUND)
+        add_subdirectory(test)
+    endif()
 endif()
 
 # Doxygen documentation
