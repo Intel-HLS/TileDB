@@ -23,8 +23,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-
+if(CMAKE_CROSSCOMPILING)
+    set(JAVA_HOME ${TARGET_JAVA_HOME})
+    set(ENV{JAVA_HOME} ${TARGET_JAVA_HOME})
+endif()
 find_package(JNI REQUIRED)
+if(CMAKE_CROSSCOMPILING)
+    unset(JAVA_HOME)
+    unset(ENV{JAVA_HOME})
+endif()
+
 find_path(HDFS_INCLUDE_DIR hdfs.h HINTS ${HDFS_SOURCE_DIR}/main/native/libhdfs)
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(HDFS "Could not find HDFS headers ${DEFAULT_MSG}" HDFS_INCLUDE_DIR)
