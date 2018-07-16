@@ -84,7 +84,8 @@ int StorageManagerConfig::init(
     MPI_Comm* mpi_comm,
 #endif
     int read_method,
-    int write_method) {
+    int write_method,
+    const bool disable_file_locking) {
   // Initialize home
   if (strstr(home, "://")) {
      if (fs_ != NULL)
@@ -139,6 +140,8 @@ int StorageManagerConfig::init(
   if(write_method_ != TILEDB_IO_WRITE &&
      write_method_ != TILEDB_IO_MPI)
     write_method_ = TILEDB_IO_WRITE;  // Use default 
+
+  fs_->set_disable_file_locking(disable_file_locking);
 
   return TILEDB_SMC_OK;
 }

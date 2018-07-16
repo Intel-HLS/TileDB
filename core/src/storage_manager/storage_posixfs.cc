@@ -483,5 +483,7 @@ int PosixFS::sync_path(const std::string& filename) {
 }
 
 bool PosixFS::locking_support() {
+  if(disable_file_locking())
+    return false;
   return true;
 }

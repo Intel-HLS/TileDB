@@ -30,6 +30,9 @@
  */
 
 #include "storage_fs.h"
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 
 /* ****************************** */
 /*        GLOBAL VARIABLES        */
@@ -46,5 +49,20 @@ int StorageFS::close_file(const std::string& filename) {
 }
 
 bool StorageFS::locking_support() {
+  return false;
+}
+
+void StorageFS::set_disable_file_locking(const bool val) {
+  disable_file_locking_ = val;
+}
+
+bool StorageFS::disable_file_locking() {
+  if(disable_file_locking_)
+    return true;
+  auto env_var = getenv("TILEDB_DISABLE_FILE_LOCKING");
+  if(env_var && (strcasecmp(env_var, "true") == 0 || strcmp(env_var, "1") == 0)) {
+    disable_file_locking_ = true;
+    return true;
+  }
   return false;
 }
