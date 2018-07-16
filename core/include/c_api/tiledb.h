@@ -118,6 +118,10 @@ typedef struct TileDB_Config {
    *      TileDB will use MPI-IO write. 
    */
   int write_method_;
+  /*
+   * Disables file locking even if the underlying storage system supports it
+   */
+  bool disable_file_locking_;
 } TileDB_Config; 
 
 

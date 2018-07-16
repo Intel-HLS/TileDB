@@ -121,7 +121,8 @@ int tiledb_ctx_init(
         tiledb_config->mpi_comm_, 
 #endif
         tiledb_config->read_method_, 
-        tiledb_config->write_method_) == TILEDB_SMC_ERR) {
+        tiledb_config->write_method_,
+        tiledb_config->disable_file_locking_) == TILEDB_SMC_ERR) {
       strcpy(tiledb_errmsg, tiledb_smc_errmsg.c_str());
       return TILEDB_ERR;
     }
