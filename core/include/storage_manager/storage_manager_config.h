@@ -106,13 +106,15 @@ class StorageManagerConfig {
    *          TileDB will use POSIX write.
    *        - TILEDB_IO_MPI
    *          TileDB will use MPI-IO write.
+   * @param disable_file_locking disable locks in POSIX fs if set
    * @return void. 
    */
   int init(
       const char* home,
       MPI_Comm* mpi_comm,
       int read_method,
-      int write_methods); 
+      int write_methods,
+      const bool disable_file_locking);
 #else
   /**
    * Initializes the configuration parameters.
@@ -132,12 +134,14 @@ class StorageManagerConfig {
    *          TileDB will use POSIX write.
    *        - TILEDB_IO_MPI
    *          TileDB will use MPI-IO write.
+   * @param disable_file_locking disable locks in POSIX fs if set
    * @return void. 
    */
   int init(
       const char* home,
       int read_method,
-      int write_method);
+      int write_method,
+      const bool disable_file_locking);
 #endif
  
   /* ********************************* */
@@ -192,6 +196,11 @@ class StorageManagerConfig {
    *      TileDB will use MPI-IO write. 
    */
   int write_method_;
+
+  /*
+   * Disable file locking even if the backend supports it
+   */
+  bool disable_file_locking_;
 
   /** The Filesystem type associated with this configuration */
   StorageFS *fs_ = NULL;

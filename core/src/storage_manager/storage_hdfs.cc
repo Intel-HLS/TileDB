@@ -579,6 +579,8 @@ int HDFS::close_file(const std::string& filename) {
 static bool done_printing_consolidation_support_message = false;
 
 bool HDFS::locking_support() {
+  if(disable_file_locking())
+    return false;
   if (!done_printing_consolidation_support_message) {
     print_errmsg("No file locking support for HDFS/GCS/EMRFS paths.");
     done_printing_consolidation_support_message = true;

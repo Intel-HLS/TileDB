@@ -86,6 +86,12 @@ class StorageFS {
   virtual int close_file(const std::string& filename);
 
   virtual bool locking_support();
+
+  void set_disable_file_locking(const bool val);
+
+  bool disable_file_locking();
+ private:
+  bool disable_file_locking_;
 };
 
 #endif /* __STORAGE_FS_H__ */
