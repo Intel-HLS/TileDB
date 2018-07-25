@@ -1580,14 +1580,17 @@ int tiledb_ls(
     int* dir_types,
     int* dir_num) {
   // Sanity check
-  if(!sanity_check(tiledb_ctx))
+  if(!sanity_check(tiledb_ctx)) {
+    *dir_num = 0;
     return TILEDB_ERR;
+  }
 
   // Check parent directory name length
   if(parent_dir == NULL || strlen(parent_dir) > TILEDB_NAME_MAX_LEN) {
     std::string errmsg = "Invalid parent directory name length";
     PRINT_ERROR(errmsg);
     strcpy(tiledb_errmsg, (TILEDB_ERRMSG + errmsg).c_str());
+    *dir_num = 0;
     return TILEDB_ERR;
   }
 

@@ -1243,6 +1243,7 @@ int StorageManager::ls(
         strerror(errno);
     PRINT_ERROR(errmsg);
     tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
+    dir_num = 0;
     return TILEDB_SM_ERR;
   }
 
