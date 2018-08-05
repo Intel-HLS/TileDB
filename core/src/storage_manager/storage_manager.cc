@@ -1195,6 +1195,7 @@ int StorageManager::ls(
             "Cannot list TileDB directory; Directory buffer overflow";
         PRINT_ERROR(errmsg);
         tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
+        closedir(dir);
         return TILEDB_SM_ERR;
       }
       strcpy(dirs[dir_i], next_file->d_name);
@@ -1206,6 +1207,7 @@ int StorageManager::ls(
             "Cannot list TileDB directory; Directory buffer overflow";
         PRINT_ERROR(errmsg);
         tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
+        closedir(dir);
         return TILEDB_SM_ERR;
       }
       strcpy(dirs[dir_i], next_file->d_name);
@@ -1217,6 +1219,7 @@ int StorageManager::ls(
             "Cannot list TileDB directory; Directory buffer overflow";
         PRINT_ERROR(errmsg);
         tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
+        closedir(dir);
         return TILEDB_SM_ERR;
       }
       strcpy(dirs[dir_i], next_file->d_name);
@@ -1228,6 +1231,7 @@ int StorageManager::ls(
             "Cannot list TileDB directory; Directory buffer overflow";
         PRINT_ERROR(errmsg);
         tiledb_sm_errmsg = TILEDB_SM_ERRMSG + errmsg;
+        closedir(dir);
         return TILEDB_SM_ERR;
       }
       strcpy(dirs[dir_i], next_file->d_name);
