@@ -631,11 +631,13 @@ class StorageManager {
    *
    * @param array The array name.
    * @param open_array The open array entry to be returned.
+   * @param flag that's set to true if this array is opened for the first time in this object
    * @return TILEDB_SM_OK for success and TILEDB_SM_ERR for error.
    */
   int array_get_open_array_entry(
       const std::string& array,
-      OpenArray*& open_array);
+      OpenArray*& open_array,
+      bool& opened_first_time);
 
   /**
    * Loads the book-keeping structures of all the fragments of an array from the
