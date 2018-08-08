@@ -1520,7 +1520,8 @@ int StorageManager::array_delete(
 
 int StorageManager::array_get_open_array_entry(
     const std::string& array,
-    OpenArray*& open_array) {
+    OpenArray*& open_array,
+    bool& opened_first_time) {
   // Lock mutexes
   if(open_array_mtx_lock() != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
@@ -1538,8 +1539,10 @@ int StorageManager::array_get_open_array_entry(
       return TILEDB_SM_ERR;
     }
     open_arrays_[array] = open_array; 
+    opened_first_time = true;
   } else {
     open_array = it->second;
+    opened_first_time = false;
   }
 
   // Increment counter
@@ -1624,8 +1627,10 @@ int StorageManager::array_open(
     const std::string& array_name, 
     OpenArray*& open_array,
     int mode) {
+  auto opened_first_time = false;
+
   // Get the open array entry
-  if(array_get_open_array_entry(array_name, open_array) != TILEDB_SM_OK)
+  if(array_get_open_array_entry(array_name, open_array, opened_first_time) != TILEDB_SM_OK)
     return TILEDB_SM_ERR;
 
   // Lock the mutex of the array
@@ -1633,7 +1638,7 @@ int StorageManager::array_open(
     return TILEDB_SM_ERR;
 
   // First time the array is opened
-  if(open_array->fragment_names_.size() == 0) {
+  if(opened_first_time) {
     // Acquire shared lock on consolidation filelock
     if(consolidation_filelock_lock(
         array_name,
