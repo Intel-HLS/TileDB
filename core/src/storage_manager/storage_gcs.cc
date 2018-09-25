@@ -139,9 +139,7 @@ hdfsFS gcs_connect(struct hdfsBuilder *builder, const std::string& working_dir) 
   hdfsBuilderConfSetStr(builder, "fs.gs.io.buffersize.write", "262144");
     
   hdfsFS hdfs_handle = hdfsBuilderConnect(builder);
-  if (value) {
-    free(value);
-  }
+  free(value);
   return hdfs_handle;
 }
 
