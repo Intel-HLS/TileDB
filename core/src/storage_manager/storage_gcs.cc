@@ -110,17 +110,20 @@ char *parse_json(char *filename, const char *key) {
   return NULL;
 }
 
-thread_local char *value = NULL;
-
 #define GCS_PREFIX "gs://"
 
 hdfsFS gcs_connect(struct hdfsBuilder *builder, const std::string& working_dir) {
+  // TODO: Remove the PRINT_ERROR statements after debugging
+  PRINT_ERROR("TileDB gcs_connect start : working_dir=" + working_dir);
   char *gcs_creds = getenv("GOOGLE_APPLICATION_CREDENTIALS");
+  char *value = NULL;
   if (gcs_creds) {
+    PRINT_ERROR("gcs_connect gcs_credentials found");
+    hdfsBuilderConfSetStr(builder, "google.cloud.auth.service.account.enable", "true");
+    hdfsBuilderConfSetStr(builder, "google.cloud.auth.service.account.json.keyfile", gcs_creds);
     value = parse_json(gcs_creds, "project_id"); // free value after hdfsBuilderConnect as it is shallow copied.
     if (value) {
-      hdfsBuilderConfSetStr(builder, "google.cloud.auth.service.account.enable", "true");
-      hdfsBuilderConfSetStr(builder, "google.cloud.auth.service.account.json.keyfile", gcs_creds);
+      PRINT_ERROR("gcs_connect project_id found");
       hdfsBuilderConfSetStr(builder, "fs.gs.project.id", value);
     }
   }
